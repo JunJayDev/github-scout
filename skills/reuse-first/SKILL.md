@@ -71,8 +71,9 @@ are often inflated. Awesome lists are printed on a separate line.
 - Expand promising awesome lists: `expand <need> <owner/list>` keeps only links that match the vocabulary.
 
 **4. Triage on metadata.** `triage <need> --short 1 4 7 --list 12 --rest "<reason>"`. Choose
-by fit and description, not by stars. Every row you don't shortlist is recorded as skipped,
-with your reason, so nobody re-reads it. A skipped repo comes back only if its stars at least
+by fit and description, not by stars. Every row you were shown and didn't shortlist is recorded
+as skipped, with your reason, so nobody re-reads it; rows below the top 40 stay open and move up
+in the next `results`. A skipped repo comes back only if its stars at least
 double. Add your own reason to one row with `--skip 9="tutorial, no code"`.
 
 **5. Peek at the shortlist.** `peek --need <need> a/b c/d` costs about 1.2k tokens per repo

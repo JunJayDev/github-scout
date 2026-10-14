@@ -301,7 +301,7 @@ def render_outdated(rows: list[dict]) -> str:
         for k in ("archived", "license_changed", "renamed"):
             if r.get(k):
                 bits.append(f"{k}: {r[k]}" if r[k] is not True else k)
-        if r.get("stars") and r.get("stars_then"):
+        if r.get("stars") and r.get("stars_then") and r["stars"] != r["stars_then"]:
             bits.append(f"stars {r['stars_then']}->{r['stars']}")
         out.append(f"{r['repo']:<40} reviewed {r.get('reviewed')}: " + " · ".join(bits))
     return "\n".join(out) or "no cards matched"

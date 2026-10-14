@@ -94,6 +94,8 @@ class Client:
             status, rh, raw = self.transport(method, url, h, data)
             if status in (403, 429) and attempt < retries:
                 wait = _retry_wait(rh, status)
+                if wait is None and b"secondary rate limit" in raw.lower():
+                    wait = 60.0
                 if wait is not None and wait <= 90:
                     self._log(f"rate limited; waiting {wait:.0f}s")
                     time.sleep(wait)

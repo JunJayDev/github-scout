@@ -251,8 +251,9 @@ def cmd_triage(args):
     if args.rest:
         from .discover import is_open
 
-        open_lists = [c for c in scan["candidates"] if c.get("list") and is_open(c)]
-        for c in open_rows + open_lists:
+        # Only rows the agent was shown count as seen: the top rows and the lists line.
+        open_lists = [c for c in scan["candidates"] if c.get("list") and is_open(c)][:8]
+        for c in open_rows[: args.top] + open_lists:
             if c["repo"].lower() not in decided:
                 entries.append(_entry(args, store, c["repo"], project, need, "skip", "meta", args.rest, c, scan.get("id")))
     store.append_ledger(entries)
@@ -497,7 +498,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--defer", nargs="+", metavar="ITEM", help="maybe later")
     p.add_argument("--skip", nargs="+", metavar="ITEM[=reason]", help="not for this need")
     p.add_argument("--why", help="reason for --skip items without their own")
-    p.add_argument("--rest", metavar="REASON", help="skip every other open row with this reason")
+    p.add_argument("--rest", metavar="REASON", help="skip every other row shown (top rows and lists) with this reason")
+    p.add_argument("--top", type=int, default=40, help="rows --rest covers, as shown by `results` (default 40)")
 
     p = add("mark", cmd_mark, "record a verdict for repos directly")
     p.add_argument("repos", nargs="+")

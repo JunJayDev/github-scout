@@ -185,7 +185,9 @@ def score(c: dict, need: dict | None = None) -> float:
     f = f or 0
     s = 0.9 * math.log10(stars + 1) + 0.6 * math.log10(vel + 1) + 0.35 * len(set(c.get("lenses", [])))
     s += 1.3 * min(f, 4) - (1.2 if f == 0 else 0)
-    s += 0.4 * math.log10((c.get("installs") or 0) + 1)
+    # Installs are a real usage signal, but only for repos that match the need at all.
+    inst = math.log10((c.get("installs") or 0) + 1)
+    s += 0.4 * inst if f > 0 else min(0.6, 0.15 * inst)
     if need is not None:
         forms = [g[0].lower() for g in groups(need.get("forms"))]
         hay = (c.get("desc") or "").lower() + " " + " ".join(c.get("topics") or [])
