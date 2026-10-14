@@ -1,0 +1,14 @@
+{
+  "name": "reuse-first",
+  "description": "reuse-first: find and vet existing open-source repos before building",
+  "owner": {
+    "name": "reuse-first contributors"
+  },
+  "plugins": [
+    {
+      "name": "reuse-first",
+      "source": "./",
+      "description": "Before building, find and vet existing open-source repos; record verdicts in a shared registry."
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.9", "3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests (offline)
+        run: python -m unittest discover -s tests -v
+      - name: Install and run the CLI
+        run: |
+          python -m pip install .
+          reuse-first --version
+          reuse-first init _registry --name ci
+          reuse-first --store _registry check
+      - name: Run from a copied skill folder
+        run: python skills/reuse-first/scripts/reuse-first.py --help
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
