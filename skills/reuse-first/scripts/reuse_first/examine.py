@@ -29,7 +29,7 @@ TEXT_EXT = {".md", ".txt", ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", 
             ".css", ".vue", ".svelte", ".lua", ".sql"}
 
 
-def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str) -> tuple[str, list[str]]:
+def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str, desc: str = "") -> tuple[str, list[str]]:
     """Best guess of a repo's kind from its tree and root manifests, with the evidence."""
     ev: list[str] = []
     skills = [p for p in paths if p.endswith("SKILL.md")]
@@ -51,8 +51,11 @@ def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str) 
         plugin = any(p.startswith(".claude-plugin/") for p in paths)
         if plugin:
             ev.append(".claude-plugin manifest")
-        # A real code base that also ships skills is software; judge it as software.
-        if len(code) > 150 or (len(code) > 40 and entry):
+        # A real code base that also ships skills is software, unless it presents itself as a skill.
+        says_skill = bool(re.search(r"\bskills?\b", (name.replace("-", " ") + " " + desc + " " + (readme or "")[:600]).lower()))
+        if says_skill:
+            ev.append("calls itself a skill")
+        if entry or (len(code) > 150 and not says_skill):
             ev.append(f"{len(code)} code files" + (" and a CLI entry point" if entry else "") + ": software that ships skills")
         else:
             return ("skill-pack" if len(skills) > 1 or plugin else "skill"), ev
@@ -136,7 +139,7 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
         if m in paths and m not in ("AGENTS.md", "CLAUDE.md", "Dockerfile"):
             files[m] = client.file(slug, m, sha) or ""
     readme = client.readme(slug, sha) or ""
-    kind, evidence = guess_kind(paths, files, r["name"], readme)
+    kind, evidence = guess_kind(paths, files, r["name"], readme, r.get("description") or "")
     rel = client.latest_release(slug)
     skills = [p for p in paths if p.endswith("SKILL.md")]
     pkg = _json(files.get("package.json"))

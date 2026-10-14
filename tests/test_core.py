@@ -327,6 +327,11 @@ class ExamineTests(unittest.TestCase):
         g = examine.guess_kind
         self.assertEqual(g(["skills/x/SKILL.md", "README.md"], {}, "x", "")[0], "skill")
         self.assertEqual(g(["a/SKILL.md", "b/SKILL.md"], {}, "x", "")[0], "skill-pack")
+        big = ["SKILL.md"] + [f"examples/e{i}.tsx" for i in range(200)]
+        self.assertEqual(g(big, {}, "x", "", "AI video skill for Claude Code")[0], "skill")
+        self.assertEqual(g(big, {"package.json": "{}"}, "x", "", "Write HTML. Render video.")[0], "library")
+        cli_with_skill = ["skills/a/SKILL.md", "package.json"] + [f"src/m{i}.ts" for i in range(50)]
+        self.assertEqual(g(cli_with_skill, {"package.json": '{"bin": {"x": "c.js"}}'}, "x", "", "agent skill and CLI")[0], "cli")
         self.assertEqual(g(["src/index.ts"], {"package.json": '{"dependencies":{"@modelcontextprotocol/sdk":"1"}}'}, "x", "")[0], "mcp")
         self.assertEqual(g(["manifest.json"], {"manifest.json": '{"manifest_version":3}'}, "x", "")[0], "extension")
         self.assertEqual(g(["README.md"], {}, "awesome-things", "")[0], "list")
