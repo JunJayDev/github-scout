@@ -39,10 +39,10 @@ team had never heard of, one of them with 97k stars.
 
 ## What it does
 
-- **Searches through 13 lenses**: entities, entity pairs in READMEs, mechanisms, combinations,
-  problem phrases, topics, the last 12 months, `SKILL.md` files, npm, the stars of builders
-  you trust, links from the repos you already use, links you found on the web or X, and
-  awesome lists.
+- **Searches through 15 lenses**: entities, entity pairs in READMEs, mechanisms, combinations,
+  problem phrases, topics, the last 12 months, `SKILL.md` files, the skills.sh directory (with
+  install counts), the official MCP registry, npm, the stars of builders you trust, links from
+  the repos you already use, links you found on the web or X, and awesome lists.
 - **Ranks without reading.** A `fit` score counts how many of your terms appear in a repo's
   own name, description and topics, so huge READMEs that mention everything sink. Awesome
   lists go to a separate line, as sources to expand.
@@ -87,7 +87,7 @@ reuse-first new-project shop --name "Shop backend"
 reuse-first new-need shop/payments --want "Take card payments with 3-D Secure from Python"
 # edit projects/shop/needs/payments.md: entities, mechanisms, forms, problems
 reuse-first plan shop/payments            # the searches, no network
-reuse-first scan shop/payments            # ~70 searches, 2–4 minutes, ranked table
+reuse-first scan shop/payments            # ~80 searches, 3–5 minutes, ranked table
 reuse-first triage shop/payments --short 1 3 8 --rest "not payments"
 reuse-first peek --need shop/payments stripe/stripe-python
 reuse-first fetch stripe/stripe-python    # source + size map
@@ -143,7 +143,7 @@ before building.
 | a full landscape for one need | ~15–25k |
 
 GitHub allows 30 searches a minute and 10 code searches a minute with a token. A scan
-throttles itself and takes 2–4 minutes.
+throttles itself and takes 3–5 minutes.
 
 ## Limits
 
@@ -155,15 +155,23 @@ throttles itself and takes 2–4 minutes.
 
 ## Related projects
 
-- [`patent`](https://github.com/r14dd/patent): from one plain-English idea, checks 19
-  package registries plus GitHub and Hacker News, ranks the matches semantically and gives a
-  crowded/open verdict. Good for "has this tool been built?". It does not keep a registry,
-  track upstream, or separate skills from software.
-- [`neuroarxiv`](https://github.com/UditAkhourii/neuroarxiv): a skill that checks arXiv
-  papers before an agent designs something new. It covers research papers; reuse-first covers
-  code.
-- Repo-to-prompt tools (repomix, gitingest, code2prompt) and DeepWiki fit well after `fetch`,
-  when you need to read a large codebase quickly.
+"Search before you build" skills are common. Most of them guide one search and end at one
+decision. reuse-first keeps going after that: it remembers every verdict, tracks the repos you
+chose, and makes the next search start from what is already known.
+
+- [ECC `search-first`](https://github.com/affaan-m/ECC) (the most-installed
+  skill of this kind on skills.sh), [`reuse-before-build`](https://github.com/Ai-Eastern/reuse-before-build)
+  and [`oss-scout`](https://github.com/Saeyeon-developer/oss-scout): research-then-decide
+  workflows for one task at a time. They work well alongside a registry.
+- [`deja-vu`](https://github.com/vishnujayvel/deja-vu): keeps an append-only log of decisions
+  with review dates. It is the closest in spirit, but it records decisions, not repositories, and
+  revalidation is manual.
+- [`patent`](https://github.com/r14dd/patent): from one plain-English idea, checks 19 package
+  registries plus GitHub and Hacker News with semantic ranking. Good for "has this tool been built?".
+- [`neuroarxiv`](https://github.com/UditAkhourii/neuroarxiv): checks arXiv papers before an
+  agent designs something new. It covers papers; reuse-first covers code.
+- [repomix](https://github.com/yamadashy/repomix) (`fetch --pack`), DeepWiki and gitingest
+  help with reading a large codebase after `fetch`.
 
 ## Contributing
 

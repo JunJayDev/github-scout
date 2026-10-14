@@ -9,5 +9,7 @@ First release.
 - CLI: `init`, `new-project`, `new-need`, `find`, `plan`, `scan`, `results`, `ingest`,
   `expand`, `triage`, `mark`, `peek`, `fetch`, `path`, `card`, `relate`, `show`, `outdated`,
   `diff`, `bump`, `index`, `check`.
-- 13 search lenses with vocabulary fit scoring and awesome-list detection.
+- 15 search lenses (including skills.sh with install counts and the official MCP registry),
+  vocabulary fit scoring and awesome-list detection.
+- `fetch --pack` writes a repomix digest when repomix is installed.
 - Claude Code plugin manifest.

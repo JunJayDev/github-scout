@@ -75,6 +75,8 @@ class PlanAndScoreTests(unittest.TestCase):
         self.assertIn(("Q", "social media automation"), queries)
         self.assertIn(("T", "topic:chrome-extension"), queries)
         self.assertIn(("K", "reddit filename:SKILL.md"), queries)
+        self.assertIn(("S", "xiaohongshu"), queries)
+        self.assertNotIn("D", {l for l, _ in queries})            # forms has no mcp
         self.assertTrue(any(l == "R" and "created:>" in s for l, s in queries))
         self.assertEqual(len(queries), len(q), "no duplicate searches")
 
@@ -169,6 +171,7 @@ class FlowTests(Base):
         self.api.search['xiaohongshu'] = [xhs]
         self.api.code['reddit filename:SKILL.md'] = ["someone/reddit-skill"]
         self.api.npm['reddit'] = ["git+https://github.com/someone/reddit-skill.git"]
+        self.api.skills['reddit'] = [("someone/reddit-skill", 4200)]
         return opencli, noise, xhs, skill
 
     def test_scan_triage_peek_card_find_index(self):
@@ -180,7 +183,9 @@ class FlowTests(Base):
         rows = [l for l in out.splitlines() if l.strip()[:3].strip().rstrip(".").isdigit()]
         self.assertTrue(rows[0].strip().startswith("1."))
         self.assertNotIn("public-apis", "\n".join(rows))
-        self.assertTrue(any("someone/reddit-skill" in r and "K" in r.split("[")[-1] and "N" in r.split("[")[-1] for r in rows))
+        skill_row = next(r for r in rows if "someone/reddit-skill" in r)
+        self.assertIn("[KSN]", skill_row)
+        self.assertIn("installs 4.2k", skill_row)
         scan = json.loads(next((self.root / "scans/ops/browser-ops").glob("*.json")).read_text())
         self.assertTrue(all("query" in s for s in scan["searches"]))
         self.assertEqual(self.store.need("ops/browser-ops").data["scanned"], discover.today())
@@ -256,6 +261,18 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("jackwener/OpenCLI", out)
         self.assertNotIn("z/unrelated", out)                        # filtered by the need's vocabulary
+
+    def test_mcp_registry_lens(self):
+        self.api.add(repo("acme/xhs-mcp", 300, "MCP server for Xiaohongshu"))
+        self.api.mcp["xiaohongshu"] = ["https://github.com/acme/xhs-mcp"]
+        need = self.store.need("ops/browser-ops")
+        need.data["forms"] = ["mcp"]
+        from reuse_first.store import NEED_ORDER, write_doc
+        write_doc(need.path, need.data, need.body, NEED_ORDER)
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet", "--lenses", "D")
+        self.assertEqual(code, 0, out)
+        self.assertIn("acme/xhs-mcp", out)
+        self.assertIn("[D]", out)
 
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed_search()

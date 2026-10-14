@@ -48,19 +48,20 @@ frontmatter. **The vocabulary decides what you find**, so spend your thinking he
 | `entities` | concrete things the solution touches: platforms, formats, protocols, APIs, products. Put synonyms and other-language names in one item, separated by `\|` | `"xiaohongshu\|小红书\|rednote"`, `"srt\|subtitles"` |
 | `mechanisms` | how it would work, in README words | `"logged-in browser"`, `"chrome extension"`, `"whisper.cpp"` |
 | `forms` | shapes it may ship as | `cli`, `mcp`, `skill`, `library`, `app`, `extension` |
-| `problems` | 2–4 plain problem phrases, one per language you search in | `"social media automation"`, `"自媒体 自动化"` |
+| `problems` | 2–4 short problem phrases (2–3 words: GitHub search ANDs every word), one per language | `"social media automation"`, `"自媒体 自动化"` |
 | `topics` | optional extra GitHub topics | `browser-automation` |
 
 Give at least four entities or mechanisms. Add other-language terms whenever the domain has a
 community outside English. Run `plan <need>` to see the searches without using the network,
 and fix the vocabulary before you scan.
 
-**2. Scan.** `scan <need>` runs about 70 searches across lenses: entities, entity pairs in
+**2. Scan.** `scan <need>` runs about 80 searches across lenses: entities, entity pairs in
 READMEs, mechanisms, combinations, problem phrases, topics, the last 12 months, SKILL.md
-files, npm, people's stars and links from chosen repos. It takes 2–4 minutes and prints a
-ranked table (~2k tokens for 40 rows). `fit` counts how many vocabulary groups a repo's own
+files, the skills.sh directory, the official MCP registry, npm, people's stars and links from
+chosen repos. It takes 3–5 minutes and prints a ranked table (~2k tokens for 40 rows). `fit` counts how many vocabulary groups a repo's own
 name, description and topics mention. A `fit 0` row only matched inside a README and is
-usually noise. Awesome lists are printed on a separate line.
+usually noise. `installs` comes from skills.sh and is a better usage signal than stars, which
+are often inflated. Awesome lists are printed on a separate line.
 
 **3. Widen with what the API cannot see.** Before you conclude anything, do one pass outside GitHub search:
 
@@ -81,7 +82,9 @@ sizes, the manifests and the start of the README. Close the ones that don't fit 
 
 **6. Read the source of the one to three that matter.** `fetch a/b` downloads one commit into
 the registry cache and prints where the code is and how big each part is. Read the entry
-points and the parts that would cover the need, not the whole tree. For software you might
+points and the parts that would cover the need, not the whole tree. For a large code base,
+`fetch a/b --pack --include "src/**"` also writes a signatures-only digest if
+[repomix](https://github.com/yamadashy/repomix) is installed. For software you might
 adopt, install it and run it on one real task from the project.
 
 **7. Register.** Run `card a/b --need <need> --relation <relation> --where <our path> --note
@@ -148,7 +151,7 @@ A card's `uses` says how each project relates to the repo. A card's status is it
 | `plan P/N` / `scan P/N` / `results P/N` | show the searches / run them / show saved results again |
 | `ingest P/N SOURCES…` / `expand P/N LIST` | add links found elsewhere / candidates from an awesome list |
 | `triage P/N` / `mark REPOS… --need P/N --verdict V` | record verdicts from a table / directly |
-| `peek REPOS…` / `fetch REPO` / `path REPO` | API digest / download source with a size map / cached source path |
+| `peek REPOS…` / `fetch REPO [--pack]` / `path REPO` | API digest / download source with a size map (and a repomix digest) / cached source path |
 | `card REPO …` / `relate REPO …` | register a repo / add or update one of its uses |
 | `show REF` | a card with its ledger history, or a need with its coverage |
 | `outdated` / `diff REPO` / `bump REPO` | what changed upstream / the watched patch / mark it reviewed |

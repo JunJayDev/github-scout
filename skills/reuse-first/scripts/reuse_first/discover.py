@@ -21,6 +21,8 @@ Lenses (one letter each, shown next to every candidate):
     T topic         GitHub topics derived from the vocabulary (+ last 12 months)
     R recent        entity / mechanism terms created in the last 12 months
     K skill code    SKILL.md files that mention an entity or mechanism
+    S skills.sh     the skills.sh directory (records install counts, a usage signal)
+    D MCP registry  the official MCP server registry
     N npm           npm packages whose repository is on GitHub
     U people        repos starred by the builders in people.txt and by owners of chosen repos
     G graph         GitHub repos linked from the READMEs of chosen repos
@@ -39,11 +41,11 @@ import sys
 from .github import Client, GitHubError, github_slug
 from .store import Store, as_list, now_stamp, today
 
-LENSES = "EPMCQTRKNUGWL"
+LENSES = "EPMCQTRKSDNUGWL"
 LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "problem", "T": "topic",
-              "R": "recent", "K": "skill code", "N": "npm", "U": "people", "G": "graph", "W": "web/ingest",
+              "R": "recent", "K": "skill code", "S": "skills.sh", "D": "mcp registry", "N": "npm", "U": "people", "G": "graph", "W": "web/ingest",
               "L": "list"}
-DEFAULT_LENSES = "EPMCQTRKNUG"
+DEFAULT_LENSES = "EPMCQTRKSDNUG"
 KEEP = 400  # candidates saved per scan (best first); the search log is always kept whole
 
 
@@ -104,9 +106,15 @@ def plan(need: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 10) -> list[
         add("T", "repos", f"topic:{t} created:>{since}")
     for term in (heads + mechs)[:8]:
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
-    if not forms or any(f in ("skill", "skills", "skill-pack", "rules", "plugin", "agent") for f in forms):
+    skillish = not forms or any(f in ("skill", "skills", "skill-pack", "rules", "plugin", "agent") for f in forms)
+    if skillish:
         for term in (heads[:4] + mechs[:2]):
             add("K", "code", f"{quote(term)} filename:SKILL.md")
+        for term in (heads[:4] + mechs[:2]):
+            add("S", "skills", term)
+    if not forms or "mcp" in forms:
+        for term in (heads[:4] + mechs[:2]):
+            add("D", "mcp", term)
     for term in (heads[:4] + mechs[:2]):
         add("N", "npm", term)
     add("U", "people", "starred by people.txt and owners of chosen repos")
@@ -177,6 +185,7 @@ def score(c: dict, need: dict | None = None) -> float:
     f = f or 0
     s = 0.9 * math.log10(stars + 1) + 0.6 * math.log10(vel + 1) + 0.35 * len(set(c.get("lenses", [])))
     s += 1.3 * min(f, 4) - (1.2 if f == 0 else 0)
+    s += 0.4 * math.log10((c.get("installs") or 0) + 1)
     if need is not None:
         forms = [g[0].lower() for g in groups(need.get("forms"))]
         hay = (c.get("desc") or "").lower() + " " + " ".join(c.get("topics") or [])
@@ -279,6 +288,16 @@ class Scan:
             return self._add_slugs(self.client.search_code(query, per_page=per_query)[:per_query], lens)
         if kind == "npm":
             return self._add_slugs(self.client.npm_search(query)[:20], lens)
+        if kind == "skills":
+            found = self.client.skills_search(query)
+            n = self._add_slugs([slug for slug, _, _ in found], lens)
+            for slug, installs, _ in found:
+                c = self.cands.get(slug.lower())
+                if c is not None:
+                    c["installs"] = max(c.get("installs") or 0, installs)
+            return n
+        if kind == "mcp":
+            return self._add_slugs(self.client.mcp_search(query), lens)
         if kind == "people":
             logins = list(dict.fromkeys(self.store.people() + [c.split("/")[0] for c in as_list(self.need.get("chosen"))]))
             terms = vocab_terms(self.need)
@@ -384,6 +403,8 @@ def row(i: int, c: dict) -> str:
     elif seen:
         flags.append(f"{seen['verdict']}" + (" (grew, look again)" if seen.get("resurfaced") else ""))
     desc = re.sub(r"\s+", " ", c.get("desc") or "")[:90]
+    if c.get("installs"):
+        flags.insert(0, f"installs {human(c['installs'])}")
     flags.insert(0, f"fit {c.get('fit', 0)}")
     return (f"{i:>3}. {c['score']:>5.1f} {human(c['stars']):>6} {human(int(vel)) + '/mo':>8} {c.get('pushed', '')[2:]:>8}"
             f"  {(c.get('license') or '-')[:12]:<12} {c['repo']}  {desc}  [{''.join(c['lenses'])}]"

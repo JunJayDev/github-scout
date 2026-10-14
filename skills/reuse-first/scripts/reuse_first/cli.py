@@ -97,7 +97,8 @@ def _merge(store: Store, project: str, need: str, since: str | None = None) -> d
             key = c["repo"].lower()
             if key in merged:
                 lenses = sorted(set(merged[key]["lenses"]) | set(c["lenses"]), key=LENSES.index)
-                merged[key] = {**c, "lenses": lenses}
+                installs = max(merged[key].get("installs") or 0, c.get("installs") or 0)
+                merged[key] = {**c, "lenses": lenses, **({"installs": installs} if installs else {})}
             else:
                 merged[key] = dict(c)
     if last is None:
@@ -302,6 +303,27 @@ def cmd_fetch(args):
     client = _client(args)
     path = fetch(store, client, _slug(args.repo) if "/" in args.repo else args.repo, args.ref)
     print(digest(path))
+    if args.pack:
+        print(pack(path, args.include))
+
+
+def pack(path: Path, include: list[str] | None) -> str:
+    """Compress the fetched source with repomix (Tree-sitter signatures), if it is installed."""
+    import shutil
+    import subprocess
+
+    tool = shutil.which("repomix")
+    if not tool:
+        return "--pack needs repomix on PATH (https://github.com/yamadashy/repomix); nothing packed."
+    out = path.with_name(path.name + ".repomix.txt")
+    cmd = [tool, str(path), "--compress", "--style", "plain", "--output", str(out)]
+    if include:
+        cmd += ["--include", ",".join(include)]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        return f"repomix failed ({r.returncode}): {(r.stderr or r.stdout).strip()[-400:]}"
+    total = next((l.strip() for l in r.stdout.splitlines() if "Total Tokens" in l), "")
+    return f"packed: {out}" + (f" ({total})" if total else "")
 
 
 def cmd_path(args):
@@ -493,6 +515,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("fetch", cmd_fetch, "download a commit's source to the cache and print where the code is")
     p.add_argument("repo")
     p.add_argument("--ref", help="commit, tag or branch (default: the card's commit, else the default branch)")
+    p.add_argument("--pack", action="store_true", help="also write a compressed digest with repomix, if installed")
+    p.add_argument("--include", nargs="+", metavar="GLOB", help="with --pack: only these paths")
 
     p = add("path", cmd_path, "print the cached source directory of a repo")
     p.add_argument("repo")

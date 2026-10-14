@@ -24,6 +24,8 @@ from . import __version__
 
 API = os.environ.get("REUSE_FIRST_GITHUB_API", "https://api.github.com")
 NPM = os.environ.get("REUSE_FIRST_NPM_API", "https://registry.npmjs.org")
+SKILLS = os.environ.get("REUSE_FIRST_SKILLS_API", "https://skills.sh/api")
+MCP = os.environ.get("REUSE_FIRST_MCP_API", "https://registry.modelcontextprotocol.io/v0")
 UA = f"reuse-first/{__version__}"
 
 # Seconds between calls; GitHub allows 30 search/min and 10 code-search/min with a token.
@@ -234,6 +236,32 @@ class Client:
                     if src is not None:
                         target.write_bytes(src.read())
         return dest
+
+    # -- directories -----------------------------------------------------
+    def _get_json(self, url: str):
+        _, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"})
+        return json.loads(raw.decode() or "null")
+
+    def skills_search(self, text: str, limit: int = 30) -> list[tuple[str, int, str]]:
+        """skills.sh search: [(owner/repo, installs, skill id)], most installed first."""
+        data = self._get_json(f"{SKILLS}/search?" + urllib.parse.urlencode({"q": text, "limit": limit})) or {}
+        out = []
+        for item in data.get("skills", []):
+            slug = github_slug(f"github.com/{item.get('source', '')}")
+            if slug:
+                out.append((slug, int(item.get("installs") or 0), str(item.get("skillId") or item.get("name") or "")))
+        return out
+
+    def mcp_search(self, text: str, limit: int = 30) -> list[str]:
+        """Official MCP registry search: GitHub repositories of matching servers."""
+        data = self._get_json(f"{MCP}/servers?" + urllib.parse.urlencode({"search": text, "limit": limit})) or {}
+        slugs = []
+        for item in data.get("servers", []):
+            url = ((item.get("server") or {}).get("repository") or {}).get("url") or ""
+            slug = github_slug(url)
+            if slug and slug.lower() not in {s.lower() for s in slugs}:
+                slugs.append(slug)
+        return slugs
 
     # -- npm -------------------------------------------------------------
     def npm_search(self, text: str, size: int = 20) -> list[str]:

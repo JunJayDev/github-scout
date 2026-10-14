@@ -43,6 +43,8 @@ class FakeAPI:
         self.search: dict[str, list] = {}       # query -> list of repo dicts
         self.code: dict[str, list] = {}         # query -> list of slugs
         self.npm: dict[str, list] = {}          # text -> list of repo urls
+        self.skills: dict[str, list] = {}       # text -> list of (owner/repo, installs)
+        self.mcp: dict[str, list] = {}          # text -> list of repo urls
         self.paths: dict[str, object] = {}      # api path -> payload (dict/list/str/bytes)
         self.calls: list[str] = []
 
@@ -55,6 +57,12 @@ class FakeAPI:
         u = urlparse(url)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         path = u.path.lstrip("/")
+        if u.netloc == "skills.sh":
+            items = [{"source": slug, "skillId": "x", "installs": n} for slug, n in self.skills.get(q.get("q", ""), [])]
+            return self._ok({"skills": items})
+        if u.netloc == "registry.modelcontextprotocol.io":
+            items = [{"server": {"repository": {"url": url}}} for url in self.mcp.get(q.get("search", ""), [])]
+            return self._ok({"servers": items})
         if u.netloc == "registry.npmjs.org":
             objs = [{"package": {"links": {"repository": r}}} for r in self.npm.get(q.get("text", ""), [])]
             return self._ok({"objects": objs})

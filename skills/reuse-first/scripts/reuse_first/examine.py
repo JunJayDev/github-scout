@@ -44,21 +44,22 @@ def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str) 
     if "@modelcontextprotocol/sdk" in deps or re.search(r"\b(fastmcp|mcp)\b", pyproj) or "mcp" in re.split(r"[-_.]", low):
         ev.append("MCP SDK dependency or mcp in name")
         return "mcp", ev
+    entry = bool(pkg.get("bin")) or "[project.scripts]" in pyproj or "Cargo.toml" in files \
+        or any(p.startswith("cmd/") for p in paths) or "main.go" in paths or "src/main.rs" in paths
     if skills:
         ev.append(f"{len(skills)} SKILL.md: " + ", ".join(skills[:4]) + (" ..." if len(skills) > 4 else ""))
         plugin = any(p.startswith(".claude-plugin/") for p in paths)
         if plugin:
             ev.append(".claude-plugin manifest")
-        # A tool that also ships a skill is still software when it has a real code base.
-        if len(code) > 40 and (pkg.get("bin") or "[project.scripts]" in pyproj or "Cargo.toml" in files):
-            ev.append(f"{len(code)} code files and a CLI entry point: software that ships skills")
+        # A real code base that also ships skills is software; judge it as software.
+        if len(code) > 150 or (len(code) > 40 and entry):
+            ev.append(f"{len(code)} code files" + (" and a CLI entry point" if entry else "") + ": software that ships skills")
         else:
             return ("skill-pack" if len(skills) > 1 or plugin else "skill"), ev
     mf = _json(files.get("manifest.json"))
     if mf.get("manifest_version"):
         return "extension", [f"browser extension manifest v{mf['manifest_version']}"]
-    if pkg.get("bin") or "[project.scripts]" in pyproj or any(p.startswith("cmd/") for p in paths) \
-            or "src/main.rs" in paths:
+    if entry:
         ev.append("CLI entry point (bin / project.scripts / cmd / main.rs)")
         return "cli", ev
     if any(p.endswith((".xcodeproj/project.pbxproj", "tauri.conf.json")) for p in paths) or "electron" in deps:
