@@ -104,7 +104,7 @@ repo's stars reach twice the recorded count (and at least 200 more).
 
 ```json
 {"id": "20261015-004320", "date": "2026-10-15", "project": "ops", "question": "browser-ops",
- "lenses": "EPMCQTRKSDNUG", "dropped": 12,
+ "lenses": "EPMCQTRHKSDNUG", "dropped": 12,
  "searches": [{"lens": "P", "kind": "repos", "query": "reddit xiaohongshu in:readme pushed:>2026-04-15", "hits": 30}],
  "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…", "license": "MIT",
                  "lang": "Go", "topics": [], "archived": false, "fork": false, "lenses": ["E", "P"],

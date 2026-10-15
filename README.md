@@ -51,8 +51,9 @@ top ten held several closely related projects the team had never heard of, one w
 - **New and maintained beats old and famous.** Ranking is relevance first, then whether the repo
   is young and moving, and star counts last. No push in 3 months ranks far down, 6 months is hidden,
   12 months is dropped. Searches ask GitHub for maintained repos only, so no slot is wasted.
-- **Searches through 13 lenses**: entities, entity pairs in READMEs, mechanisms, combinations,
-  problem phrases, topics, the last 12 months, `SKILL.md` files, skills.sh (with install counts),
+- **Searches through 14 lenses**: entities, entity pairs in READMEs, mechanisms, combinations,
+  problem phrases, topics, the last 12 months, new repos rising fast in your form (found without
+  any of your words), `SKILL.md` files, skills.sh (with install counts),
   the official MCP registry, npm, the stars of builders you trust, and links from repos you picked.
   Links found on the web or X and awesome lists feed into the same ranking.
 - **Remembers.** Every verdict is recorded with its reason. Each card keeps the commit it was

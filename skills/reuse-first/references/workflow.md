@@ -55,6 +55,9 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
 - Lens letters show why a row is there; several letters mean several independent routes found it.
 - The header line says how many repos were dropped (no push in 12 months) or hidden (6 months).
 - `seen:skip@other/question` means another question already judged it; read that reason first.
+- The `rising` block under the table (`h1`, `h2`...) holds new repos growing fast that match no
+  vocabulary. Words cannot find a tool whose description never names your use, so read these
+  by what they make. They are counted in `pick --rest` like the table rows.
 
 Pick about 5–10 rows. A wrong pick costs a 1.3k-token look; a right one skipped is the whole
 reason this skill exists.

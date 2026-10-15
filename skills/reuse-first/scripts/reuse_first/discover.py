@@ -20,6 +20,11 @@ Lenses (one letter each, kept with every candidate):
     Q problem       each problem phrase as typed
     T topic         GitHub topics derived from the vocabulary (+ last 12 months)
     R recent        entity / mechanism terms created in the last 12 months
+    H rising        no vocabulary: repos created in the last 2 months in the question's form
+                    (skill or MCP topics, or any repo past 500 stars in a month), most stars first.
+                    A repo says what it makes, not every use people find for it, so words miss
+                    some of the best new ones. Those that match no vocabulary are listed apart
+                    for the agent to judge by description (`h1`, `h2`... in `pick`).
     K skill code    SKILL.md files that mention an entity or mechanism
     S skills.sh     the skills.sh directory (records install counts, a usage signal)
     D MCP registry  the official MCP server registry
@@ -50,12 +55,19 @@ import sys
 from .github import Client, GitHubError, github_slug
 from .store import Store, as_list, now_stamp, today
 
-LENSES = "EPMCQTRKSDNUGWL"
+LENSES = "EPMCQTRHKSDNUGWL"
 LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "problem", "T": "topic",
-              "R": "recent", "K": "skill code", "S": "skills.sh", "D": "mcp registry", "N": "npm", "U": "people",
+              "R": "recent", "H": "rising", "K": "skill code", "S": "skills.sh", "D": "mcp registry", "N": "npm", "U": "people",
               "G": "graph", "W": "web/add", "L": "list"}
-DEFAULT_LENSES = "EPMCQTRKSDNUG"
+DEFAULT_LENSES = "EPMCQTRHKSDNUG"
 KEEP = 400  # candidates saved per scan (best first); the search log is always kept whole
+SKILL_FORMS = ("skill", "skills", "skill-pack", "rules", "plugin", "agent")
+RISE_TOPICS = {"skill": ("agent-skill", "agent-skills", "claude-skills", "claude-skill", "claude-code-skill", "skills"),
+               "mcp": ("mcp-server", "mcp")}
+RISE_MONTHS, RISE_STARS = 2, 50          # H: created in the last 2 months, past 50 stars, in the form's topics
+BREAKOUT_MONTHS, BREAKOUT_STARS = 1, 500  # H for other forms: any repo past 500 stars within a month
+RISE_KEEP, RISE_SHOW = 300, 30           # rising repos kept beyond KEEP; rows shown apart
+RISE_TOPIC_SET = {t for ts in RISE_TOPICS.values() for t in ts}
 SLOW, HIDE, DROP = 3, 6, 12  # months since the last push: penalised, hidden by default, dropped
 
 
@@ -124,7 +136,16 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dic
         add("T", "repos", f"topic:{t} created:>{since}")
     for term in (ent_terms + mech_terms)[:12]:
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
-    if not forms or any(f in ("skill", "skills", "skill-pack", "rules", "plugin", "agent") for f in forms):
+    rise = window(RISE_MONTHS)
+    if not forms or any(f in SKILL_FORMS for f in forms):
+        for t in RISE_TOPICS["skill"]:
+            add("H", "repos", f"topic:{t} created:>{rise} stars:>{RISE_STARS}")
+    if not forms or "mcp" in forms:
+        for t in RISE_TOPICS["mcp"]:
+            add("H", "repos", f"topic:{t} created:>{rise} stars:>{RISE_STARS}")
+    if not forms or any(f not in SKILL_FORMS and f != "mcp" for f in forms):
+        add("H", "repos", f"created:>{window(BREAKOUT_MONTHS)} stars:>{BREAKOUT_STARS}")
+    if not forms or any(f in SKILL_FORMS for f in forms):
         for term in lead_terms[:10]:
             add("K", "code", f"{quote(term)} filename:SKILL.md")
         for term in lead_terms[:10]:
@@ -333,7 +354,7 @@ class Scan:
     def _one(self, s: dict, per_query: int) -> int:
         kind, query, lens = s["kind"], s["query"], s["lens"]
         if kind == "repos":
-            items = self.client.search_repos(query, per_page=per_query)
+            items = self.client.search_repos(query, per_page=100 if lens == "H" else per_query)
             for r in items:
                 self._add(r, lens)
             return len(items)
@@ -380,7 +401,8 @@ class Scan:
                 "lenses": lenses, "searches": self.log, "dropped": len(self.dropped),
                 "candidates": list(self.cands.values())}
         rescore(scan, self.q)
-        scan["candidates"] = scan["candidates"][:KEEP]
+        ranked = scan["candidates"]
+        scan["candidates"] = ranked[:KEEP] + [c for c in ranked[KEEP:] if is_rising(c)][:RISE_KEEP]
         return scan
 
 
@@ -440,18 +462,40 @@ def is_stale(c: dict) -> bool:
     return months_since(c.get("pushed")) > HIDE
 
 
+def is_rising(c: dict) -> bool:
+    """Found only because it is new and growing fast: none of the vocabulary is in its own words."""
+    return "H" in c.get("lenses", []) and not c.get("fit") and not c.get("list")
+
+
+def momentum(c: dict) -> float:
+    return (c.get("stars") or 0) / max(months_since(c.get("created")), 0.25)
+
+
 def visible(scan: dict, show_all: bool = False) -> list[dict]:
     """Rows `render` numbers; `pick` resolves numbers against the same list."""
-    return [c for c in scan["candidates"] if not c.get("list") and not c.get("card")
+    return [c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_rising(c)
             and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c)))]
+
+
+def rising(scan: dict, show_all: bool = False) -> list[dict]:
+    """Rows `render` lists apart as h1, h2...: fastest-growing first, those in the form's topics
+    (skills, MCP servers) ahead of breakouts from anywhere, which keep a third of the shown rows."""
+    rows = sorted((c for c in scan["candidates"] if is_rising(c) and not c.get("card")
+                   and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c)))),
+                  key=lambda c: -momentum(c))
+    form = [c for c in rows if RISE_TOPIC_SET & set(c.get("topics") or [])]
+    other = [c for c in rows if not RISE_TOPIC_SET & set(c.get("topics") or [])]
+    n_form = min(len(form), RISE_SHOW - min(len(other), RISE_SHOW // 3))
+    n_other = min(len(other), RISE_SHOW - n_form)
+    return form[:n_form] + other[:n_other] + sorted(form[n_form:] + other[n_other:], key=lambda c: -momentum(c))
 
 
 def human(n: int) -> str:
     return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
 
 
-def row(i: int, c: dict) -> str:
-    flags = [f"fit {c.get('fit', 0)}"]
+def row(i, c: dict) -> str:
+    flags = [f"fit {c.get('fit', 0)}"] if not is_rising(c) else [f"{human(int(momentum(c)))} stars/month"]
     if c.get("installs"):
         flags.append(f"installs {human(c['installs'])}")
     if c.get("archived"):
@@ -464,7 +508,8 @@ def row(i: int, c: dict) -> str:
     elif seen:
         flags.append(seen["verdict"] + (" (grew, look again)" if seen.get("resurfaced") else ""))
     desc = re.sub(r"\s+", " ", c.get("desc") or "")[:90]
-    return (f"{i:>3}. {c['score']:>5.1f} {human(c['stars']):>6} {c.get('created', '')[2:7]:>6} {c.get('pushed', '')[2:]:>8}"
+    label = f"{i:>3}." if isinstance(i, int) else f"{i:>4}"
+    return (f"{label} {c['score']:>5.1f} {human(c['stars']):>6} {c.get('created', '')[2:7]:>6} {c.get('pushed', '')[2:]:>8}"
             f"  {c['repo']}  {desc}  [{''.join(c['lenses'])}] {' '.join(flags)}")
 
 
@@ -497,4 +542,11 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     out += [row(i, c) for i, c in enumerate(rows[:top], 1)]
     if len(rows) > top:
         out.append(f"... {len(rows) - top} more (--top N)")
+    rise = rising(scan, show_all)
+    if rise:
+        out.append(f"rising: new in the last {RISE_MONTHS} months and growing fast, but no vocabulary in their own words "
+                   f"({len(rise)}). Judge each by what it makes, not by its words; pick with h<#>")
+        out += [row(f"h{i}.", c) for i, c in enumerate(rise[:RISE_SHOW], 1)]
+        if len(rise) > RISE_SHOW:
+            out.append(f"... {len(rise) - RISE_SHOW} more rising (--json lists them)")
     return "\n".join(out)

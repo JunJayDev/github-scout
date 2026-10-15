@@ -63,17 +63,24 @@ start from its answer. If a repository has a card, read the card, not the reposi
     searched on its own; pairs and combinations use the first term of the first six groups, so
     put the most specific entities first.
   - `mechanisms`: how it would work, in the words a README uses: `"logged-in browser"`, `"remotion"`.
-    Add the positive way people name the goal too (`"human writing|活人感"`), not only the negative.
+    Add the positive way people name the goal too (`"human writing|活人感"`), not only the negative,
+    and neighbours whose output you could reuse (for video: `"explainer|animation|diagram"`).
   - `forms`: `cli`, `mcp`, `skill`, `library`, `app`.
   - `problems`: 2–4 short phrases (GitHub ANDs every word), one per language.
   - Changed the question later? `ask <q> "<new ask>" --stage <s> --update`.
 
-**2. Scan.** `scan <q> --plan` shows the searches; `scan <q>` runs about 80 of them across 13
+**2. Scan.** `scan <q> --plan` shows the searches; `scan <q>` runs about 90 of them across 14
 lenses in a few minutes and prints a ranked table (~2k tokens for 40 rows). Ranking puts
 relevance first (`fit`: vocabulary groups in the repo's own name, description and topics),
 then life (created recently, pushed recently, stars per month), and plain star counts last.
 Maintenance is a hard rule: no push for over 3 months ranks far down, over 6 months is hidden
 (`--all` shows it), over 12 months is dropped without a verdict.
+
+Below the table, `rising` lists up to 30 repos that no vocabulary matched: created in the last
+two months in your form's topics (skills, MCP servers), plus breakouts from anywhere, fastest
+growing first. A repo describes what it makes, not every use people found for it: an
+isometric-figure skill never says "video", yet people make explainer videos with it. Read
+those lines and judge each by what it makes; pick with `h<#>`.
 
 **3. Widen with what the API cannot see.** Search the web (`site:github.com <entity> <mechanism>`,
 other languages, forums) and X (posts that link github.com with your entities), and collect
@@ -82,8 +89,8 @@ links the user shared. Feed them in: `scan <q> --add <file|url|text> --note "<wh
 landed). Expand promising awesome lists with `scan <q> --expand <owner/list>` (lens L).
 
 **4. Pick.** `pick <q> 1 4 7 --rest "<why the rest do not help>"`. Numbers refer to the table
-`scan` printed last (`scan <q> --show` reprints it); `pick` echoes the names it resolved, and
-`owner/repo` works too. Choose on fit and description. Every row you were shown and did not pick
+`scan` printed last (`scan <q> --show` reprints it), `h<#>` to the rising list; `pick` echoes
+the names it resolved, and `owner/repo` works too. Choose on fit and description. Every row you were shown and did not pick
 is recorded as skipped with your reason. Then `scan <q> --lenses UG`: it follows the stars of the
 picked repos' owners and the repos their READMEs link to, which find nothing before you pick.
 

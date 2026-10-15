@@ -75,6 +75,16 @@ class PlanAndRankTests(unittest.TestCase):
         self.assertTrue(all(alive in s for lens, s in queries if lens in "EPMCQTR"))
         self.assertEqual(len(set(queries)), len(queries))
 
+    def test_rising_lens_needs_no_vocabulary(self):
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        rise = f"created:>{discover.window(discover.RISE_MONTHS)} stars:>{discover.RISE_STARS}"
+        queries = [x["query"] for x in discover.plan(QUESTION) if x["lens"] == "H"]
+        self.assertIn(f"topic:agent-skill {rise}" + alive, queries)
+        self.assertIn(f"created:>{discover.window(discover.BREAKOUT_MONTHS)} stars:>{discover.BREAKOUT_STARS}" + alive,
+                      queries)                                          # forms include cli: any breakout counts
+        only_skill = [x["query"] for x in discover.plan({**QUESTION, "forms": ["skill"]}) if x["lens"] == "H"]
+        self.assertTrue(only_skill and all(q.startswith("topic:") for q in only_skill))
+
     def test_fit_counts_own_text_not_readme(self):
         c = {"repo": "jackwener/opencli", "desc": "Make Any Website into CLI & Use your logged-in browser", "topics": ["cli"]}
         self.assertEqual(discover.fit(c, QUESTION), 1)
@@ -295,6 +305,33 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("jackwener/OpenCLI", out)
         self.assertNotIn("z/unrelated", out)
+
+    def test_rising_repos_are_listed_apart(self):
+        self.seed()
+        anatomy = self.api.add(repo("wheresryan22/anatomy", 11000, "Interactive isometric illustrations of machines, in SVG",
+                                    created=ago(0.25), pushed=ago(0.05), topics=["agent-skill", "svg"]))
+        slow = self.api.add(repo("a/calm-skill", 120, "A diff viewer", created=ago(1.5), pushed=ago(0.5), topics=["agent-skill"]))
+        near = self.api.add(repo("b/reddit-digest", 300, "Daily Reddit digest", created=ago(1), pushed=ago(0.2),
+                                 topics=["agent-skill"]))
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        rise = f"created:>{discover.window(discover.RISE_MONTHS)} stars:>{discover.RISE_STARS}"
+        self.api.search[f"topic:agent-skill {rise}" + alive] = [anatomy, slow, near]
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        names = [r.split()[5] for r in self.rows(out)]
+        self.assertIn("b/reddit-digest", names)                       # matches the vocabulary: ranked with the rest
+        self.assertNotIn("wheresryan22/anatomy", names)
+        self.assertIn("rising: new in the last 2 months", out)
+        h1 = next(ln for ln in out.splitlines() if ln.strip().startswith("h1."))
+        self.assertIn("wheresryan22/anatomy", h1)                     # fastest growing first
+        self.assertIn("stars/month", h1)
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "h1=explainer figures an agent can film", "--rest", "no")
+        self.assertEqual(code, 0, out)
+        verdicts = {(e["repo"], e["verdict"]) for e in self.store.ledger()}
+        self.assertIn(("wheresryan22/anatomy", "short"), verdicts)
+        self.assertIn(("a/calm-skill", "skip"), verdicts)             # shown in the rising list, so judged
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "h9")
+        self.assertNotEqual(code, 0)
 
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed()

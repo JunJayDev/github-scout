@@ -11,7 +11,8 @@ from pathlib import Path
 
 from . import __version__
 from .discover import (
-    DEFAULT_LENSES, LENS_NAMES, LENSES, Scan, annotate, is_open, is_stale, plan, render, rescore, slugs_in_text, visible,
+    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, is_open, is_stale, plan, render, rescore, rising, row,
+    slugs_in_text, visible,
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
@@ -181,6 +182,7 @@ def cmd_scan(args):
     if (args.add or args.expand) and not args.show and not args.json:
         rows = visible(merged)
         index = {c["repo"].lower(): i for i, c in enumerate(rows, 1)}
+        index.update({c["repo"].lower(): f"h{i}." for i, c in enumerate(rising(merged), 1)})
         added = [c["repo"] for c in scan["candidates"]]
         print(f"added {len(added)} repos ({scan.get('dropped', 0)} dropped: no push in 12 months). Where they rank now:")
         by = {c["repo"].lower(): c for c in merged["candidates"]}
@@ -189,7 +191,6 @@ def cmd_scan(args):
             if c is None:
                 continue
             i = index.get(slug.lower())
-            from .discover import row
             print(row(i, c) if i else f"  -  {slug}  ({'decided' if c.get('card') or c.get('seen') else 'stale or a list'})")
         print(f"full table: reuse-first scan {ref} --show")
         return
@@ -203,6 +204,7 @@ def cmd_pick(args):
     project, qid = store.split_ref(args.ref)
     scan = _merged(store, project, qid)
     rows = visible(scan)
+    rise = rising(scan)
     by_repo = {c["repo"].lower(): c for c in scan["candidates"]}
 
     def resolve(item: str) -> tuple[dict, str | None]:
@@ -213,6 +215,11 @@ def cmd_pick(args):
             if not 1 <= i <= len(rows):
                 raise StoreError(f"#{i} is not in the list (1-{len(rows)}); run `reuse-first scan {args.ref} --show`")
             return rows[i - 1], reason or None
+        if ref[:1].lower() == "h" and ref[1:].isdigit():
+            i = int(ref[1:])
+            if not 1 <= i <= len(rise):
+                raise StoreError(f"h{i} is not in the rising list (h1-h{len(rise)}); run `reuse-first scan {args.ref} --show`")
+            return rise[i - 1], reason or None
         slug = _slug(ref)
         return by_repo.get(slug.lower(), {"repo": slug}), reason or None
 
@@ -225,7 +232,7 @@ def cmd_pick(args):
                                   reason or (args.why if verdict == "skip" else None), c, scan.get("id")))
     if args.rest:
         lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c)][:8]
-        for c in rows[: args.top] + lists:
+        for c in rows[: args.top] + lists + rise[:RISE_SHOW]:
             if c["repo"].lower() not in decided:
                 entries.append(_entry(args, c["repo"], project, qid, "skip", "meta", args.rest, c, scan.get("id")))
     store.append_ledger(entries)

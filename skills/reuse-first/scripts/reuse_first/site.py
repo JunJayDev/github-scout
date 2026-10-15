@@ -109,7 +109,7 @@ def _blocks(lines: list[str]) -> list:
             continue
         m = _FENCE.match(line)
         if m:
-            close = re.compile(r"^ {0,3}" + re.escape(m.group(1)[0]) + "{%d,}[ \t]*$" % len(m.group(1)))
+            close = re.compile(r"^ {0,3}" + re.escape(m.group(1)[0]) + f"{{{len(m.group(1))},}}[ \t]*$")
             body, i = [], i + 1
             while i < n and not close.match(lines[i]):
                 body.append(lines[i])

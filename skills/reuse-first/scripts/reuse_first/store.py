@@ -182,7 +182,7 @@ class Store:
 
     # -- init ------------------------------------------------------------
     @staticmethod
-    def init(root: Path, name: str | None = None, lang: str = "en") -> "Store":
+    def init(root: Path, name: str | None = None, lang: str = "en") -> Store:
         root = Path(root).expanduser()
         root.mkdir(parents=True, exist_ok=True)
         marker = root / MARKER
