@@ -1,7 +1,7 @@
 # reuse-first skill
 
-Makes an agent find and vet existing open-source repositories before it builds, and record
-every verdict in a shared registry. `SKILL.md` is the procedure. This file covers setup.
+Makes an agent ask the right question, find what open source already solved, take the ideas
+and parts that fit where the project stands, and record every verdict in a shared registry. `SKILL.md` is the procedure. This file covers setup.
 Project home, design notes and issues are in the repository's top-level README.
 
 ## Requirements
@@ -48,7 +48,7 @@ When installed as a package (`pipx install <repo>`), the same CLI is `reuse-firs
 
 ## Maintenance
 
-- `outdated`, `diff` and `bump` keep cards current; `check` validates the registry; `index`
-  regenerates `INDEX.md`.
+- `updates` (with `--diff` and `--done`) keeps cards current; `check` validates the registry and
+  regenerates `INDEX.md`; `site` writes `site/index.html`.
 - Known defects that remain unfixed: `scripts/report-problem.sh "<summary>" [observed] [tried]`
   (writes to local state, never to the registry).
