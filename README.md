@@ -20,7 +20,7 @@ old bots and tutorials, so they started writing a scraper. The right tool was a
 use your logged-in browser by AI agent", and none of the agents' words are in it. A person
 found it on X.
 
-On that same need, GitHub repository search gives these results:
+On that same question, GitHub repository search gives these results:
 
 | query | where the right tool lands |
 |---|---|
@@ -61,7 +61,8 @@ top ten held several closely related projects the team had never heard of, one w
 ## Install
 
 Requirements: Python 3.9+ (standard library only) and a GitHub token, either in
-`GITHUB_TOKEN` or from a logged-in [`gh`](https://cli.github.com/) CLI.
+`GITHUB_TOKEN` or from a logged-in [`gh`](https://cli.github.com/) CLI. Network: api.github.com,
+codeload.github.com, skills.sh, registry.modelcontextprotocol.io and registry.npmjs.org.
 
 **Claude Code plugin**
 
@@ -142,7 +143,7 @@ throttles itself (also across processes sharing a registry) and takes a few minu
 
 ## Limits
 
-- It sees public GitHub, npm, and whatever you `ingest`. GitLab, Codeberg, PyPI-only and
+- It sees public GitHub, npm, skills.sh, the MCP registry, and whatever you `scan --add`. GitLab, Codeberg, PyPI-only and
   closed-source options need the web pass described in the skill.
 - GitHub search returns at most 1,000 results per query; the tool reads the top 30 of each.
 - A clean scan proves nothing is missing only for the sources checked. The scan file lists them.
@@ -165,7 +166,7 @@ chose, and makes the next search start from what is already known.
   registries plus GitHub and Hacker News with semantic ranking. Good for "has this tool been built?".
 - [`neuroarxiv`](https://github.com/UditAkhourii/neuroarxiv): checks arXiv papers before an
   agent designs something new. It covers papers; reuse-first covers code.
-- [repomix](https://github.com/yamadashy/repomix) (`fetch --pack`), DeepWiki and gitingest
+- [repomix](https://github.com/yamadashy/repomix) (`look --source --pack`), DeepWiki and gitingest
   help with reading a large codebase after `fetch`.
 
 ## Contributing

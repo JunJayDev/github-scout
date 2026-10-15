@@ -24,8 +24,9 @@ Lenses (one letter each, kept with every candidate):
     S skills.sh     the skills.sh directory (records install counts, a usage signal)
     D MCP registry  the official MCP server registry
     N npm           npm packages whose repository is on GitHub
-    U people        repos starred by the builders in people.txt and by owners of picked repos
-    G graph         GitHub repos linked from the READMEs of picked repos
+    U people        repos starred by the builders in people.txt and by owners of picked/shortlisted repos
+    G graph         GitHub repos linked from the READMEs of picked/shortlisted repos
+                    (U and G find nothing before you pick: rerun `scan <q> --lenses UG` after picking)
     W web / add     links found elsewhere (web search, X, chat), fed in with `scan --add`
     L list          links expanded from an awesome list with `scan --expand`
 
@@ -80,17 +81,23 @@ def window(months: int = 12) -> str:
     return (_dt.date.today() - _dt.timedelta(days=int(months * 30.4))).isoformat()
 
 
-def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 10) -> list[dict]:
-    """The searches a scan will run. Pure: no network."""
+def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dict]:
+    """The searches a scan will run. Pure: no network.
+
+    Every synonym in a `|` group is searched by the single-term lenses. Pairs and combos use
+    the first term of each group, in the order written, so put the most specific entities first."""
     ents = groups(q.get("entities"))
-    mechs = [g[0] for g in groups(q.get("mechanisms"))]
+    mech_groups = groups(q.get("mechanisms"))
     forms = [g[0].lower() for g in groups(q.get("forms"))]
     probs = [g[0] for g in groups(q.get("problems"))]
     heads = [g[0] for g in ents]
+    mech_heads = [g[0] for g in mech_groups]
+    ent_terms = [t for g in ents for t in g]
+    mech_terms = [t for g in mech_groups for t in g]
+    lead_terms = [t for g in ents[:4] for t in g] + [t for g in mech_groups[:2] for t in g]
     since = window(12)
-    out: list[dict] = []
-
     alive = f" pushed:>{window(HIDE)}"
+    out: list[dict] = []
 
     def add(lens, kind, query):
         if kind == "repos":
@@ -98,38 +105,37 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 10) -> list[dic
         if lens in lenses and not any(x["lens"] == lens and x["query"] == query for x in out):
             out.append({"lens": lens, "kind": kind, "query": query})
 
-    for g in ents:
-        for term in g:
-            add("E", "repos", quote(term))
-    for a, b in itertools.islice(itertools.combinations(heads, 2), max_pairs):
+    for term in ent_terms:
+        add("E", "repos", quote(term))
+    for a, b in itertools.islice(itertools.combinations(heads[:6], 2), max_pairs):
         add("P", "repos", f"{quote(a)} {quote(b)} in:readme")
-    for m in mechs:
+    for m in mech_terms[:10]:
         add("M", "repos", quote(m))
         add("M", "repos", f"{quote(m)} in:readme")
-    for m in mechs[:3]:
+    for m in mech_heads[:3]:
         for e in heads[:3]:
             add("C", "repos", f"{quote(m)} {quote(e)} in:readme")
     for p in probs:
         add("Q", "repos", p)
     topics = [t for t in (slugify(x) for x in as_list(q.get("topics"))) if t]
-    topics += [t for t in (slugify(x) for x in heads + mechs) if t and t not in topics]
-    for t in topics[:10]:
+    topics += [t for t in (slugify(x) for x in ent_terms + mech_terms) if t and t not in topics]
+    for t in topics[:12]:
         add("T", "repos", f"topic:{t}")
         add("T", "repos", f"topic:{t} created:>{since}")
-    for term in (heads + mechs)[:8]:
+    for term in (ent_terms + mech_terms)[:12]:
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
     if not forms or any(f in ("skill", "skills", "skill-pack", "rules", "plugin", "agent") for f in forms):
-        for term in heads[:4] + mechs[:2]:
+        for term in lead_terms[:10]:
             add("K", "code", f"{quote(term)} filename:SKILL.md")
-        for term in heads[:4] + mechs[:2]:
+        for term in lead_terms[:10]:
             add("S", "skills", term)
     if not forms or "mcp" in forms:
-        for term in heads[:4] + mechs[:2]:
+        for term in lead_terms[:8]:
             add("D", "mcp", term)
-    for term in heads[:4] + mechs[:2]:
+    for term in lead_terms[:8]:
         add("N", "npm", term)
-    add("U", "people", "starred by people.txt and owners of picked repos")
-    add("G", "graph", "links in READMEs of picked repos")
+    add("U", "people", "starred by people.txt and owners of picked or shortlisted repos")
+    add("G", "graph", "links in READMEs of picked or shortlisted repos")
     return out
 
 
@@ -159,6 +165,25 @@ def compact(r: dict) -> dict:
     }
 
 
+def _stem(w: str) -> str:
+    for suffix, keep in (("ing", 5), ("ies", 5), ("es", 5), ("ed", 4), ("s", 3)):
+        if w.endswith(suffix) and len(w) > keep:
+            return w[: -len(suffix)] + ("y" if suffix == "ies" else "")
+    return w
+
+
+def _tokens(text: str) -> set[str]:
+    return {_stem(w) for w in re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", text.lower())}
+
+
+def _has(term: str, hay_text: str, hay_tokens: set[str]) -> bool:
+    """A term matches when all its (stemmed) words appear, in any order; non-Latin terms match as substrings."""
+    if not term.isascii():
+        return term.lower() in hay_text
+    words = [_stem(w) for w in re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", term.lower())]
+    return bool(words) and all(w in hay_tokens for w in words)
+
+
 def _term_re(term: str):
     t = re.escape(term.lower())
     return re.compile(rf"(?<![a-z0-9]){t}(?![a-z0-9])") if term.isascii() else re.compile(t)
@@ -167,17 +192,25 @@ def _term_re(term: str):
 def fit(c: dict, q: dict) -> int:
     """How many vocabulary groups the repo's own name, description and topics mention.
 
-    README-only matches do not count: big READMEs mention everything."""
-    hay = " ".join([c["repo"].split("/")[1], c.get("desc") or "", " ".join(c.get("topics") or [])]).lower()
-    hay += " " + hay.replace("-", " ")
+    README-only matches do not count: big READMEs mention everything. Words are compared after
+    light stemming and in any order, so "Edit videos with coding agents" matches "agent video editing"."""
+    text = " ".join([c["repo"].split("/")[1], c.get("desc") or "", " ".join(c.get("topics") or [])])
+    hay = text.lower()
+    tokens = _tokens(text.replace("-", " ").replace("_", " "))
     n = 0
     for key in ("entities", "mechanisms", "topics"):
         for g in groups(q.get(key)):
-            if any(_term_re(t).search(hay) for t in g):
+            if any(_has(t, hay, tokens) for t in g):
                 n += 1
     for p in groups(q.get("problems")):
-        words = [w for w in re.split(r"\s+", p[0].lower()) if w]
-        if words and all(_term_re(w).search(hay) for w in words):
+        if not p[0].isascii():
+            n += int(all(w in hay for w in p[0].lower().split()))
+            continue
+        words = [_stem(w) for w in re.findall(r"[a-z0-9]+", p[0].lower())]
+        if not words:
+            continue
+        need = 1 if len(words) == 1 else max(2, -(-2 * len(words) // 3))   # two thirds of the words, at least two
+        if sum(w in tokens for w in words) >= need:
             n += 1
     return n
 
@@ -195,15 +228,17 @@ def score(c: dict, q: dict | None = None) -> float:
     stars = c.get("stars", 0)
     age = months_since(c.get("created"))
     idle = months_since(c.get("pushed"))
-    s = 1.4 * min(f, 4) - (1.5 if f == 0 else 0)                      # relevance
+    lenses = set(c.get("lenses", []))
+    s = 2.2 * min(f, 4) - (2.0 if f == 0 else 0)                      # relevance dominates
     s += 1.6 * max(0.0, 1 - age / 18)                                 # created in the last 18 months
     s -= 0.6 if age > 48 else 0
     s += 1.0 if idle < 1 else 0.6 if idle < SLOW else -2.5 if idle < HIDE else -4.0   # unmaintained sinks
-    s += 0.7 * math.log10(stars / max(age, 1) + 1)                    # momentum: stars per month
-    s += 0.3 * math.log10(stars + 1)                                  # reach
-    s += 0.3 * len(set(c.get("lenses", [])))                          # independent routes found it
+    s += min(1.5, 0.5 * math.log10(stars / max(age, 1) + 1))          # momentum: stars per month, capped
+    s += 0.2 * math.log10(stars + 1)                                  # reach
+    s += (0.3 if f > 0 else 0.1) * len(lenses - {"W", "L"})           # independent routes found it
+    s += 3.0 if "W" in lenses else 0.5 if "L" in lenses else 0        # a person or a curated list pointed at it
     inst = math.log10((c.get("installs") or 0) + 1)                   # skills.sh installs: real use
-    s += 0.4 * inst if f > 0 else min(0.5, 0.12 * inst)
+    s += 0.4 * inst if f > 0 else min(0.4, 0.1 * inst)
     if q is not None:
         forms = [g[0].lower() for g in groups(q.get("forms"))]
         hay = (c.get("desc") or "").lower() + " " + " ".join(c.get("topics") or [])
@@ -317,6 +352,10 @@ class Scan:
         if kind == "mcp":
             return self.add_slugs(self.client.mcp_search(query), lens)
         picked = [str(x) for x in as_list(self.q.get("picked"))]
+        if self.store is not None:
+            ref = f"{self.project}/{self.qid}"
+            picked += [e["repo"] for (k, r), e in self.store.verdicts().items()
+                       if r == ref and e.get("verdict") in ("short", "card") and e["repo"] not in picked]
         if kind == "people":
             logins = list(dict.fromkeys(self.store.people() + [p.split("/")[0] for p in picked]))
             terms = vocab_terms(self.q)

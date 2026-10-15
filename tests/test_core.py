@@ -344,6 +344,58 @@ class FlowTests(Base):
         self.assertIn("entry points: README.md, src/main.py", out)
 
 
+class DogfoodFixTests(Base):
+    """Fixes from the first two real runs (agent video, human-sounding writing)."""
+
+    def test_every_synonym_is_searched(self):
+        q = {"entities": ["xiaohongshu|小红书|rednote"], "mechanisms": ["去AI味|humanizer"], "forms": ["skill"]}
+        queries = [x["query"] for x in discover.plan(q)]
+        for term in ("小红书", "rednote", "去AI味", "humanizer"):
+            self.assertTrue(any(term in s for s in queries if not s.startswith(("topic:",))), term)
+        self.assertIn("humanizer filename:SKILL.md", queries)
+
+    def test_fit_tolerates_word_forms_and_order(self):
+        q = {"problems": ["agent video editing"], "mechanisms": ["programmatic video"]}
+        self.assertEqual(discover.fit({"repo": "a/b", "desc": "Edit videos with coding agents", "topics": []}, q), 1)
+        self.assertEqual(discover.fit({"repo": "a/b", "desc": "Programmatic videos in React", "topics": []}, q), 1)
+        self.assertEqual(discover.fit({"repo": "a/b", "desc": "Agent for coding", "topics": []}, q), 0)
+
+    def test_relevant_beats_popular_and_added_beats_found(self):
+        popular = {"repo": "a/claude-stuff", "desc": "Everything for Claude Code and reddit", "stars": 200000,
+                   "created": ago(5)[:10], "pushed": ago(0.1)[:10], "license": "MIT", "lenses": ["E", "M", "R"], "topics": []}
+        relevant = {"repo": "b/xhs-reddit-cli", "desc": "Xiaohongshu and Reddit CLI with your logged-in browser",
+                    "stars": 300, "created": ago(5)[:10], "pushed": ago(0.5)[:10], "license": "MIT", "lenses": ["P"], "topics": []}
+        self.assertGreater(discover.score(relevant, QUESTION), discover.score(popular, QUESTION))
+        added = {**relevant, "repo": "c/x", "desc": "Reddit tool", "lenses": ["W"]}
+        found = {**relevant, "repo": "d/x", "desc": "Reddit tool", "lenses": ["E"]}
+        self.assertGreater(discover.score(added, QUESTION), discover.score(found, QUESTION))
+
+    def test_license_hint_catches_non_commercial(self):
+        self.assertEqual(examine.license_hint("# PolyForm Noncommercial License 1.0.0\n..."), ("PolyForm-Noncommercial", True))
+        self.assertEqual(examine.license_hint("MIT License\n\nCopyright"), ("MIT", False))
+        self.assertIsNone(examine.license_hint("All rights reserved."))
+
+    def test_note_idea_and_ask_update(self):
+        slug = "a/b"
+        self.api.add(repo(slug, pushed=ago(1)))
+        sha = "e" * 40
+        self.api.paths[f"repos/{slug}/commits/main"] = {"sha": sha}
+        self.api.paths[f"repos/{slug}/git/trees/{sha}"] = {"tree": [{"path": "LICENSE", "type": "blob", "size": 10}]}
+        self.api.paths[f"repos/{slug}/contents/LICENSE"] = "PolyForm Noncommercial License 1.0.0"
+        self.api.repos[slug]["license"] = None
+        code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
+                                    "--idea", "Judge pairs, not scores.", "--note", "judge design")
+        self.assertEqual(code, 0, out)
+        self.assertIn("LICENSE WARNING: PolyForm-Noncommercial", out)
+        card = self.store.card(slug)
+        self.assertEqual(card.data["license"], "PolyForm-Noncommercial")
+        self.assertIn("## The idea\nJudge pairs, not scores.", card.body)
+        code, out, _ = self.run_cli("ask", "ops/browser-ops", "A sharper question", "--stage", "prototype", "--update")
+        self.assertEqual(code, 0, out)
+        q = self.store.question("ops/browser-ops").data
+        self.assertEqual((q["ask"], q["stage"]), ("A sharper question", "prototype"))
+
+
 class ExamineTests(unittest.TestCase):
     def test_guess_form_and_kind(self):
         g = examine.guess_kind

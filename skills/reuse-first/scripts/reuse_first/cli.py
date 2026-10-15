@@ -16,7 +16,8 @@ from .discover import (
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
 from .registry import (
-    find, new_card, new_project, new_question, render_find, set_use, show_card, show_question, stage_help, write_index,
+    find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
+    write_index,
 )
 from .store import KINDS, LEVELS, STAGES, TAKES, Store, StoreError, locate, today
 
@@ -108,6 +109,14 @@ def cmd_new_project(args):
 
 def cmd_ask(args):
     store = _store(args)
+    project, qid = store.split_ref(args.ref)
+    if args.update:
+        doc = store.question(args.ref)
+        doc.data["ask"] = args.question
+        doc.data["stage"] = args.stage
+        store.save_question(doc)
+        print(f"{doc.path}: ask and stage updated (edit the body's stage line by hand if it differs)")
+        return
     path = new_question(store, args.ref, args.question, args.stage)
     print(f"{path}\n"
           f"stage {args.stage}: {stage_help(store, args.stage)}\n"
@@ -169,8 +178,24 @@ def cmd_scan(args):
         path = store.save_scan(scan)
         print(f"saved {path.relative_to(store.root)} · {client.calls} API calls", file=sys.stderr)
     merged = _merged(store, q["project"], q["id"])
+    if (args.add or args.expand) and not args.show and not args.json:
+        rows = visible(merged)
+        index = {c["repo"].lower(): i for i, c in enumerate(rows, 1)}
+        added = [c["repo"] for c in scan["candidates"]]
+        print(f"added {len(added)} repos ({scan.get('dropped', 0)} dropped: no push in 12 months). Where they rank now:")
+        by = {c["repo"].lower(): c for c in merged["candidates"]}
+        for slug in added:
+            c = by.get(slug.lower())
+            if c is None:
+                continue
+            i = index.get(slug.lower())
+            from .discover import row
+            print(row(i, c) if i else f"  -  {slug}  ({'decided' if c.get('card') or c.get('seen') else 'stale or a list'})")
+        print(f"full table: reuse-first scan {ref} --show")
+        return
     _out(args, render(merged, args.top, args.all)
-         + f"\nnext: reuse-first pick {ref} <#>... --rest \"<why the rest do not help>\"", merged)
+         + f"\nnext: reuse-first pick {ref} <#>... --rest \"<why the rest do not help>\" "
+           f"(numbers refer to this table)", merged)
 
 
 def cmd_pick(args):
@@ -208,6 +233,13 @@ def cmd_pick(args):
     for e in entries:
         counts[e["verdict"]] = counts.get(e["verdict"], 0) + 1
     print("recorded: " + (", ".join(f"{k} {v}" for k, v in counts.items()) or "nothing"))
+    for verdict in ("short", "list", "later"):
+        names = [e["repo"] for e in entries if e["verdict"] == verdict]
+        if names:
+            print(f"  {verdict}: " + ", ".join(names))
+    explicit = [e["repo"] for e in entries if e["verdict"] == "skip" and e.get("reason") != args.rest]
+    if explicit:
+        print("  skip: " + ", ".join(explicit))
     short = [e["repo"] for e in entries if e["verdict"] == "short"]
     if short:
         print(f"next: reuse-first look --q {project}/{qid} " + " ".join(short))
@@ -224,7 +256,7 @@ def cmd_look(args):
         card = store.card(r)
         slug = card.id if card else _slug(r)
         try:
-            p = peek(client, slug, args.readme)
+            p = peek(client, slug, min(args.readme, 600) if args.source else args.readme)
         except (LookupError, GitHubError) as exc:
             texts.append(f"## {r}: {exc}")
             continue
@@ -272,6 +304,8 @@ def cmd_note(args):
     use = {"project": project, "question": qid, "take": args.take, "where": args.where, "note": args.note}
     if card:
         set_use(store, card.id, use, args.level)
+        if args.idea:
+            put_idea(store, card.id, args.idea)
         store.append_ledger([_entry(args, card.id, project, qid, "card", args.level or "read", f"{args.take}: {args.note or ''}")])
         print(f"{card.path}: {project}/{qid} -> {args.take}")
         return
@@ -283,8 +317,12 @@ def cmd_note(args):
     client = make_client(args, store)
     meta = peek(client, slug, 0)
     kind = args.kind or meta["kind"]
+    if meta.get("license_note"):
+        print(f"LICENSE WARNING: {meta['license']}: {meta['license_note']}")
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
                    args.level or "read", args.summary)
+    if args.idea:
+        put_idea(store, doc.id, args.idea)
     store.append_ledger([_entry(args, meta["repo"], project, qid, "card", args.level or "read",
                                 f"{args.take}: {args.note or ''}", meta)])
     print(f"{doc.path}\nkind {kind} ({meta['form']}; {'; '.join(meta['evidence'])})\n"
@@ -373,6 +411,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("ref", help="<project>/<question-id>")
     p.add_argument("question", help="one sentence: the result we want, not the tool we imagine")
     p.add_argument("--stage", required=True, choices=STAGES, help="where our own work stands")
+    p.add_argument("--update", action="store_true", help="change the ask and stage of an existing question")
 
     p = add("find", cmd_find, "search questions, cards and the ledger: has anyone looked at this?", (common, js))
     p.add_argument("words", nargs="+")
@@ -423,6 +462,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--summary", help="one line; default: the repo description")
     p.add_argument("--level", choices=LEVELS, help="how deep we looked (default read)")
     p.add_argument("--card", action="store_true", help="with --take skip: make a card anyway")
+    p.add_argument("--idea", help="the idea, written into the card's first section")
 
     p = add("show", cmd_show, "a question with its coverage and answer, or a card with its history")
     p.add_argument("ref", help="<project>/<question>, owner/repo, or an alias")

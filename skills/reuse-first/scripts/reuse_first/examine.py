@@ -34,6 +34,35 @@ FORM_KIND = {"skill": "skill", "skill-pack": "skill", "rules": "skill", "list": 
              "data": "other"}
 
 
+# Licenses GitHub reports as NOASSERTION or not at all, recognised from the file itself.
+LICENSE_HINTS = [
+    (r"PolyForm Noncommercial", "PolyForm-Noncommercial", True),
+    (r"PolyForm Shield", "PolyForm-Shield", True),
+    (r"PolyForm", "PolyForm", True),
+    (r"Commons Clause", "Commons-Clause", True),
+    (r"Business Source License", "BUSL", True),
+    (r"Server Side Public License", "SSPL", True),
+    (r"Elastic License", "Elastic", True),
+    (r"Attribution-NonCommercial|CC BY-NC", "CC-BY-NC", True),
+    (r"non-?commercial", "custom (non-commercial)", True),
+    (r"MIT License|Permission is hereby granted, free of charge", "MIT", False),
+    (r"Apache License[\s\S]{0,80}Version 2\.0", "Apache-2.0", False),
+    (r"GNU AFFERO GENERAL PUBLIC", "AGPL-3.0", False),
+    (r"GNU GENERAL PUBLIC LICENSE", "GPL", False),
+    (r"BSD", "BSD", False),
+]
+LICENSE_FILES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING", "license", "License.md")
+
+
+def license_hint(text: str) -> tuple[str, bool] | None:
+    """(name, non-commercial?) from a license file's first lines."""
+    head = text[:3000]
+    for pattern, name, nc in LICENSE_HINTS:
+        if re.search(pattern, head, re.I if name.startswith("custom") else 0):
+            return name, nc
+    return None
+
+
 def kind_of(form: str) -> str:
     """The four kinds the registry uses: skill, software, list, other."""
     return FORM_KIND.get(form, "software")
@@ -111,7 +140,7 @@ def clean_readme(text: str, limit: int) -> str:
                 continue
         lines.append(s)
     out = "\n".join(lines).strip()
-    return out if len(out) <= limit else out[:limit].rsplit("\n", 1)[0] + "\n[... README cut; reuse-first peek --readme N for more]"
+    return out if len(out) <= limit else out[:limit].rsplit("\n", 1)[0] + "\n[... README cut; reuse-first look --readme N for more]"
 
 
 def tree_summary(paths: list[tuple[str, int]], depth: int = 1, width: int = 14) -> list[str]:
@@ -161,13 +190,24 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
     top_share = round(100 * int(people[0].get("contributions") or 0) / total) if people and total else None
     skills = [p for p in paths if p.endswith("SKILL.md")]
     pkg = _json(files.get("package.json"))
+    lic = (r.get("license") or {}).get("spdx_id")
+    lic_note = None
+    if lic in (None, "NOASSERTION"):
+        lf = next((f for f in LICENSE_FILES if f in paths), None)
+        hint = license_hint(client.file(slug, lf, sha) or "") if lf else None
+        if hint:
+            lic, nc = hint
+            lic_note = "NON-COMMERCIAL: learn from it, do not copy or run it in a commercial project" if nc else None
+        else:
+            lic = "custom (read LICENSE)" if lf else None
+            lic_note = None if lf else "no license file: all rights reserved, read only"
     return {
         "repo": slug, "url": r.get("html_url") or f"https://github.com/{slug}",
         "desc": r.get("description") or "", "homepage": r.get("homepage") or "",
         "stars": r.get("stargazers_count", 0), "forks": r.get("forks_count", 0),
         "open_issues": r.get("open_issues_count", 0),
         "created": (r.get("created_at") or "")[:10], "pushed": (r.get("pushed_at") or "")[:10],
-        "license": (r.get("license") or {}).get("spdx_id"), "archived": r.get("archived", False),
+        "license": lic, "license_note": lic_note, "archived": r.get("archived", False),
         "lang": r.get("language"), "topics": r.get("topics", []), "branch": branch, "commit": sha[:12],
         "release": {"tag": rel.get("tag_name"), "date": (rel.get("published_at") or "")[:10]} if rel else None,
         "kind": kind_of(kind), "form": kind, "evidence": evidence, "files": len(paths),
@@ -197,7 +237,8 @@ def render_peek(p: dict) -> str:
     lines = [f"## {p['repo']}  ({p['kind']}: {p['form']}?)  {p['url']}",
              f"{p['desc']}",
              f"stars {p['stars']} · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
-             f" · license {p['license'] or 'none'} · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else ""),
+             f" · license {p['license'] or 'none'} · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else "")
+             + (f"\nLICENSE WARNING: {p['license_note']}" if p.get("license_note") else ""),
              f"head {p['branch']}@{p['commit']}" + (f" · release {p['release']['tag']} {p['release']['date']}" if p["release"] else " · no releases"),
              f"maintenance: {maintenance(a['idle_months'])} · {a['commits_30d']}{'+' if a['commits_30d'] >= 100 else ''} commits in 30 days"
              f" · {a['releases_90d']} releases in 90 days · {a['contributors']}{'+' if a['contributors'] >= 10 else ''} contributors"

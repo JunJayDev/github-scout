@@ -32,6 +32,9 @@ whom, and how it changes our project.
   `reuse-first.json`. If none exists, ask the user where to create one: `init <dir> [--lang zh]`.
 - Network: api.github.com, codeload.github.com, skills.sh, registry.modelcontextprotocol.io,
   registry.npmjs.org. A sandbox that blocks them makes every search fail.
+- Writes: every command except `find`, `show` and `scan --plan` writes to the registry. If your
+  harness only lets you write inside the project, keep the registry inside it or run the
+  commands outside the sandbox.
 
 ## The loop
 
@@ -42,7 +45,8 @@ start from its answer. If a repository has a card, read the card, not the reposi
 
 - Ask for the result, not the tool you imagine. Not "find a video generation tool" but "make
   our product videos cut and move like an editor's, with an agent doing the work".
-- Set the stage honestly. It decides what is worth borrowing:
+- Set the stage honestly. It decides what is worth borrowing. If parts of the question stand at
+  different stages, split it into two questions:
 
 | stage | where our work stands | borrow mostly |
 |---|---|---|
@@ -55,10 +59,14 @@ start from its answer. If a repository has a card, read the card, not the reposi
   Read that code first: you cannot judge a difference you have not seen.
 - Write the vocabulary in the frontmatter. It decides what the search can see:
   - `entities`: concrete things the solution touches (platforms, formats, APIs, products). Synonyms
-    and other-language names in one item with `|`: `"xiaohongshu|小红书|rednote"`.
+    and other-language names in one item with `|`: `"xiaohongshu|小红书|rednote"`. Every synonym is
+    searched on its own; pairs and combinations use the first term of the first six groups, so
+    put the most specific entities first.
   - `mechanisms`: how it would work, in the words a README uses: `"logged-in browser"`, `"remotion"`.
+    Add the positive way people name the goal too (`"human writing|活人感"`), not only the negative.
   - `forms`: `cli`, `mcp`, `skill`, `library`, `app`.
   - `problems`: 2–4 short phrases (GitHub ANDs every word), one per language.
+  - Changed the question later? `ask <q> "<new ask>" --stage <s> --update`.
 
 **2. Scan.** `scan <q> --plan` shows the searches; `scan <q>` runs about 80 of them across 13
 lenses in a few minutes and prints a ranked table (~2k tokens for 40 rows). Ranking puts
@@ -69,20 +77,25 @@ Maintenance is a hard rule: no push for over 3 months ranks far down, over 6 mon
 
 **3. Widen with what the API cannot see.** Search the web (`site:github.com <entity> <mechanism>`,
 other languages, forums) and X (posts that link github.com with your entities), and collect
-links the user shared. Feed them in: `scan <q> --add <file|url|text> --note "<where from>"`.
-Expand promising awesome lists with `scan <q> --expand <owner/list>`.
+links the user shared. Feed them in: `scan <q> --add <file|url|text> --note "<where from>"`
+(lens W; they rank high because someone pointed at them, and the command prints where each
+landed). Expand promising awesome lists with `scan <q> --expand <owner/list>` (lens L).
 
-**4. Pick.** `pick <q> 1 4 7 --rest "<why the rest do not help>"`. Choose on fit and description.
-Every row you were shown and did not pick is recorded as skipped with your reason.
+**4. Pick.** `pick <q> 1 4 7 --rest "<why the rest do not help>"`. Numbers refer to the table
+`scan` printed last (`scan <q> --show` reprints it); `pick` echoes the names it resolved, and
+`owner/repo` works too. Choose on fit and description. Every row you were shown and did not pick
+is recorded as skipped with your reason. Then `scan <q> --lenses UG`: it follows the stars of the
+picked repos' owners and the repos their READMEs link to, which find nothing before you pick.
 
 **5. Look.** `look --q <q> a/b c/d` (~1.3k tokens each): facts, activity (commits in 30 days,
 releases in 90, how much the top contributor carries), kind, tree with token sizes, README
 start. For the one to three that matter, `look a/b --source` downloads one commit and maps the
 code; read the parts that carry the idea. For software you might run, try it on one real task.
 
-**6. Note.** `note a/b --q <q> --take <take> --note "<what we take>" --where <our path>
---watch <upstream paths>` creates or updates the card. Fill the card, **the idea first**: the
-design decision, where it lives (file), why it is not obvious. A repository that gives nothing:
+**6. Note.** `note a/b --q <q> --take <take> --idea "<the idea, where it lives, why not obvious>"
+--note "<what we take>" --where <our path> --watch <upstream paths>` creates or updates the card;
+`--idea` fills its first section. A license GitHub cannot name is read from the file; a
+non-commercial one prints a warning (learn the idea, do not copy or run it). A repository that gives nothing:
 `note a/b --q <q> --take skip --note "<why>"` (ledger only, no card).
 
 **7. Answer.** Write the `## Answer` section of the question file. This is the deliverable:

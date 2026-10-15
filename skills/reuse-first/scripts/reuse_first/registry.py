@@ -223,6 +223,25 @@ def set_use(store: Store, slug: str, use: dict, level: str | None = None) -> Doc
     return card
 
 
+def put_idea(store: Store, slug: str, idea: str) -> None:
+    """Write the idea into the card's first section, replacing the template hint if it is still there."""
+    card = store.card(slug)
+    lines = card.body.split("\n")
+    first = next((i for i, ln in enumerate(lines) if ln.startswith("## ")), None)
+    if first is None:
+        card.body = card.body.rstrip() + "\n\n" + idea + "\n"
+    else:
+        j = first + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j < len(lines) and lines[j].startswith(("(", "（")):
+            lines[j] = idea
+        else:
+            lines.insert(first + 1, idea)
+        card.body = "\n".join(lines)
+    store.save_card(card)
+
+
 def new_project(store: Store, pid: str, name: str, summary: str, code: str = "") -> Path:
     path = store.root / "projects" / pid / "project.md"
     if path.exists():
