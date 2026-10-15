@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .github import Client
+from .discover import DROP, HIDE, SLOW, months_since
 from .store import Store, as_list, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
@@ -29,8 +30,17 @@ TEXT_EXT = {".md", ".txt", ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", 
             ".css", ".vue", ".svelte", ".lua", ".sql"}
 
 
+FORM_KIND = {"skill": "skill", "skill-pack": "skill", "rules": "skill", "list": "list", "example": "other",
+             "data": "other"}
+
+
+def kind_of(form: str) -> str:
+    """The four kinds the registry uses: skill, software, list, other."""
+    return FORM_KIND.get(form, "software")
+
+
 def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str, desc: str = "") -> tuple[str, list[str]]:
-    """Best guess of a repo's kind from its tree and root manifests, with the evidence."""
+    """Best guess of a repo's form (cli, mcp, skill-pack, ...) from its tree and manifests, with the evidence."""
     ev: list[str] = []
     skills = [p for p in paths if p.endswith("SKILL.md")]
     pkg = _json(files.get("package.json"))
@@ -141,6 +151,14 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
     readme = client.readme(slug, sha) or ""
     kind, evidence = guess_kind(paths, files, r["name"], readme, r.get("description") or "")
     rel = client.latest_release(slug)
+    import datetime as _dt
+    since30 = (_dt.date.today() - _dt.timedelta(days=30)).isoformat() + "T00:00:00Z"
+    commits30 = client.commits_since(slug, since30)
+    releases90 = [x for x in client.releases(slug, 30)
+                  if months_since((x.get("published_at") or "")[:10]) <= 3]
+    people = client.contributors(slug, 10)
+    total = sum(int(x.get("contributions") or 0) for x in people)
+    top_share = round(100 * int(people[0].get("contributions") or 0) / total) if people and total else None
     skills = [p for p in paths if p.endswith("SKILL.md")]
     pkg = _json(files.get("package.json"))
     return {
@@ -152,7 +170,11 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
         "license": (r.get("license") or {}).get("spdx_id"), "archived": r.get("archived", False),
         "lang": r.get("language"), "topics": r.get("topics", []), "branch": branch, "commit": sha[:12],
         "release": {"tag": rel.get("tag_name"), "date": (rel.get("published_at") or "")[:10]} if rel else None,
-        "kind": kind, "evidence": evidence, "files": len(paths), "truncated": bool(tree.get("truncated")),
+        "kind": kind_of(kind), "form": kind, "evidence": evidence, "files": len(paths),
+        "truncated": bool(tree.get("truncated")),
+        "activity": {"idle_months": round(months_since((r.get("pushed_at") or "")[:10]), 1),
+                     "commits_30d": commits30, "releases_90d": len(releases90),
+                     "contributors": len(people), "top_contributor_pct": top_share},
         "tree": tree_summary(entries), "skills": skills[:15],
         "manifests": [m for m in MANIFESTS if m in paths],
         "package": {k: pkg[k] for k in ("name", "version", "bin") if k in pkg} if pkg else None,
@@ -160,12 +182,26 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
     }
 
 
+def maintenance(idle: float) -> str:
+    if idle > DROP:
+        return f"UNMAINTAINED: no push in {idle:.0f} months; excluded by rule"
+    if idle > HIDE:
+        return f"stale: no push in {idle:.0f} months; ignore unless nothing newer exists"
+    if idle > SLOW:
+        return f"slowing: no push in {idle:.0f} months"
+    return "active"
+
+
 def render_peek(p: dict) -> str:
-    lines = [f"## {p['repo']}  ({p['kind']}?)  {p['url']}",
+    a = p["activity"]
+    lines = [f"## {p['repo']}  ({p['kind']}: {p['form']}?)  {p['url']}",
              f"{p['desc']}",
              f"stars {p['stars']} · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
              f" · license {p['license'] or 'none'} · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else ""),
              f"head {p['branch']}@{p['commit']}" + (f" · release {p['release']['tag']} {p['release']['date']}" if p["release"] else " · no releases"),
+             f"maintenance: {maintenance(a['idle_months'])} · {a['commits_30d']}{'+' if a['commits_30d'] >= 100 else ''} commits in 30 days"
+             f" · {a['releases_90d']} releases in 90 days · {a['contributors']}{'+' if a['contributors'] >= 10 else ''} contributors"
+             + (f", top one {a['top_contributor_pct']}% of commits" if a['top_contributor_pct'] is not None else ""),
              f"kind evidence: {'; '.join(p['evidence'])}"]
     if p["topics"]:
         lines.append("topics: " + ", ".join(p["topics"][:10]))
@@ -264,6 +300,9 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
             row["license_changed"] = f"{d.get('license')} -> {lic}"
         if r.get("archived"):
             row["archived"] = True
+        idle = months_since((r.get("pushed_at") or "")[:10])
+        if idle > SLOW:
+            row["unmaintained"] = f"no push in {idle:.0f} months"
         branch = d.get("branch") or r.get("default_branch") or "main"
         cmp = client.compare(r["full_name"], row["commit"], branch) if row["commit"] else None
         if cmp is None:
@@ -276,9 +315,10 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
             row["head"] = (cmp.get("commits") or [{}])[-1].get("sha", "")[:12] if cmp.get("commits") else row["commit"]
         rels = [x for x in client.releases(r["full_name"]) if (x.get("published_at") or "")[:10] > str(d.get("reviewed") or "")]
         row["releases"] = [x.get("tag_name") for x in rels][:6]
-        if row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") and not row.get("license_changed"):
+        if row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") and not row.get("license_changed") \
+                and not row.get("unmaintained"):
             row["state"] = "up to date"
-        elif row.get("watched_changed") or row.get("archived") or row.get("license_changed"):
+        elif row.get("watched_changed") or row.get("archived") or row.get("license_changed") or row.get("unmaintained"):
             row["state"] = "review"
         elif row.get("ahead") or row["releases"]:
             row["state"] = "changed (not in watched paths)" if as_list(d.get("watch")) else "changed (card watches no paths)"
@@ -298,7 +338,7 @@ def render_outdated(rows: list[dict]) -> str:
             bits.append("watched: " + ", ".join(w[:5]) + (f" +{len(w) - 5}" if len(w) > 5 else ""))
         if r.get("releases"):
             bits.append("releases " + ", ".join(r["releases"]))
-        for k in ("archived", "license_changed", "renamed"):
+        for k in ("archived", "unmaintained", "license_changed", "renamed"):
             if r.get(k):
                 bits.append(f"{k}: {r[k]}" if r[k] is not True else k)
         if r.get("stars") and r.get("stars_then") and r["stars"] != r["stars_then"]:

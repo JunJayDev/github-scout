@@ -57,10 +57,11 @@ def _token() -> str | None:
 class Client:
     """Thin REST/GraphQL client. `transport` can be swapped in tests."""
 
-    def __init__(self, token: str | None = None, transport=None, verbose: bool = True):
+    def __init__(self, token: str | None = None, transport=None, verbose: bool = True, stamp_dir: Path | None = None):
         self.token = token if token is not None else _token()
         self.transport = transport or self._urlopen
         self.verbose = verbose
+        self.stamp_dir = stamp_dir
         self.calls = 0
         self._last = {"search": 0.0, "code": 0.0}
 
@@ -127,11 +128,35 @@ class Client:
             raise
 
     def _throttle(self, kind: str):
+        """Space search calls. With a stamp file, several processes on one token share the budget."""
+        if self.transport != self._urlopen:
+            return
         gap = CODE_GAP if kind == "code" else SEARCH_GAP
-        wait = self._last[kind] + gap - time.monotonic()
-        if wait > 0 and self.transport == self._urlopen:
-            time.sleep(wait)
-        self._last[kind] = time.monotonic()
+        if self.stamp_dir is None:
+            wait = self._last[kind] + gap - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            self._last[kind] = time.monotonic()
+            return
+        self.stamp_dir.mkdir(parents=True, exist_ok=True)
+        path = self.stamp_dir / f".throttle-{kind}"
+        with open(path, "a+") as f:
+            _lock(f)
+            try:
+                f.seek(0)
+                try:
+                    last = float(f.read().strip() or 0)
+                except ValueError:
+                    last = 0.0
+                wait = last + gap - time.time()
+                if wait > 0:
+                    time.sleep(min(wait, gap * 4))
+                f.seek(0)
+                f.truncate()
+                f.write(str(time.time()))
+                f.flush()
+            finally:
+                _unlock(f)
 
     def search_repos(self, q: str, sort: str = "stars", per_page: int = 30) -> list[dict]:
         self._throttle("search")
@@ -170,6 +195,13 @@ class Client:
 
     def releases(self, slug: str, per_page: int = 20) -> list[dict]:
         return self.get_or_none(f"repos/{slug}/releases", {"per_page": per_page}) or []
+
+    def commits_since(self, slug: str, since_iso: str) -> int:
+        """Commits on the default branch since a date (capped at 100)."""
+        return len(self.get_or_none(f"repos/{slug}/commits", {"since": since_iso, "per_page": 100}) or [])
+
+    def contributors(self, slug: str, n: int = 10) -> list[dict]:
+        return self.get_or_none(f"repos/{slug}/contributors", {"per_page": n}) or []
 
     def compare(self, slug: str, base: str, head: str) -> dict | None:
         return self.get_or_none(f"repos/{slug}/compare/{base}...{head}")
@@ -276,6 +308,24 @@ class Client:
             if slug:
                 slugs.append(slug)
         return slugs
+
+
+def _lock(f):
+    try:
+        import fcntl
+
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+    except ImportError:  # Windows: no cross-process lock; each process still spaces its own calls
+        pass
+
+
+def _unlock(f):
+    try:
+        import fcntl
+
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except ImportError:
+        pass
 
 
 def _retry_wait(headers: dict, status: int) -> float | None:

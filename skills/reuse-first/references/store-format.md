@@ -1,115 +1,122 @@
-# Registry format (version 1)
+# Registry format (version 2)
 
 A registry is a directory of Markdown and JSON, usually a git repository so several agents and
-machines share it. `reuse-first check` validates it, and `reuse-first index` writes `INDEX.md`.
+machines share it. `reuse-first check` validates it and writes `INDEX.md`; `reuse-first site`
+writes `site/index.html`.
 
 ```
-reuse-first.json                      marker: {"format": 1, "name": "...", "default_project": null}
-README.md                             what the registry is (written by init)
-INDEX.md                              generated overview; do not edit
-people.txt                            GitHub logins whose stars feed the people lens
-projects/<project>/project.md         a project profile
-projects/<project>/needs/<need>.md    one capability: vocabulary, landscape, decision
-repos/<owner>__<repo>.md              one card per reviewed repository (lowercase file name)
-ledger.jsonl                          every verdict, append-only
-scans/<project>/<need>/<stamp>.json   each scan's searches and ranked candidates
-cache/                                downloaded source, one dir per commit (gitignored)
+reuse-first.json                         {"format": 2, "name": "...", "lang": "en" | "zh", "default_project": null}
+README.md                                what the registry is (written by init)
+INDEX.md                                 generated overview; do not edit
+people.txt                               GitHub logins whose stars feed the people lens
+projects/<project>/project.md            a project profile
+projects/<project>/questions/<q>.md      one question: stage, vocabulary, answer
+repos/<owner>__<repo>.md                 one card per repository looked at closely (lowercase file name)
+ledger.jsonl                             every verdict, append-only
+scans/<project>/<q>/<stamp>.json         each scan's searches and ranked candidates
+site/index.html                          generated viewer
+cache/                                   downloaded source, one dir per commit (gitignored)
 ```
 
-Ids: projects and needs use lowercase letters, digits, `.`, `_` and `-`. A need is referred to
-as `<project>/<need>`. A repository is `owner/repo`, kept in GitHub's capitalisation inside
-the card, with a lowercase file name.
+`lang` picks the language of new templates. Ids use lowercase letters, digits, `.`, `_` and
+`-`; a question is referred to as `<project>/<q>`; a repository as `owner/repo`.
 
-## Frontmatter
+Frontmatter uses a YAML subset any YAML parser reads: scalars (plain, `"double"` with JSON
+escapes, `'single'`), inline lists `[a, "b c"]`, and block lists of scalars or flat mappings.
 
-Frontmatter uses a YAML subset that any YAML parser reads: scalars (plain, `"double"` with
-JSON escapes, or `'single'`), inline lists `[a, "b c"]`, and block lists of scalars or of flat
-mappings. Nested mappings and block scalars (`|`, `>`) are rejected with a line number.
-
-### Project: `projects/<project>/project.md`
+## Project
 
 ```yaml
-id: shop                 # = directory name
+id: shop
 name: Shop backend
 summary: one line
-where: https://github.com/acme/shop     # optional: the repo or path of the project
+code: https://github.com/acme/shop       # where its code is: agents read it to compare
 stack: [python, postgres]
-constraints: ["no AGPL in the service", "must run on Linux arm64"]
-languages: [en, zh]      # languages to search in
+constraints: ["no AGPL in the service", "Linux arm64"]
+languages: [en, zh]
 ```
 
-The body describes the project for an agent judging fit.
-
-### Need: `projects/<project>/needs/<need>.md`
+## Question
 
 ```yaml
-id: payments
-project: shop
-want: "Take card payments with 3-D Secure from a Python service"
-status: open             # open | partial | covered | gap | building
-entities: ["stripe", "adyen", "3-d secure|3ds"]
-mechanisms: ["payment intent", "webhook signature"]
-forms: [library, service]
-problems: ["accept card payments python"]
+id: video-agent
+project: ops
+ask: "Make product videos that cut and move like an editor's, with an agent doing the work"
+stage: working            # idea | prototype | working | polishing
+status: open              # open | answered
+entities: ["remotion", "after effects"]
+mechanisms: ["programmatic video", "html to video"]
+forms: [skill, library]
+problems: ["agent video editing"]
 topics: []
-chosen: [stripe/stripe-python]     # cards the decision uses
-scanned: 2026-10-15                # set by scan
+picked: [heygen-com/hyperframes]   # repos the answer relies on
+scanned: 2026-10-15
 ```
 
-The body has two sections: `## Landscape` (the options side by side) and `## Decision`.
+Body sections (template in the registry's language): where we are (what we have, what is not
+good enough), the answer (one paragraph; ideas worth taking; practices and components; a
+table against what we have; next steps), and what was searched.
 
-### Card: `repos/<owner>__<repo>.md`
+## Card
 
 ```yaml
 id: jackwener/OpenCLI
 repo: https://github.com/jackwener/OpenCLI
-kind: cli                # skill | skill-pack | rules | mcp | cli | app | extension |
-                         # library | framework | service | list | example | data
+kind: software           # skill | software | list | other
+form: cli                # detail: skill-pack, mcp, cli, library, framework, app, extension, ...
 summary: "Turns websites into CLI commands through your logged-in Chrome"
-license: Apache-2.0      # SPDX id, or none
-stars: 30264             # at review time
-pushed: 2026-10-13
+license: Apache-2.0
+stars: 30264
 created: 2026-03-14
+pushed: 2026-10-13
 branch: main
 commit: b9213a15d63d     # the commit that was reviewed
 reviewed: 2026-10-14
-level: trial             # meta | peek | read | trial
-watch: [src/daemon.ts, "clis/reddit/**"]   # upstream paths we depend on
-aliases: [opencli]       # optional short names
+level: trial             # meta | look | read | trial
+watch: [src/daemon.ts, "clis/reddit/**"]
+aliases: [opencli]
 uses:
   - project: ops
-    need: browser-ops
-    relation: adopt      # adopt | extend | derive | migrate | borrow | watch | reject
+    question: browser-ops
+    take: use            # use | adapt | learn | later | skip
     where: tools/opencli
-    note: "Reddit reads through its fetch adapters; our own adapter for comments"
+    note: "Reddit reads through its fetch adapters"
 ```
 
-The body follows the template for the card's family (agent-facing, software, other). The
-template headings are suggestions; any Markdown is valid.
+The body starts with the idea (the design decision that makes the repo worth knowing), then
+quality, what we take, risks or safety, and what to read first.
 
-## Ledger: `ledger.jsonl`
+## Ledger
 
-One JSON object per line, append-only. The latest entry per (repo, project/need) is the
+One JSON object per line, append-only; the latest entry per (repo, project/question) is the
 current verdict.
 
 ```json
-{"date": "2026-10-15", "repo": "a/b", "project": "ops", "need": "browser-ops",
+{"date": "2026-10-15", "repo": "a/b", "project": "ops", "question": "browser-ops",
  "verdict": "skip", "level": "meta", "reason": "video downloader, not a browser driver",
- "stars": 1200, "pushed": "2026-09-30", "desc": "…", "scan": "20261015-001847", "by": "agent"}
+ "stars": 1200, "pushed": "2026-09-30", "desc": "…", "scan": "20261015-004320", "by": "agent"}
 ```
 
-Verdicts are `peeked`, `short`, `list`, `defer`, `skip` and `card`. A `skip` comes back in
-results once the repo's stars reach twice the recorded count (and at least 200 more).
+Verdicts: `peeked`, `short`, `list`, `later`, `skip`, `card`. A `skip` comes back once the
+repo's stars reach twice the recorded count (and at least 200 more).
 
-## Scan: `scans/<project>/<need>/<stamp>.json`
+## Scan
 
 ```json
-{"id": "20261015-001847", "date": "2026-10-15", "project": "ops", "need": "browser-ops",
- "lenses": "EPMCQTRKNUG",
- "searches": [{"lens": "P", "kind": "repos", "query": "reddit xiaohongshu in:readme", "hits": 30}],
- "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…",
-                 "license": "MIT", "lang": "Go", "topics": [], "archived": false, "fork": false,
-                 "lenses": ["E", "P"], "fit": 2, "score": 9.1}]}
+{"id": "20261015-004320", "date": "2026-10-15", "project": "ops", "question": "browser-ops",
+ "lenses": "EPMCQTRKSDNUG", "dropped": 12,
+ "searches": [{"lens": "P", "kind": "repos", "query": "reddit xiaohongshu in:readme pushed:>2026-04-15", "hits": 30}],
+ "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…", "license": "MIT",
+                 "lang": "Go", "topics": [], "archived": false, "fork": false, "lenses": ["E", "P"],
+                 "installs": 4200, "fit": 2, "score": 9.1}]}
 ```
 
-The search log is the proof of what was checked. Only the best 400 candidates are kept.
+`dropped` counts repos with no push in 12 months; they are not saved. Only the best 400
+candidates are kept. `fit` and `score` are recomputed from the question's vocabulary on every view.
+
+## From format 1
+
+Format 1 had `needs/` with `want` and `chosen`, card `uses` with `need` and `relation`, and 13
+kinds. Rename `needs/` to `questions/`, `want` to `ask` (and add `stage`, `status`), `chosen`
+to `picked`; in cards `need` to `question` and `relation` to `take` (adopt→use, extend,
+derive, migrate→adapt, borrow→learn, watch→later, reject→skip); kinds become `kind` + `form`.

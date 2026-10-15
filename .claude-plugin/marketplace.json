@@ -8,7 +8,7 @@
     {
       "name": "reuse-first",
       "source": "./",
-      "description": "Before building, find and vet existing open-source repos; record verdicts in a shared registry."
+      "description": "Before building, find what open source already solved, take the ideas that fit, record verdicts."
     }
   ]
 }

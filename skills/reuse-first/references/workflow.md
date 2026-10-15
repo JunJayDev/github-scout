@@ -5,20 +5,23 @@ Xiaohongshu through a logged-in browser, with no model in the loop. Agents searc
 "social media automation" and "自媒体 运营", found old bots and tutorials, and started writing
 their own scraper. The right tool, a 30k-star project created that year, described itself as
 "Make any website into CLI & use your logged-in browser by AI agent". None of the agents'
-words appeared in that sentence. A person found it while scrolling X.
+words appear in that sentence. A person found it while scrolling X.
 
-## 1. Vocabulary
+## 1. The question
 
-Bad, because it has only problem words:
+A weak question asks for a tool: "find a social media automation tool". It gets tools for
+someone else's problem.
 
-```yaml
-problems: ["social media automation", "post to social media"]
+A strong question asks for a result, says where we stand, and what is not good enough:
+
+```
+reuse-first ask ops/browser-ops "Drive our logged-in accounts on Reddit, X and Xiaohongshu from scripts, no model clicking pages" --stage prototype
 ```
 
-Good:
+Then, in the file: what we have (`tools/reddit/chrome.ts` drives Chrome through a model; one run
+costs 580k tokens and 16 subreddits get blocked), and the vocabulary:
 
 ```yaml
-want: "Drive logged-in sites (Reddit, X, Xiaohongshu) from scripts without a model in the loop"
 entities: ["reddit", "xiaohongshu|小红书|rednote", "twitter|x.com", "bilibili", "zhihu"]
 mechanisms: ["logged-in browser", "chrome extension", "browser cookies", "CDP"]
 forms: [cli, mcp, skill]
@@ -27,85 +30,85 @@ problems: ["social media automation", "自媒体 自动化", "website to cli"]
 
 Why each part works:
 
-- **Entity pairs** find multi-platform tools. A tool that supports both Reddit and Xiaohongshu
-  names both in its README; a tutorial about one platform does not. `"reddit xiaohongshu
-  in:readme"` put the target first.
-- **Mechanisms** find the tool by how it works. `"logged-in browser"` also put it first.
-- **Topics plus a 12-month window** find young projects that best-match search buries under
-  old ones.
+- **Entity pairs** find multi-platform tools: a tool that supports both Reddit and Xiaohongshu
+  names both in its README; a tutorial about one platform does not. `"reddit xiaohongshu"
+  in:readme` put the target first.
+- **Mechanisms** find a tool by how it works. `"logged-in browser"` also put it first.
+- **Topics plus a 12-month window** find young projects that best-match search buries.
 - **Other-language synonyms** (`小红书`) reach communities that do not write in English.
-- **Problem phrases** are kept, but they find the least.
+- **Problem phrases** find the least. Keep them short.
 
-Writing good mechanisms: picture the solution's README. What would it say it uses? "headless
-Chrome", "Playwright", "the Web Speech API", "an MCP server", "SQLite FTS5", "whisper.cpp".
-Write those words, not what the solution is for.
+Writing mechanisms: picture the solution's README. What would it say it uses? "headless
+Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those words.
 
 ## 2. Reading the scan table
 
 ```
-  #  score  stars   stars/mo  pushed  license      repo  description  [lenses]
-  1.  14.7  97.2k 12.7k/mo 26-10-08  MIT          Panniantong/Agent-Reach  Give your AI agent eyes ...  [EPMTR]  fit 4
-  7.   9.7  30.3k  4.3k/mo 26-10-13  Apache-2.0   jackwener/OpenCLI  Make Any Website into CLI & ...  [PMCR]  fit 1
+  #  score  stars created   pushed  repo  description  [lenses] fit
+  1.  11.6  64.2k  26-01 26-10-13  mvanhorn/last30days-skill  AI agent skill that researches ...  [EPMCTRS] fit 1
+  4.   9.5    282  26-10 26-10-14  aindeev/agent-chrome-relay  Let your AI agents use your Chrome ...  [T] fit 3
 ```
 
-- `score` combines fit, stars, stars per month since creation, how many lenses found the repo,
-  and recent activity. It decides the order of the table. It is not a verdict.
+- `score` orders the table; it is not a verdict. Relevance counts most, then life: a 282-star
+  repo created this month that matches three vocabulary groups ranks above a famous old one.
 - `fit` is the number of vocabulary groups in the repo's own name, description and topics.
-- The lens letters show why a row is there. Several letters mean several independent routes
-  found it.
-- `seen:skip@other/need` means another need already triaged the repo. Read that reason before
-  you look at it again.
+- Lens letters show why a row is there; several letters mean several independent routes found it.
+- The header line says how many repos were dropped (no push in 12 months) or hidden (6 months).
+- `seen:skip@other/question` means another question already judged it; read that reason first.
 
-Shortlist about 5–10 rows. One irrelevant shortlisted row costs a ~1.2k-token peek. One
-relevant row you skip is the whole reason this skill exists, so when in doubt, shortlist.
+Pick about 5–10 rows. A wrong pick costs a 1.3k-token look; a right one skipped is the whole
+reason this skill exists.
 
 ## 3. Widening the search
 
 The API does not see repos without good metadata, projects announced on social media, or
-projects hosted outside GitHub. One pass outside GitHub search takes about 5 minutes:
+projects hosted elsewhere. Do one pass outside GitHub search:
 
 | source | query patterns |
 |---|---|
-| web search | `site:github.com <entity> <mechanism>` · `site:github.com <entity> cli OR mcp OR skill` · `"<entity>" "github.com" <mechanism>` |
-| other languages | the same queries with `小红书`, `自动化`, `开源`, or Japanese, Korean and other terms |
+| web | `site:github.com <entity> <mechanism>` · `site:github.com <entity> cli OR mcp OR skill` |
+| other languages | the same with `小红书`, `自动化`, `开源`, Japanese, Korean terms |
 | forums | `<problem> github` on Reddit, Hacker News, V2EX, Zhihu |
-| X | posts that mention an entity and link github.com, plus posts from builders in the field |
-| the user | links they shared in chat or bookmarked |
-
-Pipe each result list into the registry, so the same ranking and triage apply:
+| X | posts that mention an entity and link github.com; builders in the field |
+| the user | links they shared or bookmarked |
 
 ```bash
-reuse-first ingest ops/browser-ops notes.txt --note "web: site:github.com xiaohongshu cli"
-pbpaste | reuse-first ingest ops/browser-ops - --note "X search: xiaohongshu github"
+reuse-first scan ops/browser-ops --add notes.txt --note "web: site:github.com xiaohongshu cli"
+pbpaste | reuse-first scan ops/browser-ops --add - --note "X: xiaohongshu github"
+reuse-first scan ops/browser-ops --expand someone/awesome-browser-agents
 ```
 
-For awesome lists, `expand` keeps only the links that match the need's vocabulary. Add `--all`
-to keep every link.
+## 4. Looking, reading, trying
 
-## 4. Peek, read, try
+- `look` shows activity next to the facts: commits in 30 days, releases in 90, the top
+  contributor's share. A one-person repo pushing daily is normal now; a team repo gone quiet is
+  a warning.
+- `look --source` maps the code in tokens, so you read `clis/reddit/*.js` and skip the other
+  100 adapters.
+- Look for the idea before the code: what decision did they make that we would not have? For
+  OpenCLI it was driving the browser through an extension that lives in the user's own profile,
+  so it inherits every login and never needs the debugging port.
 
-- `peek` shows a kind guess with its evidence. A repo can be a CLI that also ships skills
-  (OpenCLI ships four). Record the kind that describes how you would use it.
-- `fetch` prints the size of each part in tokens, so you can read `clis/reddit/*.js` and
-  skip the other 100 adapters.
-- For software: install it on the machine where it will run, do one real task with it, and
-  write down what happened (exit codes, failures, speed). That moves the card to `level: trial`.
+## 5. The answer
 
-## 5. Writing the decision
+Write it in the question file. A good one, for a project at `prototype`:
 
-A good Decision section names, for each part of the need, what covers it and how:
+> **In one paragraph.** Use OpenCLI for reads on Reddit and Xiaohongshu (pinned v1.8.8). Write
+> our own Reddit comment adapter on its plugin API, because its `reddit read` drops comment ids.
+> Keep posting where it is; nothing found posts without a model and survives rate limits.
+>
+> **Ideas worth taking.** (1) An extension inside the user's profile instead of a debugging port
+> (OpenCLI `extension/manifest.json`): inherits logins, works with Chrome 136+. (2) Exit codes
+> as a contract (`docs/guide/exit-codes.md`: 66 empty, 69 extension missing, 77 needs login):
+> our scheduler can route "needs login" to a human without parsing text.
+>
+> **Against what we have.** | model-driven page reading, 580k tokens a run | one JSON request per subreddit | ... | take |
 
-> Reads on Reddit and Xiaohongshu: jackwener/OpenCLI (adopt, pinned v1.8.8). Reddit comments
-> with ids and parents: our own adapter on OpenCLI's plugin API (extend; 60 lines), because
-> its `reddit read` drops comment ids. Posting stays on the existing scheduler; no tool found
-> that posts without a model and survives rate limits (scans 20261015-001847, web pass
-> 2026-10-15). Watch Tencent/BrowserSkill for the same job with a smaller permission set.
-
-That one paragraph tells the next agent what to run, what not to rebuild, and where the gap is.
+That tells the next agent what to run, what not to rebuild, and where the gap is.
 
 ## 6. Upkeep
 
-- Weekly, or before relying on a repo again: `outdated --project <p>`.
-- A `review` row means a watched path changed, a release came out, or the repo was archived
-  or relicensed. Run `diff`, update the card if anything you use changed, then `bump`.
-- Rescan a need with `scan`. `results` merges all scans, and repos already triaged stay hidden.
+- Before relying on a repo again: `updates --project <p>`.
+- A `review` row means a watched path changed, a release came out, the repo was archived or
+  relicensed, or it stopped being maintained. `updates --diff <repo>`, update the card, `updates --done <repo>`.
+- Rescan a question with `scan`; `scan --show` merges all scans and hides what was decided.

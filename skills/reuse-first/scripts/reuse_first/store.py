@@ -1,16 +1,17 @@
 """The registry store: a plain directory (usually a git repo) of Markdown and JSON.
 
-    reuse-first.json                 marker + settings
-    INDEX.md                         generated overview (reuse-first index)
-    projects/<project>/project.md    what a project is and its constraints
-    projects/<project>/needs/<need>.md   one capability: search vocabulary + decision
-    repos/<owner>__<repo>.md         one card per reviewed repository
-    ledger.jsonl                     every triage verdict, append-only
-    scans/<project>/<need>/<stamp>.json  what each search ran and found
-    people.txt                       GitHub logins whose stars feed the people lens
-    cache/                           downloaded source (not committed)
+    reuse-first.json                         marker + settings ({"format", "name", "lang"})
+    INDEX.md                                 generated overview
+    projects/<project>/project.md            what the project is, where its code is, its rules
+    projects/<project>/questions/<q>.md      one question: stage, vocabulary, and the answer (the brief)
+    repos/<owner>__<repo>.md                 one card per repository we looked at closely
+    ledger.jsonl                             every verdict, append-only
+    scans/<project>/<q>/<stamp>.json         what each search ran and found
+    people.txt                               GitHub logins whose stars feed the people lens
+    site/index.html                          generated viewer (reuse-first site)
+    cache/                                   downloaded source (not committed)
 
-See docs/store-format.md for the full specification.
+See references/store-format.md for the full specification.
 """
 
 from __future__ import annotations
@@ -25,27 +26,23 @@ from pathlib import Path
 from .yamlish import FormatError, join_frontmatter, split_frontmatter
 
 MARKER = "reuse-first.json"
-FORMAT = 1
+FORMAT = 2
 
-KINDS = {
-    "skill": "agent", "skill-pack": "agent", "rules": "agent",
-    "mcp": "software", "cli": "software", "app": "software", "extension": "software",
-    "library": "software", "framework": "software", "service": "software",
-    "list": "other", "example": "other", "data": "other",
-}
-FAMILY_TITLES = {"agent": "Agent-facing (skills, skill packs, rules)", "software": "Software (tools, servers, libraries, apps)",
-                 "other": "Other (lists, examples, data)"}
-# Strongest first: a card's overall status is its strongest relation.
-RELATIONS = ["adopt", "extend", "derive", "migrate", "borrow", "watch", "reject"]
-NEED_STATUS = ["open", "partial", "covered", "gap", "building"]
-VERDICTS = ["peeked", "short", "list", "defer", "skip", "card"]
-LEVELS = ["meta", "peek", "read", "trial"]
+# What a repository is. Skills and software are judged differently (references/evaluation.md).
+KINDS = ["skill", "software", "list", "other"]
+# What we take from it, strongest first. A card's status is its strongest take.
+TAKES = ["use", "adapt", "learn", "later", "skip"]
+# Where our own work stands. It decides what is worth borrowing.
+STAGES = ["idea", "prototype", "working", "polishing"]
+QUESTION_STATUS = ["open", "answered"]
+VERDICTS = ["peeked", "short", "list", "later", "skip", "card"]
+LEVELS = ["meta", "look", "read", "trial"]
 
-CARD_ORDER = ["id", "repo", "kind", "summary", "license", "stars", "pushed", "created", "branch", "commit",
+CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars", "created", "pushed", "branch", "commit",
               "reviewed", "level", "watch", "aliases", "uses"]
-NEED_ORDER = ["id", "project", "want", "status", "entities", "mechanisms", "forms", "problems", "topics",
-              "chosen", "scanned"]
-PROJECT_ORDER = ["id", "name", "summary", "where", "stack", "constraints", "languages"]
+QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "entities", "mechanisms", "forms", "problems", "topics",
+                  "picked", "scanned"]
+PROJECT_ORDER = ["id", "name", "summary", "code", "stack", "constraints", "languages"]
 
 SLUG = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9_.-]+$")
 ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -70,14 +67,19 @@ def card_filename(slug: str) -> str:
     return f"{owner}__{name}.md"
 
 
-def family(kind: str | None) -> str:
-    return KINDS.get(kind or "", "other")
-
-
 def as_list(v) -> list:
     if v is None:
         return []
     return v if isinstance(v, list) else [v]
+
+
+def strongest(takes: list[str]) -> str | None:
+    ranked = [t for t in TAKES if t in takes]
+    return ranked[0] if ranked else None
+
+
+def card_takes(data: dict) -> list[str]:
+    return [str(u.get("take")) for u in as_list(data.get("uses")) if isinstance(u, dict)]
 
 
 @dataclass
@@ -103,11 +105,6 @@ def read_doc(path: Path) -> Doc:
 def write_doc(path: Path, data: dict, body: str, order: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(join_frontmatter(data, body, order), encoding="utf-8")
-
-
-def strongest(relations: list[str]) -> str | None:
-    ranked = [r for r in RELATIONS if r in relations]
-    return ranked[0] if ranked else None
 
 
 # ---------------------------------------------------------------------------
@@ -174,11 +171,18 @@ class Store:
     def __init__(self, root: Path):
         self.root = Path(root)
         self.settings = json.loads((self.root / MARKER).read_text(encoding="utf-8"))
+        if int(self.settings.get("format", 1)) > FORMAT:
+            raise StoreError(f"{self.root} uses registry format {self.settings['format']}; this reuse-first reads "
+                             f"format {FORMAT}. Upgrade reuse-first.")
         self._cards: list[Doc] | None = None
+
+    @property
+    def lang(self) -> str:
+        return "zh" if str(self.settings.get("lang", "en")).lower().startswith("zh") else "en"
 
     # -- init ------------------------------------------------------------
     @staticmethod
-    def init(root: Path, name: str | None = None) -> "Store":
+    def init(root: Path, name: str | None = None, lang: str = "en") -> "Store":
         root = Path(root).expanduser()
         root.mkdir(parents=True, exist_ok=True)
         marker = root / MARKER
@@ -186,8 +190,8 @@ class Store:
             raise StoreError(f"{root} is already a registry")
         for sub in ("projects", "repos", "scans", "cache"):
             (root / sub).mkdir(exist_ok=True)
-        marker.write_text(json.dumps({"format": FORMAT, "name": name or root.name, "default_project": None},
-                                     indent=2) + "\n", encoding="utf-8")
+        marker.write_text(json.dumps({"format": FORMAT, "name": name or root.name, "lang": lang,
+                                      "default_project": None}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         (root / "ledger.jsonl").touch()
         gi = root / ".gitignore"
         if not gi.exists():
@@ -210,9 +214,10 @@ class Store:
 
     def card(self, ref: str) -> Doc | None:
         ref_l = ref.lower()
-        path = self.root / "repos" / card_filename(ref) if "/" in ref else None
-        if path and path.is_file():
-            return read_doc(path)
+        if "/" in ref:
+            path = self.root / "repos" / card_filename(ref)
+            if path.is_file():
+                return read_doc(path)
         for c in self.cards():
             if c.id.lower() == ref_l or ref_l in [str(a).lower() for a in as_list(c.data.get("aliases"))]:
                 return c
@@ -225,48 +230,53 @@ class Store:
         write_doc(doc.path, doc.data, doc.body, CARD_ORDER)
         self._cards = None
 
-    # -- projects and needs ---------------------------------------------
+    # -- projects and questions ------------------------------------------
     def projects(self) -> list[Doc]:
         d = self.root / "projects"
-        return [read_doc(p / "project.md") for p in sorted(d.iterdir()) if (p / "project.md").is_file()] if d.is_dir() else []
+        if not d.is_dir():
+            return []
+        return [read_doc(p / "project.md") for p in sorted(d.iterdir()) if (p / "project.md").is_file()]
 
     def project(self, pid: str) -> Doc | None:
         p = self.root / "projects" / pid / "project.md"
         return read_doc(p) if p.is_file() else None
 
-    def needs(self, project: str | None = None) -> list[Doc]:
+    def questions(self, project: str | None = None) -> list[Doc]:
         out = []
         for proj in self.projects():
             pid = proj.path.parent.name
             if project and pid != project:
                 continue
-            nd = proj.path.parent / "needs"
-            if nd.is_dir():
-                out.extend(read_doc(p) for p in sorted(nd.glob("*.md")))
+            qd = proj.path.parent / "questions"
+            if qd.is_dir():
+                out.extend(read_doc(p) for p in sorted(qd.glob("*.md")))
         return out
 
-    def need_path(self, project: str, need: str) -> Path:
-        return self.root / "projects" / project / "needs" / f"{need}.md"
+    def question_path(self, project: str, qid: str) -> Path:
+        return self.root / "projects" / project / "questions" / f"{qid}.md"
 
-    def need(self, ref: str) -> Doc:
-        project, need = self.split_ref(ref)
-        p = self.need_path(project, need)
+    def question(self, ref: str) -> Doc:
+        project, qid = self.split_ref(ref)
+        p = self.question_path(project, qid)
         if not p.is_file():
-            raise StoreError(f"no need {project}/{need} (create it: reuse-first new-need {project}/{need} --want \"...\")")
+            raise StoreError(f"no question {project}/{qid} (create it: reuse-first ask {project}/{qid} \"...\")")
         doc = read_doc(p)
         if doc.error:
             raise StoreError(f"{p}: {doc.error}")
         return doc
 
+    def save_question(self, doc: Doc) -> None:
+        write_doc(doc.path, doc.data, doc.body, QUESTION_ORDER)
+
     def split_ref(self, ref: str) -> tuple[str, str]:
         if "/" in ref:
-            project, need = ref.split("/", 1)
+            project, qid = ref.split("/", 1)
         else:
             project = self.settings.get("default_project") or read_config().get("REUSE_FIRST_PROJECT")
-            need = ref
+            qid = ref
             if not project:
-                raise StoreError(f"write the need as <project>/<need> (no default project set): {ref}")
-        return project, need
+                raise StoreError(f"write the question as <project>/<question> (no default project set): {ref}")
+        return project, qid
 
     # -- ledger ----------------------------------------------------------
     def ledger(self) -> list[dict]:
@@ -287,15 +297,14 @@ class Store:
         if not entries:
             return
         with (self.root / "ledger.jsonl").open("a", encoding="utf-8") as f:
-            for e in entries:
-                f.write(json.dumps(e, ensure_ascii=False, sort_keys=True) + "\n")
+            f.write("".join(json.dumps(e, ensure_ascii=False, sort_keys=True) + "\n" for e in entries))
 
     def verdicts(self) -> dict[tuple[str, str], dict]:
-        """Latest ledger entry per (repo, project/need)."""
+        """Latest ledger entry per (repo, project/question)."""
         latest: dict[tuple[str, str], dict] = {}
         for e in self.ledger():
             if "repo" in e:
-                latest[(e["repo"].lower(), f"{e.get('project', '')}/{e.get('need', '')}")] = e
+                latest[(e["repo"].lower(), f"{e.get('project', '')}/{e.get('question', '')}")] = e
         return latest
 
     def history(self, slug: str) -> list[dict]:
@@ -303,15 +312,15 @@ class Store:
         return [e for e in self.ledger() if str(e.get("repo", "")).lower() == s]
 
     # -- scans -----------------------------------------------------------
-    def scan_dir(self, project: str, need: str) -> Path:
-        return self.root / "scans" / project / need
+    def scan_dir(self, project: str, qid: str) -> Path:
+        return self.root / "scans" / project / qid
 
-    def scans(self, project: str, need: str) -> list[Path]:
-        d = self.scan_dir(project, need)
+    def scans(self, project: str, qid: str) -> list[Path]:
+        d = self.scan_dir(project, qid)
         return sorted(d.glob("*.json")) if d.is_dir() else []
 
     def save_scan(self, scan: dict) -> Path:
-        d = self.scan_dir(scan["project"], scan["need"])
+        d = self.scan_dir(scan["project"], scan["question"])
         d.mkdir(parents=True, exist_ok=True)
         p = d / f"{scan['id']}.json"
         p.write_text(json.dumps(scan, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
@@ -321,7 +330,8 @@ class Store:
         p = self.root / "people.txt"
         if not p.is_file():
             return []
-        return [l.split("#", 1)[0].strip() for l in p.read_text(encoding="utf-8").splitlines() if l.split("#", 1)[0].strip()]
+        return [ln.split("#", 1)[0].strip() for ln in p.read_text(encoding="utf-8").splitlines()
+                if ln.split("#", 1)[0].strip()]
 
     # -- cache -----------------------------------------------------------
     def cache_dir(self, slug: str, sha: str) -> Path:
@@ -337,7 +347,10 @@ class Store:
     def check(self) -> tuple[list[str], list[str]]:
         errors: list[str] = []
         warns: list[str] = []
-        rel = lambda p: str(p.relative_to(self.root))  # noqa: E731
+
+        def rel(p: Path) -> str:
+            return str(p.relative_to(self.root))
+
         projects = {p.path.parent.name: p for p in self.projects()}
         for pid, doc in projects.items():
             if doc.error:
@@ -347,33 +360,35 @@ class Store:
                 errors.append(f"{rel(doc.path)}: id must be {pid!r}")
             if not ID.match(pid):
                 errors.append(f"{rel(doc.path)}: project ids use lowercase letters, digits, . _ -")
-        need_ids: set[str] = set()
-        for doc in self.needs():
-            pid = doc.path.parent.parent.name
-            nid = doc.path.stem
-            need_ids.add(f"{pid}/{nid}")
+        qids: set[str] = set()
+        for doc in self.questions():
+            pid, qid = doc.path.parent.parent.name, doc.path.stem
+            qids.add(f"{pid}/{qid}")
+            r = rel(doc.path)
             if doc.error:
-                errors.append(f"{rel(doc.path)}: {doc.error}")
+                errors.append(f"{r}: {doc.error}")
                 continue
             d = doc.data
-            if d.get("id") != nid:
-                errors.append(f"{rel(doc.path)}: id must be {nid!r}")
+            if d.get("id") != qid:
+                errors.append(f"{r}: id must be {qid!r}")
             if d.get("project") != pid:
-                errors.append(f"{rel(doc.path)}: project must be {pid!r}")
-            if not d.get("want"):
-                errors.append(f"{rel(doc.path)}: missing want")
-            if d.get("status") not in NEED_STATUS:
-                errors.append(f"{rel(doc.path)}: status must be one of {', '.join(NEED_STATUS)}")
-            for key in ("entities", "mechanisms", "forms", "problems", "topics", "chosen"):
+                errors.append(f"{r}: project must be {pid!r}")
+            if not d.get("ask"):
+                errors.append(f"{r}: missing ask (the question, one sentence)")
+            if d.get("stage") not in STAGES:
+                errors.append(f"{r}: stage must be one of {', '.join(STAGES)}")
+            if d.get("status") not in QUESTION_STATUS:
+                errors.append(f"{r}: status must be one of {', '.join(QUESTION_STATUS)}")
+            for key in ("entities", "mechanisms", "forms", "problems", "topics", "picked"):
                 if d.get(key) is not None and not isinstance(d.get(key), list):
-                    errors.append(f"{rel(doc.path)}: {key} must be a list")
+                    errors.append(f"{r}: {key} must be a list")
             if not (as_list(d.get("entities")) or as_list(d.get("mechanisms")) or as_list(d.get("problems"))):
-                warns.append(f"{rel(doc.path)}: no search vocabulary (entities, mechanisms, problems)")
-            for slug in as_list(d.get("chosen")):
+                warns.append(f"{r}: no search vocabulary yet (entities, mechanisms, problems)")
+            for slug in as_list(d.get("picked")):
                 if not self.card(str(slug)):
-                    warns.append(f"{rel(doc.path)}: chosen {slug} has no card")
+                    warns.append(f"{r}: picked {slug} has no card")
             if d.get("scanned") and not DATE.match(str(d.get("scanned"))):
-                errors.append(f"{rel(doc.path)}: scanned must be YYYY-MM-DD")
+                errors.append(f"{r}: scanned must be YYYY-MM-DD")
         seen_ids: dict[str, Path] = {}
         for doc in self.cards():
             r = rel(doc.path)
@@ -406,21 +421,21 @@ class Store:
                 errors.append(f"{r}: uses must be a list")
                 uses = []
             if not uses:
-                warns.append(f"{r}: no uses (relate it to a project, even as watch or reject)")
+                warns.append(f"{r}: no uses (say what a project takes from it, even skip)")
             for u in as_list(uses):
                 if not isinstance(u, dict):
-                    errors.append(f"{r}: each uses item is a mapping (project, need, relation, where, note)")
+                    errors.append(f"{r}: each uses item is a mapping (project, question, take, where, note)")
                     continue
-                if u.get("relation") not in RELATIONS:
-                    errors.append(f"{r}: relation must be one of {', '.join(RELATIONS)}")
+                if u.get("take") not in TAKES:
+                    errors.append(f"{r}: take must be one of {', '.join(TAKES)}")
                 if not u.get("project"):
                     errors.append(f"{r}: uses item without project")
                 elif u["project"] not in projects:
                     warns.append(f"{r}: project {u['project']!r} has no profile")
-                elif u.get("need") and f"{u['project']}/{u['need']}" not in need_ids:
-                    warns.append(f"{r}: need {u['project']}/{u['need']} does not exist")
-                if u.get("relation") in ("reject", "borrow", "migrate") and not u.get("note"):
-                    warns.append(f"{r}: {u.get('relation')} without a note (say why / what)")
+                elif u.get("question") and f"{u['project']}/{u['question']}" not in qids:
+                    warns.append(f"{r}: question {u['project']}/{u['question']} does not exist")
+                if u.get("take") in ("skip", "learn", "adapt") and not u.get("note"):
+                    warns.append(f"{r}: {u.get('take')} without a note (say what, or why not)")
         for n, e in enumerate(self.ledger(), 1):
             if "_bad" in e:
                 errors.append(f"ledger.jsonl:{n}: not JSON")
@@ -431,16 +446,15 @@ class Store:
 
 STORE_README = """# {name}
 
-A reuse-first registry: every open-source repository
-we looked at, what we decided, and what we searched for.
+A reuse-first registry: the questions we asked, what we found on GitHub, what we took from
+it, and every repository we looked at and why we passed.
 
-Start with `INDEX.md` (generated). Agents: load the reuse-first skill and run
-`reuse-first find <words>` before reading anything here by hand.
-
-- `projects/<project>/project.md`: what the project is and its constraints.
-- `projects/<project>/needs/<need>.md`: one capability, its search vocabulary, and the decision.
-- `repos/<owner>__<repo>.md`: one card per reviewed repository.
-- `ledger.jsonl`: every triage verdict, so nobody reviews the same repo twice.
+- `INDEX.md` (generated) and `site/index.html` (`reuse-first site`) give the overview.
+- `projects/<project>/questions/<q>.md`: one question, where we stand, and the answer.
+- `repos/<owner>__<repo>.md`: one card per repository we looked at closely.
+- `ledger.jsonl`: every verdict, so nobody looks at the same repository twice.
 - `scans/`: what each search ran and found.
-- `cache/`: downloaded source, not committed (`reuse-first fetch` restores it).
+- `cache/`: downloaded source, not committed.
+
+Agents: load the reuse-first skill and run `reuse-first find <words>` before reading anything here.
 """

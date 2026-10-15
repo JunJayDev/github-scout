@@ -1,4 +1,4 @@
-"""Cards, needs and projects: creating them, relating repos to needs, finding, indexing."""
+"""Questions, cards and projects: creating them, recording what we take, finding, indexing."""
 
 from __future__ import annotations
 
@@ -6,156 +6,268 @@ import re
 from pathlib import Path
 
 from .store import (
-    FAMILY_TITLES, KINDS, NEED_ORDER, PROJECT_ORDER, RELATIONS, Doc, Store, StoreError, as_list, family,
-    strongest, today, write_doc,
+    KINDS, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, as_list, card_takes, strongest,
+    today, write_doc,
 )
 
-TEMPLATES = {
-    "agent": """
+# What is worth borrowing depends on where our own work stands.
+STAGE_HELP = {
+    "en": {
+        "idea": "nothing built yet: borrow how others frame the problem, their overall approach, the dead ends they hit",
+        "prototype": "a first version exists: borrow key workflows, architecture and trade-offs",
+        "working": "it works: borrow techniques, parameters, prompts, edge cases and how they evaluate",
+        "polishing": "we are refining: borrow details, benchmarks and components we can drop in",
+    },
+    "zh": {
+        "idea": "还没动手：借别人怎么理解这个问题、整体做法、走过的弯路",
+        "prototype": "有了雏形：借关键流程、架构和取舍",
+        "working": "已经能用：借技巧、参数、提示词、边角处理和评测方法",
+        "polishing": "在打磨：借细节、对比基准和能直接搬的组件",
+    },
+}
+
+T = {
+    "en": {
+        "question": """
+# {ask}
+
+## Where we are
+Stage: {stage} ({stage_help})
+- What we have: (paths in our code, docs, what already works)
+- What is not good enough: (the reason we are asking)
+
+## Answer
+(The deliverable. Ideas first: code is cheap for an agent, an idea it never had is not.)
+
+### In one paragraph
+(What to take from whom, or "build it ourselves, because ...".)
+
+### Ideas worth taking
+(One per line: the idea, where it is (repo + file), why it is not obvious, how it applies to us.)
+
+### Practices and components
+(Only what our stage needs: workflows, parameters, prompts, modules.)
+
+### Against what we have
+| we have | they do | difference | take it? |
+|---|---|---|---|
+
+### Next steps in our project
+
+## Searched
+(Scans are in scans/{project}/{id}/. Note the web and X pass here.)
+""",
+        "skill": """
 # {id}
 
-## What it teaches
-(The method in two or three sentences: what an agent does differently with it.)
+## The idea
+(What it does that an agent would not think of. Where, by file.)
+
+## Method quality
+(Concrete steps or vague advice? Evidence it works? What it costs to load?)
 
 ## What we take
-(Concrete rules, steps, prompts or scripts, with file paths, and where they go in our setup.)
-
-## What we leave, and why
+(By our stage: idea, practice, parameter or component, with file paths.)
 
 ## Safety
-(Instructions or scripts that send data out, call the network, self-update or ask for broad
-permissions. "None found in <files>" is an answer.)
+(Network calls, credential reads, self-update, broad permissions. "None found in <files>" is an answer.)
 
 ## Read first
-(Paths relative to the repository root.)
 """,
-    "software": """
+        "software": """
 # {id}
 
-## What it is
-(Who maintains it, what it does, how it is used: CLI, server, library, app.)
+## The idea
+(The key design decision, and how it differs from what we would have built. Where, by file.)
 
-## What we use
-(Commands, modules, adapters and versions; where it runs in our setup.)
+## Quality
+(New and moving? Who uses it? Do maintainers answer issues?)
 
-## Fit and gaps
-(Which parts of the need it covers, and what we would still have to build.)
+## What we take
+(By our stage: idea, practice, parameter or component, with file paths; or how we run or adapt it.)
 
 ## Risks
-(Permissions, data it can reach, maintenance, license terms, lock-in.)
-
-## Adoption
-(How we install and pin it, the wrapper or plugin we write, and which of our own code it replaces.)
+(Permissions, data it can reach, license, lock-in.)
 
 ## Read first
-(Paths relative to the repository root.)
 """,
-    "other": """
+        "other": """
 # {id}
 
-## What it is
+## The idea
 
 ## What we take
 
 ## Read first
 """,
+    },
+    "zh": {
+        "question": """
+# {ask}
+
+## 我们现在
+阶段：{stage}（{stage_help}）
+- 已经有的：（我们的代码路径、文档、已经能用的部分）
+- 不满意的：（为什么要问这个问题）
+
+## 答案
+（交付物。思路优先：代码 agent 随手能写，没想到的思路不会去做。）
+
+### 一段话结论
+（向谁借什么；或者「只能自己做，因为……」。）
+
+### 值得借的思路
+（一行一条：思路是什么、在哪（仓库 + 文件）、为什么不是显而易见的、用到我们这里会怎样。）
+
+### 做法和组件
+（只写我们这个阶段用得上的：流程、参数、提示词、模块。）
+
+### 和我们已有的对照
+| 我们已有 | 别人的做法 | 差在哪 | 拿不拿 |
+|---|---|---|---|
+
+### 我们接下来改什么
+
+## 搜过哪些
+（扫描记录在 scans/{project}/{id}/；网页和 X 那一轮写在这里。）
+""",
+        "skill": """
+# {id}
+
+## 思路
+（它做了什么 agent 自己想不到的事。写在哪个文件。）
+
+## 方法质量
+（是具体步骤还是空泛建议？有没有真实效果？加载要多少 token？）
+
+## 我们拿什么
+（按我们的阶段：思路、做法、参数还是组件，写到文件。）
+
+## 安全
+（联网、读凭证、自动更新、要宽权限。没有就写「在哪些文件里没看到」。）
+
+## 先读
+""",
+        "software": """
+# {id}
+
+## 思路
+（关键的设计决定，和我们自己会怎么做有什么不同。写在哪个文件。）
+
+## 质量
+（新不新、更新勤不勤、谁在用、维护者回不回 issue。）
+
+## 我们拿什么
+（按我们的阶段：思路、做法、参数还是组件，写到文件；或者怎么直接用、怎么改了用。）
+
+## 风险
+（权限、能碰到的数据、许可证、锁定。）
+
+## 先读
+""",
+        "other": """
+# {id}
+
+## 思路
+
+## 我们拿什么
+
+## 先读
+""",
+    },
 }
 
 
-def new_card(store: Store, meta: dict, kind: str, uses: list[dict], watch: list[str], level: str,
+def stage_help(store: Store, stage: str) -> str:
+    return STAGE_HELP[store.lang].get(stage, "")
+
+
+def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[dict], watch: list[str], level: str,
              summary: str | None = None) -> Doc:
     slug = meta["repo"]
     path = store.card_path(slug)
     if path.exists():
-        raise StoreError(f"{slug} already has a card: {path} (use `relate` to add a use)")
+        raise StoreError(f"{slug} already has a card: {path} (use `note` again to add or change a take)")
     if kind not in KINDS:
         raise StoreError(f"kind must be one of {', '.join(KINDS)}")
     data = {
-        "id": slug, "repo": f"https://github.com/{slug}", "kind": kind,
+        "id": slug, "repo": f"https://github.com/{slug}", "kind": kind, "form": form,
         "summary": summary or meta.get("desc") or "", "license": meta.get("license") or "none",
-        "stars": meta.get("stars"), "pushed": meta.get("pushed") or None, "created": meta.get("created") or None,
+        "stars": meta.get("stars"), "created": meta.get("created") or None, "pushed": meta.get("pushed") or None,
         "branch": meta.get("branch"), "commit": meta.get("commit"), "reviewed": today(), "level": level,
         "watch": watch, "uses": uses,
     }
     data = {k: v for k, v in data.items() if v is not None}
-    doc = Doc(path, data, TEMPLATES[family(kind)].format(id=slug))
+    doc = Doc(path, data, T[store.lang].get(kind, T[store.lang]["other"]).format(id=slug))
     store.save_card(doc)
     return doc
 
 
-def relate(store: Store, slug: str, use: dict) -> Doc:
+def set_use(store: Store, slug: str, use: dict, level: str | None = None) -> Doc:
     card = store.card(slug)
     if not card or card.error:
-        raise StoreError(f"{slug}: no card (create one with `reuse-first card`)")
-    if use.get("relation") not in RELATIONS:
-        raise StoreError(f"relation must be one of {', '.join(RELATIONS)}")
+        raise StoreError(f"{slug}: no card")
+    if use.get("take") not in TAKES:
+        raise StoreError(f"take must be one of {', '.join(TAKES)}")
     uses = [u for u in as_list(card.data.get("uses")) if isinstance(u, dict)]
     for u in uses:
-        if u.get("project") == use.get("project") and (u.get("need") or None) == (use.get("need") or None):
+        if u.get("project") == use.get("project") and (u.get("question") or None) == (use.get("question") or None):
             u.update({k: v for k, v in use.items() if v})
             break
     else:
         uses.append({k: v for k, v in use.items() if v})
     card.data["uses"] = uses
+    if level:
+        card.data["level"] = level
     store.save_card(card)
     return card
 
 
-def new_project(store: Store, pid: str, name: str, summary: str) -> Path:
+def new_project(store: Store, pid: str, name: str, summary: str, code: str = "") -> Path:
     path = store.root / "projects" / pid / "project.md"
     if path.exists():
         raise StoreError(f"project {pid} exists: {path}")
-    data = {"id": pid, "name": name, "summary": summary, "where": "", "stack": [], "constraints": [],
+    data = {"id": pid, "name": name, "summary": summary, "code": code, "stack": [], "constraints": [],
             "languages": ["en"]}
-    body = f"""
-# {name}
-
-(What this project is, who it serves, and what we would never adopt: licenses, platforms,
-hosting, data handling. Agents read this before judging fit.)
-"""
+    body = ("\n# {name}\n\n(What this project is, who it serves, where its code is, and what we would never adopt: "
+            "licenses, platforms, hosting, data handling. Agents read this before judging fit.)\n" if store.lang == "en" else
+            "\n# {name}\n\n（这个项目是什么、给谁用、代码在哪；哪些东西绝不采用：许可证、平台、托管、数据处理。"
+            "agent 判断合不合适之前先读这里。）\n").format(name=name)
     write_doc(path, data, body, PROJECT_ORDER)
     return path
 
 
-def new_need(store: Store, ref: str, want: str) -> Path:
-    project, need = store.split_ref(ref)
+def new_question(store: Store, ref: str, ask: str, stage: str) -> Path:
+    project, qid = store.split_ref(ref)
     if not store.project(project):
         raise StoreError(f"no project {project} (reuse-first new-project {project} --name ...)")
-    path = store.need_path(project, need)
+    if stage not in STAGES:
+        raise StoreError(f"stage must be one of {', '.join(STAGES)}")
+    path = store.question_path(project, qid)
     if path.exists():
-        raise StoreError(f"need exists: {path}")
-    data = {"id": need, "project": project, "want": want, "status": "open", "entities": [], "mechanisms": [],
-            "forms": [], "problems": [], "topics": [], "chosen": [], "scanned": None}
-    body = f"""
-# {project}/{need}
-
-{want}
-
-## Landscape
-(Compare the serious options side by side: what each covers, how mature, what it costs us.
-`reuse-first show {project}/{need}` lists everything carded and triaged for this need.)
-
-## Decision
-(What we use for which part, what we adapt, and what we build because nothing covers it, with
-the searches that prove it: `scans/{project}/{need}/`.)
-"""
-    write_doc(path, data, body, NEED_ORDER)
+        raise StoreError(f"question exists: {path}")
+    data = {"id": qid, "project": project, "ask": ask, "stage": stage, "status": "open", "entities": [],
+            "mechanisms": [], "forms": [], "problems": [], "topics": [], "picked": [], "scanned": None}
+    body = T[store.lang]["question"].format(ask=ask, stage=stage, stage_help=stage_help(store, stage),
+                                            project=project, id=qid)
+    write_doc(path, data, body, QUESTION_ORDER)
     return path
 
 
 def card_line(c: Doc) -> str:
     d = c.data
-    rels = [f"{u.get('project')}/{u.get('need') or '-'}:{u.get('relation')}" for u in as_list(d.get("uses")) if isinstance(u, dict)]
-    return (f"{c.id} [{d.get('kind')}] {strongest([str(u.get('relation')) for u in as_list(d.get('uses')) if isinstance(u, dict)]) or 'unrelated'}"
-            f" — {str(d.get('summary') or '')[:100]} ({', '.join(rels) or 'no uses'}; reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]})")
+    uses = [u for u in as_list(d.get("uses")) if isinstance(u, dict)]
+    takes = [f"{u.get('project')}/{u.get('question') or '-'}:{u.get('take')}" for u in uses]
+    return (f"{c.id} [{d.get('kind')}{'/' + str(d['form']) if d.get('form') else ''}] {strongest(card_takes(d)) or 'unrelated'}"
+            f" — {str(d.get('summary') or '')[:100]} ({', '.join(takes) or 'no uses'}; "
+            f"reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]})")
 
 
 def _text(doc: Doc) -> str:
     vals = []
     for v in doc.data.values():
         if isinstance(v, list):
-            for x in v:
-                vals.append(" ".join(map(str, x.values())) if isinstance(x, dict) else str(x))
+            vals += [" ".join(map(str, x.values())) if isinstance(x, dict) else str(x) for x in v]
         else:
             vals.append(str(v))
     return (" ".join(vals) + " " + doc.body).lower()
@@ -170,79 +282,78 @@ def find(store: Store, terms: list[str], limit: int = 20) -> dict:
         return sum(1 for t in terms_l if t in text)
 
     cards = sorted(((hits(_text(c)), c) for c in store.cards() if not c.error), key=lambda x: (-x[0], x[1].id))
-    needs = sorted(((hits(_text(n)), n) for n in store.needs() if not n.error), key=lambda x: -x[0])
+    questions = sorted(((hits(_text(q)), q) for q in store.questions() if not q.error), key=lambda x: -x[0])
     seen: dict[str, dict] = {}
     for e in store.ledger():
         if "repo" not in e:
             continue
-        text = " ".join(str(e.get(k, "")) for k in ("repo", "reason", "need", "project", "desc")).lower()
-        h = hits(text)
+        h = hits(" ".join(str(e.get(k, "")) for k in ("repo", "reason", "question", "project", "desc")).lower())
         if h:
             prev = seen.get(e["repo"].lower())
             if not prev or (e.get("date") or "") >= (prev["entry"].get("date") or ""):
                 seen[e["repo"].lower()] = {"hits": h, "entry": e}
     carded = {c.id.lower() for _, c in cards}
     ledger = sorted((v for k, v in seen.items() if k not in carded), key=lambda v: -v["hits"])
-    top = max([h for h, _ in cards] + [h for h, _ in needs] + [v["hits"] for v in ledger] + [0])
-    keep = lambda h: h > 0 and (h == top or h >= 2 or len(terms_l) == 1)  # noqa: E731
-    return {
-        "cards": [c for h, c in cards if keep(h)][:limit],
-        "needs": [n for h, n in needs if keep(h)][:limit],
-        "ledger": [v["entry"] for v in ledger if keep(v["hits"])][:limit],
-    }
+    top = max([h for h, _ in cards] + [h for h, _ in questions] + [v["hits"] for v in ledger] + [0])
+
+    def keep(h: int) -> bool:
+        return h > 0 and (h == top or h >= 2 or len(terms_l) == 1)
+
+    return {"cards": [c for h, c in cards if keep(h)][:limit],
+            "questions": [q for h, q in questions if keep(h)][:limit],
+            "ledger": [v["entry"] for v in ledger if keep(v["hits"])][:limit]}
 
 
 def render_find(res: dict) -> str:
     out = []
+    if res["questions"]:
+        out.append("questions:")
+        for q in res["questions"]:
+            d = q.data
+            out.append(f"  {d.get('project')}/{d.get('id')} [{d.get('stage')}, {d.get('status')}] {d.get('ask')}"
+                       f" (picked: {', '.join(map(str, as_list(d.get('picked')))) or '-'}; scanned {d.get('scanned') or 'never'})")
     if res["cards"]:
         out.append("cards:")
         out += [f"  {card_line(c)}" for c in res["cards"]]
-    if res["needs"]:
-        out.append("needs:")
-        for n in res["needs"]:
-            d = n.data
-            out.append(f"  {d.get('project')}/{d.get('id')} [{d.get('status')}] {d.get('want')}"
-                       f" (chosen: {', '.join(map(str, as_list(d.get('chosen')))) or '-'}; scanned {d.get('scanned') or 'never'})")
     if res["ledger"]:
-        out.append("triaged, no card:")
-        for e in res["ledger"]:
-            out.append(f"  {e['repo']} {e.get('verdict')} for {e.get('project')}/{e.get('need')} on {e.get('date')}"
-                       + (f": {e.get('reason')}" if e.get("reason") else ""))
-    return "\n".join(out) or "nothing in the registry matches. Run a scan for the need (see the skill)."
+        out.append("looked at, no card:")
+        out += [f"  {e['repo']} {e.get('verdict')} for {e.get('project')}/{e.get('question')} on {e.get('date')}"
+                + (f": {e.get('reason')}" if e.get("reason") else "") for e in res["ledger"]]
+    return "\n".join(out) or "nothing in the registry matches. Ask the question: reuse-first ask <project>/<id> \"...\""
 
 
-def coverage(store: Store, project: str, need: str) -> dict:
-    ref = f"{project}/{need}"
+def coverage(store: Store, project: str, qid: str) -> dict:
+    ref = f"{project}/{qid}"
     cards = [c for c in store.cards() if not c.error and any(
-        isinstance(u, dict) and u.get("project") == project and u.get("need") == need for u in as_list(c.data.get("uses")))]
+        isinstance(u, dict) and u.get("project") == project and u.get("question") == qid for u in as_list(c.data.get("uses")))]
     latest = {k: e for k, e in store.verdicts().items() if k[1] == ref}
     counts: dict[str, int] = {}
     for e in latest.values():
         counts[e["verdict"]] = counts.get(e["verdict"], 0) + 1
-    scans = store.scans(project, need)
-    return {"cards": cards, "verdicts": counts, "open": [e for e in latest.values() if e["verdict"] in ("short", "peeked", "defer", "list")],
-            "scans": [p.stem for p in scans]}
+    return {"cards": cards, "verdicts": counts,
+            "open": [e for e in latest.values() if e["verdict"] in ("short", "peeked", "list")],
+            "scans": [p.stem for p in store.scans(project, qid)]}
 
 
-def show_need(store: Store, ref: str) -> str:
-    doc = store.need(ref)
+def show_question(store: Store, ref: str) -> str:
+    doc = store.question(ref)
     d = doc.data
-    project, need = d["project"], d["id"]
-    cov = coverage(store, project, need)
-    out = [f"{project}/{need} [{d.get('status')}] {d.get('want')}",
+    cov = coverage(store, d["project"], d["id"])
+    out = [f"{d['project']}/{d['id']} [{d.get('stage')}, {d.get('status')}] {d.get('ask')}",
+           f"stage: {stage_help(store, str(d.get('stage')))}",
            f"file: {doc.path}",
-           f"chosen: {', '.join(map(str, as_list(d.get('chosen')))) or '-'} · scanned {d.get('scanned') or 'never'}"
-           f" · scans {len(cov['scans'])}" + (f" (latest {cov['scans'][-1]})" if cov["scans"] else ""),
-           "vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("entities", "mechanisms", "forms", "problems", "topics") if as_list(d.get(k)))]
-    out.append("triaged: " + (", ".join(f"{k} {v}" for k, v in sorted(cov["verdicts"].items())) or "nothing yet"))
+           f"picked: {', '.join(map(str, as_list(d.get('picked')))) or '-'} · scanned {d.get('scanned') or 'never'}"
+           f" · scans {len(cov['scans'])}",
+           "vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("entities", "mechanisms", "forms", "problems", "topics")
+                                       if as_list(d.get(k))),
+           "looked at: " + (", ".join(f"{k} {v}" for k, v in sorted(cov["verdicts"].items())) or "nothing yet")]
     if cov["open"]:
         out.append("waiting for a decision: " + ", ".join(f"{e['repo']} ({e['verdict']})" for e in cov["open"]))
     if cov["cards"]:
         out.append("cards:")
         out += [f"  {card_line(c)}" for c in cov["cards"]]
-    body = doc.body.strip()
-    if body:
-        out += ["", body]
+    if doc.body.strip():
+        out += ["", doc.body.strip()]
     return "\n".join(out)
 
 
@@ -251,48 +362,46 @@ def show_card(store: Store, ref: str) -> str:
     hist = store.history(card.id if card else ref)
     out = []
     if card:
-        out.append(f"card: {card.path}")
-        out.append(card.path.read_text(encoding="utf-8").strip())
+        out += [f"card: {card.path}", card.path.read_text(encoding="utf-8").strip()]
         cached = store.cached(card.id)
         if cached:
             out.append("cached source: " + ", ".join(str(p) for p in cached))
     if hist:
         out.append("ledger:")
-        out += [f"  {e.get('date')} {e.get('verdict')} ({e.get('level')}) {e.get('project')}/{e.get('need')}"
+        out += [f"  {e.get('date')} {e.get('verdict')} ({e.get('level')}) {e.get('project')}/{e.get('question')}"
                 + (f": {e.get('reason')}" if e.get("reason") else "") for e in hist]
-    return "\n".join(out) or f"{ref}: never seen. Peek it: reuse-first peek {ref}"
+    return "\n".join(out) or f"{ref}: never seen. Look at it: reuse-first look {ref}"
 
 
 def write_index(store: Store) -> Path:
     cards = [c for c in store.cards() if not c.error]
-    lines = [f"# {store.settings.get('name') or 'Registry'} index", "",
-             f"Generated by `reuse-first index` on {today()}. Do not edit; edit the cards and needs.", ""]
-    lines += ["## Needs", "", "| need | status | chosen | cards | triaged | last scan | want |", "|---|---|---|---|---|---|---|"]
-    for n in store.needs():
-        if n.error:
+    lines = [f"# {store.settings.get('name') or 'Registry'}", "",
+             f"Generated by `reuse-first check` on {today()}. Do not edit; edit the questions and cards.", "",
+             "## Questions", "", "| question | stage | status | picked | cards | looked at | asks |", "|---|---|---|---|---|---|---|"]
+    for q in store.questions():
+        if q.error:
             continue
-        d = n.data
+        d = q.data
         cov = coverage(store, d["project"], d["id"])
-        lines.append(f"| [{d['project']}/{d['id']}](projects/{d['project']}/needs/{d['id']}.md) | {d.get('status')} | "
-                     f"{', '.join(map(str, as_list(d.get('chosen')))) or '-'} | {len(cov['cards'])} | "
-                     f"{sum(cov['verdicts'].values())} | {cov['scans'][-1][:8] if cov['scans'] else '-'} | {_cell(d.get('want'))} |")
-    for fam in ("agent", "software", "other"):
-        group = [c for c in cards if family(c.data.get("kind")) == fam]
+        lines.append(f"| [{d['project']}/{d['id']}](projects/{d['project']}/questions/{d['id']}.md) | {d.get('stage')} | "
+                     f"{d.get('status')} | {', '.join(map(str, as_list(d.get('picked')))) or '-'} | {len(cov['cards'])} | "
+                     f"{sum(cov['verdicts'].values())} | {_cell(d.get('ask'))} |")
+    titles = {"skill": "Skills", "software": "Software", "list": "Lists", "other": "Other"}
+    for kind in KINDS:
+        group = [c for c in cards if c.data.get("kind") == kind]
         if not group:
             continue
-        lines += ["", f"## {FAMILY_TITLES[fam]}", "", "| repo | kind | status | uses | summary | stars | reviewed |",
-                  "|---|---|---|---|---|---|---|"]
-        for c in sorted(group, key=lambda c: (RELATIONS.index(strongest([str(u.get('relation')) for u in as_list(c.data.get('uses')) if isinstance(u, dict)]) or 'reject'), c.id.lower())):
+        lines += ["", f"## {titles[kind]}", "", "| repo | take | used by | summary | pushed | reviewed |",
+                  "|---|---|---|---|---|---|"]
+        for c in sorted(group, key=lambda c: (TAKES.index(strongest(card_takes(c.data)) or "skip"), c.id.lower())):
             d = c.data
             uses = [u for u in as_list(d.get("uses")) if isinstance(u, dict)]
-            lines.append(f"| [{c.id}](repos/{c.path.name}) | {d.get('kind')} | "
-                         f"{strongest([str(u.get('relation')) for u in uses]) or '-'} | "
-                         f"{', '.join(sorted({str(u.get('project')) + '/' + str(u.get('need') or '-') for u in uses}))} | "
-                         f"{_cell(d.get('summary'))} | {d.get('stars', '')} | {d.get('reviewed')} |")
+            lines.append(f"| [{c.id}](repos/{c.path.name}) | {strongest(card_takes(d)) or '-'} | "
+                         f"{', '.join(sorted({str(u.get('project')) + '/' + str(u.get('question') or '-') for u in uses}))} | "
+                         f"{_cell(d.get('summary'))} | {d.get('pushed', '')} | {d.get('reviewed')} |")
     led = store.ledger()
-    repos = {str(e.get('repo', '')).lower() for e in led if e.get("repo")}
-    lines += ["", "## Ledger", "", f"{len(led)} verdicts on {len(repos)} repositories in `ledger.jsonl`; "
-              f"{len(cards)} have cards. `reuse-first find <words>` searches all of it.", ""]
+    repos = {str(e.get("repo", "")).lower() for e in led if e.get("repo")}
+    lines += ["", "## Ledger", "", f"{len(led)} verdicts on {len(repos)} repositories; {len(cards)} have cards.", ""]
     path = store.root / "INDEX.md"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path

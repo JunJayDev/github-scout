@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reuse-first"
 version = "0.1.0"
-description = "Before building, find and vet existing open-source repos; record verdicts in a shared registry."
+description = "Before building, find what open source already solved, take the ideas that fit, record verdicts."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
