@@ -245,7 +245,7 @@ use its fallback and say so; never write that a lens ran when it did not.
 | entry point | URL | lenses it serves |
 |---|---|---|
 | GitHub search page | `https://github.com/search?q=<terms>&type=repositories&s=stars` | words (E, P, M, C, R) |
-| GitHub search API | `https://api.github.com/search/repositories?q=<terms>&sort=stars` | the same, as JSON; shared chat servers often hit its rate limit |
+| GitHub search API | `https://api.github.com/search/repositories?q=<terms>&sort=stars` | the same, as JSON; often unreachable from a chat |
 | topic page | `https://github.com/topics/<topic>?o=desc&s=updated` | topics (T), rising (H) |
 | trending | `https://github.com/trending?since=monthly` | rising (H) |
 | raw file | `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md` | lists (L), links (G) |
@@ -545,7 +545,7 @@ Where we stand: <what exists today, what falls short>
 | entry point | worked | fallback used |
 |---|---|---|
 | GitHub search page | yes | |
-| GitHub search API | no: rate limited | search page |
+| GitHub search API | no: could not open | search page |
 
 ### Search log
 | # | lens | direction | lang | query or URL | looked at | kept |

@@ -28,7 +28,7 @@ Where we stand: <what exists today, what falls short>
 | entry point | worked | fallback used |
 |---|---|---|
 | GitHub search page | yes | |
-| GitHub search API | no: rate limited | search page |
+| GitHub search API | no: could not open | search page |
 
 ### Search log
 | # | lens | direction | lang | query or URL | looked at | kept |
