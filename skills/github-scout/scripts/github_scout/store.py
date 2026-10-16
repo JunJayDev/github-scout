@@ -227,11 +227,11 @@ def locate(explicit: str | None = None, create_lang: str | None = None) -> Path:
         here = Path.cwd().resolve()
         found = next((p for p in [here, *here.parents] if marker_of(p)), None)
         root = found or DEFAULT_STORE.expanduser()
-        if not found and not marker_of(root):
-            if not create_lang:
-                raise StoreError(f"no registry yet. The first `github-scout ask` creates one in {DEFAULT_STORE}; "
-                                 "to keep it elsewhere, set GITHUB_SCOUT_STORE=<dir> or pass --store.")
-            Store.init(root, "github-scout", create_lang)
+        if not found and not marker_of(root) and not create_lang:
+            raise StoreError(f"no registry yet. The first `github-scout ask` creates one in {DEFAULT_STORE}; "
+                             "to keep it elsewhere, set GITHUB_SCOUT_STORE=<dir> or pass --store.")
+    if create_lang and not marker_of(root) and (not root.exists() or (root.is_dir() and not any(root.iterdir()))):
+        Store.init(root, root.name if root.name not in (".github-scout", "") else "github-scout", create_lang)
     if not marker_of(root):
         raise StoreError(f"{root} is not a registry (no {MARKER}). Run `github-scout init {root}`.")
     return root.resolve()

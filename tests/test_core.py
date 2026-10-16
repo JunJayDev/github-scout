@@ -228,6 +228,17 @@ class FirstRunTests(unittest.TestCase):
             finally:
                 os.chdir(cwd)
 
+    def test_ask_creates_a_named_registry_that_does_not_exist_yet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "team-registry"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = cli.main(["--store", str(root), "ask", "web/payments", "Take card payments", "--stage", "idea"])
+            self.assertEqual(code, 0, out.getvalue())
+            self.assertEqual(Store(root).lang, "en")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertNotEqual(cli.main(["--store", str(Path(tmp) / "nothing"), "find", "x"]), 0)   # reads never create
+
     def test_registries_made_before_the_rename_still_open(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "old"
