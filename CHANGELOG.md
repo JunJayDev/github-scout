@@ -14,6 +14,11 @@ Renamed from reuse-first to github-scout, and split by stage.
   licence and reviewed commit. The project is never changed.
 - `import`: a report from a cloud chat comes back into the registry (the question is created from the report when missing); every GitHub link is checked
   and the ones that do not exist are listed; table columns (kind, verdict, reason) are kept.
+  Verdicts count only outside the Candidates section: a ChatGPT Pro run wrote "learn" on all 84
+  candidate rows, which would have shortlisted every one.
+- Cloud search reads every awesome list it opens (that run opened one holding the best three
+  repos and missed them), writes "found by" word for word, names well-known tools without
+  searching, and tries `commits.atom` for dates before writing "unknown".
 - `ask` creates the registry (`~/.github-scout`) and the project on first use; inside a git
   repository the project is named after it and its code path recorded.
 - Lures (game cheats, cracks, "Ultimate Trainer 2026") and skills.sh install counts far beyond a

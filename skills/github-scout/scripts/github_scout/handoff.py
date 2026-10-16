@@ -67,11 +67,19 @@ def report_goal(text: str) -> tuple[str | None, str | None]:
 
 
 def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
-    """Every GitHub repo linked in the text, in order, and per repo the fields found in table rows."""
+    """Every GitHub repo linked in the text, in order, and per repo the fields found in table rows.
+
+    A verdict counts only outside the Candidates section: a candidate list is not triaged yet, and
+    a chat model fills such a column with one word for every row (84 rows of "learn" in one test).
+    """
     rows: dict[str, dict] = {}
     lines = text.splitlines()
+    candidates = False
     i = 0
     while i < len(lines):
+        h = re.match(r"^(#{1,2})\s+(.*)$", lines[i])
+        if h:
+            candidates = bool(re.search(r"candidates|候选", h.group(2), re.I))
         if lines[i].lstrip().startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|?\s*:?-{2,}", lines[i + 1]):
             header = _cells(lines[i])
             cols = {k: _column(header, k) for k in COLUMNS}
@@ -87,7 +95,7 @@ def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
                         if j is not None and j < len(cells) and cells[j] and key not in entry:
                             entry[key] = cells[j][:300]
                     j = cols["take"]
-                    if j is not None and j < len(cells) and _take(cells[j]):
+                    if not candidates and j is not None and j < len(cells) and _take(cells[j]):
                         entry["take"] = _take(cells[j])
                 i += 1
             continue

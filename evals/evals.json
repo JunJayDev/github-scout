@@ -21,6 +21,13 @@
       "stage": "working",
       "must_find": ["KKKKhazix/human-writing", "alchaincyf/tramstop-skill", "larashero3-dotcom/lieflat-less-ai-tone"],
       "note": "Chinese projects; tramstop is found by the Chinese term 人味, not by an English translation."
+    },
+    {
+      "id": "agent-video-making",
+      "prompt": "用 github-scout：研究 GitHub 上用 Claude Code（特别是 Opus 5.5）或 Codex 做视频的 skill、工作流、素材制作和下载方法，视频用于自媒体（起号、产品宣传、科普），覆盖画风、动画、转场、特效、素材、音效、剪辑，最后给完整登记表。",
+      "stage": "idea",
+      "must_find": ["Vincentwei1021/video-shotcraft", "YeJe-cpu/SeeCut", "feitangyuan/onetake"],
+      "note": "ChatGPT Pro run 2026-10-17 listed 84 repos but missed these three, the local picks for agents that check their own cut; all three are linked from zhuyansen/awesome-claude-video-skills, which that run opened and did not read."
     }
   ]
 }

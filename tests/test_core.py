@@ -436,6 +436,23 @@ class FlowTests(Base):
         self.assertNotIn("possibly invented", out)
         self.assertIn(("qwen/voice", "short"), {(e["repo"], e["verdict"]) for e in self.store.ledger()})
 
+    def test_import_takes_verdicts_from_triage_not_candidates(self):
+        self.seed()
+        self.run_cli("scan", "ops/browser-ops", "--quiet")
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("## 2. Candidates\n\n| repo | kind | verdict |\n|---|---|---|\n"
+                          "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | learn |\n"
+                          "| https://github.com/jackwener/OpenCLI | cli | learn |\n\n"
+                          "### Other sources\n\n| repo | verdict |\n|---|---|\n| https://github.com/jackwener/OpenCLI | use |\n\n"
+                          "## 3. Triage\n\n| repo | route | verdict | reason |\n|---|---|---|---|\n"
+                          "| https://github.com/jackwener/OpenCLI | read the adapters | shortlist | one command per site |\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 verdicts from the report's table", out)
+        mine = {e["repo"]: e["verdict"] for e in self.store.ledger() if e.get("by") != "seed"}
+        self.assertEqual(mine.get("jackwener/OpenCLI"), "short")
+        self.assertNotIn("xpzouying/xiaohongshu-mcp", mine)
+
     def test_import_creates_the_question_from_the_report(self):
         self.seed()
         report = Path(self.tmp.name) / "cloud.md"

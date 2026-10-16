@@ -51,6 +51,8 @@ Write section 3 of the report:
 - a table of the shortlist: repo URL, kind, route, verdict (shortlist, later, skip), reason;
 - one line on why the rest were left.
 
+This is the only table whose verdicts the local import records.
+
 ## Next
 
 `github-scout-dig`.

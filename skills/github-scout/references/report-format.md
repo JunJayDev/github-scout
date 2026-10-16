@@ -27,6 +27,7 @@ Where we stand: <what exists today, what falls short>
 |---|---|---|---|---|---|---|---|
 | https://github.com/owner/name | skill | D1 | zh | ... | 2026-10-12 | 1.2k | site:github.com 审片 skill |
 
+No verdict column here (verdicts go in section 3). "found by" is the query or list, word for word.
 Searches per direction and language: D1 en 4, zh 3; D2 ...
 Seen but not opened: <names only>. Found nothing: <directions>.
 Excluded: <repo, why> (lures, farmed installs, no push in 12 months).

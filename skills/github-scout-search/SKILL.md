@@ -50,7 +50,10 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
 ## Without the command line (cloud chat)
 
 A chat has room for about 60 searches and page fetches. Spread them over the directions and
-languages, and keep 10 to 30 candidates whose pages you opened.
+languages, and keep 10 to 30 candidates whose pages you opened. If the user asks for a complete
+register, list more, but spend the budget on what they would not find alone: tools everyone
+knows (FFmpeg, Blender, Whisper and the like) need no search, so name them with their links in
+one line under the table.
 
 For every direction, in each language from the plan (English and Chinese always, others when the
 user's audience needs them):
@@ -68,17 +71,23 @@ user's audience needs them):
    - the same without `site:` when results drift to package indexes;
    - `<中文词> github 开源`;
    - `site:juejin.cn OR site:zhihu.com <中文词> github`.
-3. **Skills:** `https://skills.sh/api/search?q=<term>` returns JSON with install counts (the web
+3. **Curated lists:** when a search turns up an awesome list or catalog for the field, read its
+   whole README (raw) and screen every repo it links. One list often holds more than all your
+   searches together; opening a list and not reading it is the most common way to miss the best
+   repos.
+4. **Skills:** `https://skills.sh/api/search?q=<term>` returns JSON with install counts (the web
    page needs JavaScript). Distrust installs far beyond the repo's stars.
-4. **New and growing fast, without words:**
+5. **New and growing fast, without words:**
    `https://api.github.com/search/repositories?q=topic:agent-skills+created:>YYYY-MM-DD&sort=stars`,
    or the topic that fits the form you need.
 
 For each candidate you keep:
 - Fetch `https://api.github.com/repos/<owner>/<repo>` for `stargazers_count`, `pushed_at`,
   `license` and `archived`.
-- If that fails, read the newest date on `https://github.com/<owner>/<repo>/commits`. Write
-  "unknown" rather than guess.
+- If that fails, try the feed `https://github.com/<owner>/<repo>/commits.atom` (its first
+  `<updated>` is the last commit), then the newest date on the commits page. If none of them
+  loads, write "unknown" and move on: the local import fills in stars and dates and drops repos
+  with no push in 12 months. Do not spend fetches retrying.
 - A page summary that does not mention something is no proof the repo lacks it. When it matters,
   read the raw README: `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md`.
 - Official documentation and hosted services often answer part of the goal. Keep them as "other
@@ -93,7 +102,9 @@ Write section 2 of the report: one row per repo, with these columns:
 - why it may help
 - last commit
 - stars
-- found by
+- found by: the query or the list that surfaced it, word for word, so someone can repeat it
+
+No verdict column here: verdicts belong to triage, and the importer ignores them in this table.
 
 Under the table, write:
 
