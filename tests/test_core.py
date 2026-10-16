@@ -467,15 +467,22 @@ class LanguageTests(Base):
         for query in pairs + combos:                                     # never mixes languages
             terms = words(query).split()
             self.assertEqual(len({lang(t) for t in terms}), 1, query)
-        zh_pairs = [p for p in pairs if lang(p) == "zh"]
-        self.assertIn(7, (len(zh_pairs), len(pairs) - len(zh_pairs)))   # 8 + 7: languages take turns
-        self.assertTrue(any(p.startswith("红迪 小红书 in:readme") for p in pairs))   # first term in that language
-        self.assertTrue(any(c.startswith("登录态 红迪 in:readme") for c in combos))
+        zh_combos = [c for c in combos if lang(c) == "zh"]
+        self.assertIn(4, (len(zh_combos), len(combos) - len(zh_combos)))  # 5 + 4: combos take turns
+        self.assertTrue(any(c.startswith("登录态 红迪 in:readme") for c in combos))   # first term in that language
+        # pairs give English its full share; Chinese pairs replayed as noise, so they only fill what is left
+        self.assertEqual({lang(p) for p in pairs}, {"en"})
+        few = {**BILINGUAL, "entities": ["reddit|红迪", "xiaohongshu|小红书", "bilibili|B站"]}
+        few_pairs = [x["query"] for x in discover.plan(few) if x["lens"] == "P"]
+        self.assertEqual([lang(p) for p in few_pairs], ["en"] * 3 + ["zh"] * 3)
+        self.assertTrue(any(p.startswith("红迪 小红书 in:readme") for p in few_pairs))
         self.assertTrue(any(c.startswith('"logged-in browser" reddit in:readme') for c in combos))
 
     def test_capped_lenses_share_slots_fairly(self):
         q = discover.plan(BILINGUAL)
-        for lens, cap in (("R", 12), ("K", 10), ("S", 10), ("N", 8)):
+        recent = [x["query"] for x in q if x["lens"] == "R"]                # English first, Chinese fills the rest
+        self.assertEqual((len(recent), {discover.lang_of(s) for s in recent}), (12, {"en"}))
+        for lens, cap in (("K", 10), ("S", 10), ("N", 8)):
             got = [x["query"] for x in q if x["lens"] == lens]
             zh = sum(discover.lang_of(s) == "zh" for s in got)
             self.assertEqual(len(got), cap, lens)

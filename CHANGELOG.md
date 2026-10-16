@@ -20,8 +20,9 @@ First release.
 - Languages: a question lists `langs` (default `[en, zh]`, `ask --langs`), because in real runs
   Chinese projects supplied half of the repos picked while only a fifth of the searches were in
   Chinese. Terms are told apart by script. Pairs and combinations are built within one language
-  from each group's first term in it (same totals: 15 pairs, 9 combinations); the capped lenses
-  (mechanisms in READMEs, recent, SKILL.md code, skills.sh, npm) take turns between languages; the
+  from each group's first term in it (same totals: 15 pairs, 9 combinations). Combinations and the
+  capped lenses (mechanisms in READMEs, SKILL.md code, skills.sh, npm) take turns between languages;
+  pairs and recent give the first language its full share and the others what is left; the
   MCP registry lens keeps Latin-script terms, since it matches ASCII server names (seven Chinese
   searches there found nothing). Every mechanism synonym is now searched, not only the first ten.
   `check`, `ask --update` and `scan --plan` warn about a vocabulary group with no term in a listed
@@ -30,7 +31,8 @@ First release.
   Replayed on three answered questions, Chinese went from 10–33% of the searches with words to
   40–50%; the new Chinese searches found about fifteen relevant Chinese writing skills the earlier
   scans never saw (most through `活人感`, `像人写` and `AI 痕迹`), a handful for browser automation,
-  and little of use for video. Chinese pair and recent searches brought mostly noise.
+  and little of use for video. Chinese pair and recent searches brought mostly noise, which is why
+  they only fill leftover slots.
 - Cards (idea first) with five takes: use, adapt, learn, later, skip; a ledger of every verdict;
   upstream tracking limited to the paths a card watches.
 - 12 commands: `init`, `new-project`, `ask`, `find`, `scan`, `pick`, `look`, `note`, `show`,

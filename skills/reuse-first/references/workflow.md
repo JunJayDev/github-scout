@@ -38,11 +38,12 @@ Why each part works:
 - **Mechanisms** find a tool by how it works. `"logged-in browser"` also put it first.
 - **Topics plus a 12-month window** find young projects that best-match search buries.
 - **Every group in both languages.** Chinese projects describe themselves in Chinese, and in real
-  runs they supplied half of the repos picked. Pairs and combinations are built within one
-  language and the capped lenses take turns between languages, so a group without a Chinese term
-  leaves Chinese searches unmade. Mechanisms carry the most: `登录态` found a tool that lets any
+  runs they supplied half of the repos picked. Combinations and the capped lenses take turns
+  between languages, so a group without a Chinese term leaves Chinese searches unmade.
+  Pairs and recent searches fill English first and give Chinese what is left. Mechanisms carry the most: `登录态` found a tool that lets any
   agent drive your own Chrome with its logins, described only in Chinese. Platform pairs are
-  noisier in Chinese, because many Chinese READMEs link the author's own 小红书 and B站 accounts.
+  noisier in Chinese, because many Chinese READMEs link the author's own 小红书 and B站 accounts,
+  which is why Chinese pairs only fill leftover slots.
   Write the name Chinese users write, not a translation: `登录态`, not `已登录的浏览器`. Names
   written the same way (`reddit`, `CDP`) need nothing; `scan --plan` warns about the rest.
 - **Problem phrases** find the least. Keep them short.

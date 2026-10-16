@@ -111,6 +111,12 @@ def _turns(lists: list[list], limit: int | None = None) -> list:
     return out[:limit] if limit is not None else out
 
 
+def _in_order(lists: list[list], limit: int | None = None) -> list:
+    """The first language's items first; the others only fill the slots it leaves."""
+    out = list(dict.fromkeys(x for row in lists for x in row))
+    return out[:limit] if limit is not None else out
+
+
 def _top_first(a: list, b: list | None = None) -> list[tuple]:
     """Pairs ordered so the leading items meet first: (0,1) (0,2) (1,2) (0,3)... or, from two lists,
     (0,0) (0,1) (1,0) (1,1) (0,2)..."""
@@ -132,7 +138,10 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos:
     take turns between languages (the question's `langs` first), so each gets a fair share of the
     slots. Pairs and combos are built per language from each group's first term in that language,
     never mixing languages; adding a language shares the same totals (max_pairs, max_combos)
-    instead of growing them."""
+    instead of growing them. Pairs (P) and recent (R) give the first language its full share and
+    the others only what is left: replayed on three real questions, Chinese pairs and recent
+    queries returned almost only noise (Chinese READMEs list the author's own social accounts),
+    while Chinese mechanisms and combos found the Chinese projects that were picked."""
     langs = vocab_langs(q)
     ents = groups(q.get("entities"))
     mech_groups = groups(q.get("mechanisms"))
@@ -162,7 +171,7 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos:
 
     for term in spread(ents):
         add("E", "repos", quote(term))
-    for a, b in _turns([_top_first(heads(ents, lang, 6)) for lang in langs], max_pairs):
+    for a, b in _in_order([_top_first(heads(ents, lang, 6)) for lang in langs], max_pairs):
         add("P", "repos", f"{quote(a)} {quote(b)} in:readme")
     for m in spread(mech_groups):
         add("M", "repos", quote(m))
@@ -177,7 +186,7 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos:
     for t in topics[:12]:
         add("T", "repos", f"topic:{t}")
         add("T", "repos", f"topic:{t} created:>{since}")
-    for term in spread(ents + mech_groups, 12):
+    for term in _in_order([_breadth(_in(ents + mech_groups, lang)) for lang in langs], 12):
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
     rise = window(RISE_MONTHS)
     if not forms or any(f in SKILL_FORMS for f in forms):

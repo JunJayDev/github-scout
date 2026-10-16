@@ -60,8 +60,9 @@ by its script: CJK ideographs are `zh`, kana `ja`, hangul `ko`, anything else `e
 Latin-script language counts as `en`). Each entity and mechanism group should hold a term in every
 language listed, written as those users write it, not translated. `check` warns about a group that
 lacks one; a name written the same way in every language, like `remotion` above, needs nothing.
-The scan builds pairs and combinations within one language, and the capped lenses take turns
-between languages. Topics and the MCP registry take Latin-script terms only (both are ASCII names).
+The scan builds pairs and combinations within one language. Combinations and the capped lenses
+take turns between languages; pairs and recent searches serve the first language in `langs` first
+and give the others what is left. Topics and the MCP registry take Latin-script terms only (both are ASCII names).
 
 Body sections (template in the registry's language): where we are (what we have, what is not
 good enough), the answer (one paragraph; ideas worth taking; practices and components; a
