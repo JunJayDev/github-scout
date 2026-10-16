@@ -12,7 +12,7 @@ Renamed from reuse-first to github-scout, and split by stage.
   confirm; a cloud chat does not stop unless asked.
 - `brief`: an answered question becomes a hand-off file for the coding agent, with each source's
   licence and reviewed commit. The project is never changed.
-- `import`: a report from a cloud chat comes back into the registry; every GitHub link is checked
+- `import`: a report from a cloud chat comes back into the registry (the question is created from the report when missing); every GitHub link is checked
   and the ones that do not exist are listed; table columns (kind, verdict, reason) are kept.
 - `ask` creates the registry (`~/.github-scout`) and the project on first use; inside a git
   repository the project is named after it and its code path recorded.

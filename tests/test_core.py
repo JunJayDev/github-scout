@@ -424,6 +424,16 @@ class FlowTests(Base):
         e = [x for x in self.store.ledger() if x["repo"] == "xpzouying/xiaohongshu-mcp"][-1]
         self.assertEqual((e["verdict"], e["reason"]), ("short", "ChatGPT Pro: learn: 登录态复用"))
 
+    def test_import_creates_the_question_from_the_report(self):
+        self.seed()
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("# GitHub scout report: Read Xiaohongshu notes from scripts\n\n- Stage: prototype\n\n"
+                          "| repo | verdict |\n|---|---|\n| https://github.com/xpzouying/xiaohongshu-mcp | shortlist |\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/xhs-read")
+        self.assertEqual(code, 0, out)
+        q = self.store.question("ops/xhs-read").data
+        self.assertEqual((q["ask"], q["stage"]), ("Read Xiaohongshu notes from scripts", "prototype"))
+
     def test_brief_packs_the_answer_for_the_coding_agent(self):
         doc = self.store.question("ops/browser-ops")
         code, out, _ = self.run_cli("brief", "ops/browser-ops")

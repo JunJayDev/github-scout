@@ -15,7 +15,7 @@ from .discover import (
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
-from .handoff import VERDICT_OF_TAKE, brief, parse_report, read_source
+from .handoff import VERDICT_OF_TAKE, brief, parse_report, read_source, report_goal
 from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
@@ -106,10 +106,19 @@ def _merged(store: Store, project: str, qid: str) -> dict:
 
 
 def cmd_import(args):
-    store = _store(args)
+    text = read_source(args.file)
+    goal, stage = report_goal(text)
+    cjk = any("\u4e00" <= ch <= "\u9fff" for ch in text[:4000])
+    store = _store(args, create_lang="zh" if cjk else "en")
     project, qid = store.split_ref(args.q)
+    if not store.question_path(project, qid).is_file():
+        if not store.project(project):
+            repo = _git_root(Path.cwd())
+            new_project(store, project, project, "", str(repo) if repo and repo.name.lower() == project.lower() else "")
+        new_question(store, f"{project}/{qid}", goal or f"(imported from {Path(args.file).name})", stage or "idea")
+        print(f"question {project}/{qid} created from the report (stage {stage or 'idea'}: check it, and fill in where we stand)")
     q = store.question(f"{project}/{qid}").data
-    slugs, rows = parse_report(read_source(args.file))
+    slugs, rows = parse_report(text)
     if not slugs:
         raise StoreError(f"no github.com/<owner>/<repo> links in {args.file}")
     client = make_client(args, store)

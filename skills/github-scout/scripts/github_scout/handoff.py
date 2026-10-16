@@ -55,6 +55,16 @@ def _take(text: str) -> str | None:
     return None
 
 
+def report_goal(text: str) -> tuple[str | None, str | None]:
+    """The goal (the report's title) and the stage written in its header, when present."""
+    goal = None
+    m = re.search(r"^#\s+(?:GitHub scout report|github-scout 报告|GitHub scout 报告)?\s*[:：]?\s*(.+)$", text, re.M)
+    if m:
+        goal = m.group(1).strip() or None
+    st = re.search(r"\b(idea|prototype|working|polishing)\b", text[:2000])
+    return goal, st.group(1) if st else None
+
+
 def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
     """Every GitHub repo linked in the text, in order, and per repo the fields found in table rows."""
     rows: dict[str, dict] = {}
