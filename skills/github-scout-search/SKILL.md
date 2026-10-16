@@ -64,9 +64,11 @@ candidates one by one. Licences, usage rights and pricing are not part of the se
 
 Use what works. Never write that a lens ran when it did not.
 
-**2. Search every direction with every lens,** in each language from the plan (English and
-Chinese always, others when the user's audience needs them). Queries of one to three terms,
-never a list of tool names you already know: such queries only return those tools.
+**2. Search with every lens.** The word lenses run for every direction in each language from
+the plan (English and Chinese always, others when the user's audience needs them); the other
+lenses run once or twice for the whole question, with its main terms. Queries of one to three
+terms, never a list of tool names you already know: such queries only return those tools, and
+a long query returns little at all.
 
 | lens | queries |
 |---|---|
@@ -104,8 +106,8 @@ import fills in stars and dates and drops repos with no push in 12 months.
 - A search snippet that does not mention something is no proof the repo lacks it. When it
   matters, read the README.
 - Keep 10 to 30 candidates whose pages you read; more if the user asks for a complete register.
-  Tools everyone knows (FFmpeg, Blender, Whisper and the like) need no search: name them with
-  their links in one line under the table.
+  Tools everyone knows (FFmpeg, Blender, Whisper and the like) need no search and are not
+  candidates: name them with their links in one line under the table.
 - Official documentation and hosted services often answer part of the goal. Keep them as "other
   sources", with their URLs.
 

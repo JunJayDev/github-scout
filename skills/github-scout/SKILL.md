@@ -48,7 +48,8 @@ Each stage is its own skill and can run alone. This skill runs them in order.
 ## Rules
 
 - Never change the user's project. The deliverable is the brief; the coding agent does the work.
-- List only repositories whose page you opened. Never invent names, stars or dates.
+- List only repositories you have seen yourself: their page, the connector, or a search result
+  that names them. Never invent names, stars or dates.
 - Search every direction in English and in Chinese, with the words each community uses, and in
   any other language the user's audience needs.
 - Maintenance decides more than stars: no push in 3 months ranks far down; 6 months is set

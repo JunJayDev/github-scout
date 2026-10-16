@@ -12,10 +12,16 @@ skip the commands.
 - Run the five stages without stopping, unless the user asked to confirm the directions first.
 - You have web search and maybe a GitHub connector, but no browser. Stage 2 starts by checking
   what they can do; search with every lens through them, and log every search in the report, so a
-  missed repo can be traced to the search that should have found it.
+  missed repo can be traced to the search that should have found it. A search engine misses many
+  new repos; the local agent covers them afterwards with GitHub's own search on your directions,
+  so write the directions with care.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
-- Open every repository page you list. Never invent a repository, a star count or a date.
+- List only repositories you have seen (their page, the connector, or a search result naming
+  them). Never invent a repository, a star count or a date.
+- Without a project, the stage is "idea".
+- If the user attaches a candidate table from a local `github-scout scan`, those are the
+  candidates: skip the search and start at triage (stage 3).
 - Skip the commands (`github-scout ...`, `scripts/report-problem.sh`); there is no registry here.
   Write anything in these instructions you could not follow into the report's last section.
 
@@ -67,7 +73,8 @@ Each stage is its own skill and can run alone. This skill runs them in order.
 ### Rules
 
 - Never change the user's project. The deliverable is the brief; the coding agent does the work.
-- List only repositories whose page you opened. Never invent names, stars or dates.
+- List only repositories you have seen yourself: their page, the connector, or a search result
+  that names them. Never invent names, stars or dates.
 - Search every direction in English and in Chinese, with the words each community uses, and in
   any other language the user's audience needs.
 - Maintenance decides more than stars: no push in 3 months ranks far down; 6 months is set
@@ -252,9 +259,11 @@ candidates one by one. Licences, usage rights and pricing are not part of the se
 
 Use what works. Never write that a lens ran when it did not.
 
-**2. Search every direction with every lens,** in each language from the plan (English and
-Chinese always, others when the user's audience needs them). Queries of one to three terms,
-never a list of tool names you already know: such queries only return those tools.
+**2. Search with every lens.** The word lenses run for every direction in each language from
+the plan (English and Chinese always, others when the user's audience needs them); the other
+lenses run once or twice for the whole question, with its main terms. Queries of one to three
+terms, never a list of tool names you already know: such queries only return those tools, and
+a long query returns little at all.
 
 | lens | queries |
 |---|---|
@@ -292,8 +301,8 @@ import fills in stars and dates and drops repos with no push in 12 months.
 - A search snippet that does not mention something is no proof the repo lacks it. When it
   matters, read the README.
 - Keep 10 to 30 candidates whose pages you read; more if the user asks for a complete register.
-  Tools everyone knows (FFmpeg, Blender, Whisper and the like) need no search: name them with
-  their links in one line under the table.
+  Tools everyone knows (FFmpeg, Blender, Whisper and the like) need no search and are not
+  candidates: name them with their links in one line under the table.
 - Official documentation and hosted services often answer part of the goal. Keep them as "other
   sources", with their URLs.
 

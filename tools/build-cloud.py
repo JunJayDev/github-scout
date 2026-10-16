@@ -38,10 +38,16 @@ skip the commands.
 - Run the five stages without stopping, unless the user asked to confirm the directions first.
 - You have web search and maybe a GitHub connector, but no browser. Stage 2 starts by checking
   what they can do; search with every lens through them, and log every search in the report, so a
-  missed repo can be traced to the search that should have found it.
+  missed repo can be traced to the search that should have found it. A search engine misses many
+  new repos; the local agent covers them afterwards with GitHub's own search on your directions,
+  so write the directions with care.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
-- Open every repository page you list. Never invent a repository, a star count or a date.
+- List only repositories you have seen (their page, the connector, or a search result naming
+  them). Never invent a repository, a star count or a date.
+- Without a project, the stage is "idea".
+- If the user attaches a candidate table from a local `github-scout scan`, those are the
+  candidates: skip the search and start at triage (stage 3).
 - Skip the commands (`github-scout ...`, `scripts/report-problem.sh`); there is no registry here.
   Write anything in these instructions you could not follow into the report's last section.
 
