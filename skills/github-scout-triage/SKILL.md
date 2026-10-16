@@ -53,3 +53,5 @@ Write section 3 of the report:
 ## Next
 
 `github-scout-dig`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

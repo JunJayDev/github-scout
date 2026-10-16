@@ -65,3 +65,5 @@ block per repo:
 ## Next
 
 `github-scout-brief`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

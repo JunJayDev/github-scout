@@ -101,6 +101,8 @@ skills sit next to this folder and use the same command.
 Formats: `store-format.md`. A worked example: `workflow.md`. How to judge
 skills and software: `evaluation.md`.
 
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+
 ---
 
 ## GitHub scout: plan
@@ -174,6 +176,8 @@ directions first.
 ### Next
 
 `github-scout-search`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -253,6 +257,8 @@ A ranked list of candidates, about 30 to 100 worth a glance.
 
 `github-scout-triage`.
 
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+
 ---
 
 ## GitHub scout: triage
@@ -304,6 +310,8 @@ Write section 3 of the report:
 ### Next
 
 `github-scout-dig`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -369,6 +377,8 @@ block per repo:
 
 `github-scout-brief`.
 
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+
 ---
 
 ## GitHub scout: brief
@@ -426,6 +436,8 @@ whole report as one file to download. To take it over locally:
 ```bash
 github-scout import report.md --q <project>/<question>
 ```
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 

@@ -79,3 +79,5 @@ A ranked list of candidates, about 30 to 100 worth a glance.
 ## Next
 
 `github-scout-triage`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

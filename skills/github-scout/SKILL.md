@@ -87,3 +87,5 @@ skills sit next to this folder and use the same command.
 
 Formats: `references/store-format.md`. A worked example: `references/workflow.md`. How to judge
 skills and software: `references/evaluation.md`.
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

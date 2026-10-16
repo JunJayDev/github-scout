@@ -59,3 +59,5 @@ whole report as one file to download. To take it over locally:
 ```bash
 github-scout import report.md --q <project>/<question>
 ```
+
+A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
