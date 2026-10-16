@@ -16,13 +16,15 @@ Renamed from reuse-first to github-scout, and split by stage.
   and the ones that do not exist are listed; table columns (kind, verdict, reason) are kept.
   Verdicts count only outside the Candidates section: a ChatGPT Pro run wrote "learn" on all 84
   candidate rows, which would have shortlisted every one.
-- Cloud search runs the same lenses as `scan` through web pages: it first checks which entry
-  points open (GitHub's search page, topic pages, trending, raw files, owners' repo lists,
-  skills.sh, the MCP registry, npm), then searches with short queries in both languages, reads
-  every awesome list it opens, follows links and owners of the shortlist, and logs every search.
-  That run used only web search and missed the best three repos, which GitHub's own search page
-  and an awesome list it had opened both show.
-- `import` reads the report's search log into the scan record.
+- Cloud search assumes what a web chat has: web search and maybe a GitHub connector, no browser.
+  It checks those tools first, runs each lens of `scan` as search queries (`site:github.com`,
+  topic pages, SKILL.md files, skills.sh, MCP and npm directories, trending sites, Chinese
+  communities) in both languages, reads every awesome list it opens, follows the shortlist's
+  authors and links, and logs every search. The first ChatGPT Pro run used long web queries only
+  and missed the best three repos, which a short query and an awesome list it had opened both show.
+- `import` reads the report's search log into the scan record, and its directions into the
+  question when the question has no words yet, so `scan` can run GitHub's API on them; `scan --show`
+  names the rows that came only from the API (the repos the report missed).
 - Licences are out of scope: no licence checks, warnings, columns or ranking penalty.
 - `ask` creates the registry (`~/.github-scout`) and the project on first use; inside a git
   repository the project is named after it and its code path recorded.

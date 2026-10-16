@@ -637,6 +637,10 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c) and not excluded(c)]
     if lists:
         out.append("lists (scan --expand <list>): " + ", ".join(f"{c['repo']} ({human(c['stars'])})" for c in lists[:8]))
+    if any("W" in c["lenses"] for c in rows) and any("W" not in c["lenses"] for c in rows):
+        api_only = [c for c in rows if "W" not in c["lenses"]]
+        out.append(f"not in the report or web links: {len(api_only)} of {len(rows)} rows came only from GitHub's API "
+                   f"(no W): {', '.join(c['repo'] for c in api_only[:6])}" + (" ..." if len(api_only) > 6 else ""))
     hidden = len([c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_stale(c)
                   and not excluded(c) and not is_rising(c)]) - len(rows)
     out.append("  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics"

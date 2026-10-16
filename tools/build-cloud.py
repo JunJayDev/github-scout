@@ -32,11 +32,13 @@ skip the commands.
 
 - The user's goal is in their message. If there is none, ask what they want to achieve in which
   project, and wait.
-- If they attached their project (a zip or files), read it first: it is "our project" in stage 1.
-  Otherwise use what they say exists today.
+- If their project is on GitHub and a GitHub connector is connected, or they attached it (a zip
+  or files), read it first: it is "our project" in stage 1. Otherwise use what they say exists
+  today.
 - Run the five stages without stopping, unless the user asked to confirm the directions first.
-- Search with every lens that works here (stage 2 starts by checking which pages open) and log
-  every search in the report, so a missed repo can be traced to the search that should have found it.
+- You have web search and maybe a GitHub connector, but no browser. Stage 2 starts by checking
+  what they can do; search with every lens through them, and log every search in the report, so a
+  missed repo can be traced to the search that should have found it.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
 - Open every repository page you list. Never invent a repository, a star count or a date.

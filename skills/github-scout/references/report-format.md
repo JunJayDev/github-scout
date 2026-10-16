@@ -25,15 +25,16 @@ Where we stand: <what exists today, what falls short>
 ## 2. Search and candidates
 
 ### Access
-| entry point | worked | fallback used |
-|---|---|---|
-| GitHub search page | yes | |
-| GitHub search API | no: could not open | search page |
+| check | answer |
+|---|---|
+| `site:github.com <term>` returns repositories | yes |
+| can open a page by its address | no |
+| GitHub connector: our project / a public repo / search across GitHub | yes / yes / no |
 
 ### Search log
 | # | lens | direction | lang | query or URL | looked at | kept |
 |---|---|---|---|---|---|---|
-| 1 | words | D1 | zh | 视频 配音 字幕 pushed:>2026-04-17 | 30 | Huanshere/VideoLingo |
+| 1 | words | D1 | zh | site:github.com 视频 配音 字幕 | 10 | Huanshere/VideoLingo |
 | 2 | list | D1 | en | https://github.com/owner/awesome-list | 120 | owner/name, owner/other |
 
 Searches per direction and language: D1 en 6, zh 5; D2 ...

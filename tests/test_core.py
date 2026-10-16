@@ -475,6 +475,37 @@ class FlowTests(Base):
         cand = {c["repo"]: c for c in scan["candidates"]}
         self.assertEqual(cand["xpzouying/xiaohongshu-mcp"].get("said"), "登录态复用")
 
+    def test_import_reads_the_directions_for_a_local_scan(self):
+        self.seed()
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("# GitHub scout report: product videos\n\n## 1. Directions\n\n"
+                          "| direction | entities (en / zh) | mechanisms (en / zh) | forms |\n|---|---|---|---|\n"
+                          "| D1 | remotion / 宣传片, 产品视频 | `video understanding` / 视频理解 | skill, cli, whatever |\n"
+                          "| D2 | Remotion、剪映 | 审片 | mcp |\n\n"
+                          "See https://github.com/xpzouying/xiaohongshu-mcp.\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/videos")
+        self.assertEqual(code, 0, out)
+        self.assertIn("directions read into the question: 4 entities, 3 mechanisms, 3 forms", out)
+        self.assertIn("rows without W are repos the report did not list", out)
+        q = self.store.question("ops/videos").data
+        self.assertEqual(q["entities"], ["remotion", "宣传片", "产品视频", "剪映"])
+        self.assertEqual(q["mechanisms"], ["video understanding", "视频理解", "审片"])
+        self.assertEqual(q["forms"], ["skill", "cli", "mcp"])
+        doc = self.store.question("ops/videos")                       # a local plan is never overwritten
+        doc.data["entities"] = ["product video|宣传片"]
+        self.store.save_question(doc)
+        self.run_cli("import", str(report), "--q", "ops/videos")
+        self.assertEqual(self.store.question("ops/videos").data["entities"], ["product video|宣传片"])
+
+    def test_show_names_the_rows_the_report_missed(self):
+        base = {"desc": "Video skill", "created": ago(1)[:10], "pushed": ago(0.1)[:10], "topics": [], "fit": 1, "score": 5,
+                "stars": 900}
+        scan = {"candidates": [{**base, "repo": "a/listed", "lenses": ["W", "E"]},
+                               {**base, "repo": "b/missed", "lenses": ["E", "H"]}],
+                "searches": [], "id": "x", "project": "p", "question": "q"}
+        self.assertIn("not in the report or web links: 1 of 2 rows came only from GitHub's API (no W): b/missed",
+                      discover.render(scan))
+
     def test_import_creates_the_question_from_the_report(self):
         self.seed()
         report = Path(self.tmp.name) / "cloud.md"

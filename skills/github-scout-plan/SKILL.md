@@ -68,8 +68,9 @@ change them, unless they said not to stop.
 
 ## Without the command line (cloud chat)
 
-Write section 1 of the report (`../github-scout/references/report-format.md`): the goal as a
-result, where we stand, the stage, and the directions in a table: direction, entities and
+Read our project first: through the GitHub connector when the user's repo is connected, else
+the files they attached, else what they say exists today. Then write section 1 of the report
+(`../github-scout/references/report-format.md`): the goal as a result, where we stand, the stage, and the directions in a table: direction, entities and
 mechanisms in each language, and forms. Then go straight to the search, unless the user asked to confirm the
 directions first.
 

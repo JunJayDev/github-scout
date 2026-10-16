@@ -126,6 +126,39 @@ def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
     return slugs_in_text(text), rows
 
 
+DIRECTION_COLUMNS = {
+    "entities": ("entities", "entity", "实体", "对象"),
+    "mechanisms": ("mechanisms", "mechanism", "机制", "做法"),
+    "forms": ("forms", "form", "形态"),
+}
+FORM_WORDS = ("skill", "skills", "skill-pack", "plugin", "agent", "rules", "mcp", "cli", "library", "framework",
+              "app", "extension", "service", "template", "model", "prompt", "list")
+
+
+def parse_directions(text: str, cap: int = 24) -> dict[str, list[str]]:
+    """Search words from the report's directions table, one group per term, for a local `scan`.
+
+    Chat models write "remotion / 宣传片, 产品视频" or "Claude Code / Codex / 宣传片": synonyms
+    cannot be paired reliably, so every term becomes its own group and the scan's language split
+    sorts them. Capped so a scan stays within its budget."""
+    out: dict[str, list[str]] = {"entities": [], "mechanisms": [], "forms": []}
+    for _, header, body in _tables(text):
+        cols = {k: _column(header, k, DIRECTION_COLUMNS) for k in DIRECTION_COLUMNS}
+        if cols["entities"] is None and cols["mechanisms"] is None:
+            continue
+        for cells, _ in body:
+            for key in out:
+                for term in re.split(r"\s*[/,，、;；|]\s*", re.sub(r"[`*]", "", _cell(cells, cols[key]))):
+                    term = term.strip().strip("()（）")
+                    if key == "forms":
+                        term = term.lower()
+                        if term not in FORM_WORDS:
+                            continue
+                    if term and len(term) <= 40 and term.lower() not in {x.lower() for x in out[key]}:
+                        out[key].append(term)
+    return {k: v[:cap] for k, v in out.items()}
+
+
 def parse_search_log(text: str) -> list[dict]:
     """The searches a report says it ran: lens, direction, language, query, results looked at, repos kept."""
     out = []

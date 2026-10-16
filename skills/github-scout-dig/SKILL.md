@@ -51,10 +51,10 @@ The take for each repo:
 
 ## Without the command line (cloud chat)
 
-- **The file list:** `https://api.github.com/repos/<owner>/<repo>/git/trees/HEAD?recursive=1`.
-- **One file, exactly as written:**
-  `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<path>`. A page fetch may return a
-  summary instead of the file. If your sandbox can reach GitHub, `git clone --depth 1` is faster.
+- **Reading the code:** with a GitHub connector that reaches the repo, list its files and read
+  the ones that carry the idea. Without one, open
+  `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<path>` if your tools can open an
+  address. A summary of a page is not the file: quote only what you read.
 - **Citing:** cite the paths you read. Mark claims you saw only in a README as self-reported.
 - **Takes:** without reading the code, the take is at most `learn` or `later`.
 

@@ -15,7 +15,7 @@ from .discover import (
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
-from .handoff import VERDICT_OF_TAKE, brief, parse_report, parse_search_log, read_source, report_goal
+from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal
 from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
@@ -117,7 +117,15 @@ def cmd_import(args):
             new_project(store, project, project, "", str(repo) if repo and repo.name.lower() == project.lower() else "")
         new_question(store, f"{project}/{qid}", goal or f"(imported from {Path(args.file).name})", stage or "idea")
         print(f"question {project}/{qid} created from the report (stage {stage or 'idea'}: check it, and fill in where we stand)")
-    q = store.question(f"{project}/{qid}").data
+    doc = store.question(f"{project}/{qid}")
+    words = parse_directions(text)
+    if words["entities"] or words["mechanisms"]:
+        fresh = {k: v for k, v in words.items() if v and not doc.data.get(k)}   # never overwrite a local plan
+        if fresh:
+            doc.data.update(fresh)
+            store.save_question(doc)
+            print("directions read into the question: " + ", ".join(f"{len(v)} {k}" for k, v in fresh.items()))
+    q = doc.data
     slugs, rows = parse_report(text)
     if not slugs:
         raise StoreError(f"no github.com/<owner>/<repo> links in {args.file}")
@@ -162,7 +170,11 @@ def cmd_import(args):
         print(f"moved ({len(moved)}), added under the new name: " + ", ".join(moved))
     if missing:
         print(f"not on GitHub ({len(missing)}), possibly invented by the report's author: " + ", ".join(missing))
-    print(f"next: github-scout scan {project}/{qid} --show   (they rank high: someone pointed at them)")
+    if q.get("entities") or q.get("mechanisms"):
+        print(f"next: github-scout scan {project}/{qid}   (GitHub's API on the same directions, no model needed; "
+              f"rows without W are repos the report did not list)")
+    else:
+        print(f"next: github-scout scan {project}/{qid} --show   (they rank high: someone pointed at them)")
 
 
 def cmd_brief(args):
