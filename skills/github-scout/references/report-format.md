@@ -22,13 +22,28 @@ Where we stand: <what exists today, what falls short>
 |---|---|---|---|
 | D1 <sub-problem> | remotion / 宣传片, 产品视频 | video understanding / 视频理解, 审片 | skill, cli |
 
-## 2. Candidates
+## 2. Search and candidates
+
+### Access
+| entry point | worked | fallback used |
+|---|---|---|
+| GitHub search page | yes | |
+| GitHub search API | no: rate limited | search page |
+
+### Search log
+| # | lens | direction | lang | query or URL | looked at | kept |
+|---|---|---|---|---|---|---|
+| 1 | words | D1 | zh | 视频 配音 字幕 pushed:>2026-04-17 | 30 | Huanshere/VideoLingo |
+| 2 | list | D1 | en | https://github.com/owner/awesome-list | 120 | owner/name, owner/other |
+
+Searches per direction and language: D1 en 6, zh 5; D2 ...
+
+### Candidates
 | repo | kind | direction | lang | why it may help | last commit | stars | found by |
 |---|---|---|---|---|---|---|---|
-| https://github.com/owner/name | skill | D1 | zh | ... | 2026-10-12 | 1.2k | site:github.com 审片 skill |
+| https://github.com/owner/name | skill | D1 | zh | ... | 2026-10-12 | 1.2k | 2 |
 
-No verdict column here (verdicts go in section 3). "found by" is the query or list, word for word.
-Searches per direction and language: D1 en 4, zh 3; D2 ...
+No verdict column here (verdicts go in section 3). "found by" is the search log number or the list.
 Seen but not opened: <names only>. Found nothing: <directions>.
 Excluded: <repo, why> (lures, farmed installs, no push in 12 months).
 
@@ -51,7 +66,7 @@ The rest: <one line on why they were left>.
 - Why it is not obvious: ...
 - Evidence: ...
 - What to take at our stage: ...
-- Risks: <licence, maintenance, network, credentials>
+- Risks: <maintenance, network, credentials>
 - Take: use | adapt | learn | later | skip
 
 ## 5. Answer
@@ -63,7 +78,7 @@ The rest: <one line on why they were left>.
 ## 6. Brief for the coding agent
 This brief only advises; the coding agent makes the changes and checks each one.
 
-1. <files to change, what to change> because <idea, repo and file>. Check: <how>. Do not copy: <licence notes>.
+1. <files to change, what to change> because <idea, repo and file>. Check: <how>.
 2. ...
 
 ## 7. Not verified
@@ -79,6 +94,15 @@ Column names the importer understands:
 | verdict | verdict, take, decision | 结论, 取舍, 处理, 建议 |
 | reason | why, reason, idea, notes | 理由, 为什么, 能借什么, 思路, 说明 |
 | direction | direction | 方向 |
+
+A table with a query column is read as the search log, one search per row:
+
+| meaning | English | Chinese |
+|---|---|---|
+| query | query, search | 检索词, 搜索词, 查询, 关键词 |
+| lens | lens, method | 方法, 方式, 途径 |
+| results looked at | looked, results | 看了, 结果 |
+| repos kept | kept | 保留, 留下 |
 
 Verdict words: shortlist, use, adapt, learn (all become "worth a look" locally, since the local
 agent still reads the code); later; skip. In Chinese: 入选, 直接用, 改了用, 学思路, 以后, 不要.

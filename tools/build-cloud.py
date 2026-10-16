@@ -35,6 +35,8 @@ skip the commands.
 - If they attached their project (a zip or files), read it first: it is "our project" in stage 1.
   Otherwise use what they say exists today.
 - Run the five stages without stopping, unless the user asked to confirm the directions first.
+- Search with every lens that works here (stage 2 starts by checking which pages open) and log
+  every search in the report, so a missed repo can be traced to the search that should have found it.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
 - Open every repository page you list. Never invent a repository, a star count or a date.

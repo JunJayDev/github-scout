@@ -122,12 +122,12 @@ Write it in the question file. A good one, for a project at `prototype`:
 > **Against what we have.** | model-driven page reading, 580k tokens a run | one JSON request per subreddit | ... | take |
 
 That tells the next agent what to run, what not to rebuild, and where the gap is. Then
-`github-scout brief ops/browser-ops` packs it, with each source's licence and reviewed commit,
+`github-scout brief ops/browser-ops` packs it, with each source's take and reviewed commit,
 into a file for the coding agent. The project itself is not changed.
 
 ## 6. Upkeep
 
 - Before relying on a repo again: `updates --project <p>`.
-- A `review` row means a watched path changed, a release came out, the repo was archived or
-  relicensed, or it stopped being maintained. `updates --diff <repo>`, update the card, `updates --done <repo>`.
+- A `review` row means a watched path changed, a release came out, the repo was archived,
+  or it stopped being maintained. `updates --diff <repo>`, update the card, `updates --done <repo>`.
 - Rescan a question with `scan`; `scan --show` merges all scans and hides what was decided.

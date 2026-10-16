@@ -15,7 +15,7 @@ from .discover import (
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
-from .handoff import VERDICT_OF_TAKE, brief, parse_report, read_source, report_goal
+from .handoff import VERDICT_OF_TAKE, brief, parse_report, parse_search_log, read_source, report_goal
 from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
@@ -140,6 +140,11 @@ def cmd_import(args):
         if key in sc.cands and r.get("reason"):
             sc.cands[key]["said"] = r["reason"]
     where = args.note or Path(args.file).name
+    searches = parse_search_log(text)
+    for s in searches:                            # what the report says it searched, kept for the next scan
+        sc.log.append({"lens": "W", "kind": "cloud " + (s["lens"] or "search")[:20],
+                       "query": " · ".join(x for x in (s["direction"], s["lang"], s["query"]) if x)[:200],
+                       "hits": len(s["kept"]) if s["kept"] else s["looked"]})
     sc.log.append({"lens": "W", "kind": "import", "query": f"import {where}"[:200], "hits": n})
     scan = sc.finish("W")
     path = store.save_scan(scan)
@@ -151,7 +156,8 @@ def cmd_import(args):
                                   reason[:300], sc.cands[key], scan["id"]))
     store.append_ledger(entries)
     print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root)}); "
-          f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table")
+          f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table; "
+          f"{len(searches)} searches from its search log")
     if moved:
         print(f"moved ({len(moved)}), added under the new name: " + ", ".join(moved))
     if missing:
@@ -418,8 +424,6 @@ def cmd_note(args):
     client = make_client(args, store)
     meta = peek(client, slug, 0)
     kind = args.kind or meta["kind"]
-    if meta.get("license_note"):
-        print(f"LICENSE WARNING: {meta['license']}: {meta['license_note']}")
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
                    args.level or "read", args.summary)
     if args.idea:

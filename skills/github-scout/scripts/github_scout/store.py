@@ -56,7 +56,8 @@ LEVELS = ["meta", "look", "read", "trial"]
 LANGS = ["en", "zh", "ja", "ko"]
 DEFAULT_LANGS = ["en", "zh"]
 
-CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars", "created", "pushed", "branch", "commit",
+CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars",  # license: old cards only, no longer written
+              "created", "pushed", "branch", "commit",
               "reviewed", "level", "watch", "aliases", "uses"]
 QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "langs", "entities", "mechanisms", "forms", "problems",
                   "topics", "picked", "scanned"]
@@ -484,7 +485,7 @@ class Store:
             if slug.lower() in seen_ids:
                 errors.append(f"{r}: duplicate of {rel(seen_ids[slug.lower()])}")
             seen_ids[slug.lower()] = doc.path
-            for key in ("repo", "kind", "summary", "license", "commit", "reviewed"):
+            for key in ("repo", "kind", "summary", "commit", "reviewed"):
                 if d.get(key) in (None, ""):
                     errors.append(f"{r}: missing {key}")
             if d.get("kind") and d["kind"] not in KINDS:

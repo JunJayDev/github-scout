@@ -56,7 +56,8 @@ Each stage is its own skill and can run alone. This skill runs them in order.
   old and famous.
 - Leave out lures (game cheats, cracks, "Ultimate Trainer 2026") and install counts far beyond a
   repo's stars. Never download them.
-- A repo with a non-commercial licence or none: take the idea, not the code.
+- Licences, usage rights and prices are not part of the research: we look for ideas and
+  references. Leave them out of the searches and the report.
 - Locally, every repo you looked at gets a verdict in the registry, so nobody reads it twice.
   Check the registry first: `github-scout find <words>`.
 

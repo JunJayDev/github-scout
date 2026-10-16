@@ -219,7 +219,7 @@ class Client:
         """Metadata for many repos, 40 per query. Returns {lower slug: REST-shaped dict}."""
         out: dict[str, dict] = {}
         fields = ("nameWithOwner description stargazerCount createdAt pushedAt isArchived isFork "
-                  "homepageUrl licenseInfo{spdxId} primaryLanguage{name} "
+                  "homepageUrl primaryLanguage{name} "
                   "repositoryTopics(first:12){nodes{topic{name}}} defaultBranchRef{name}")
         for start in range(0, len(slugs), 40):
             chunk = slugs[start : start + 40]
@@ -361,7 +361,6 @@ def _graphql_to_rest(node: dict) -> dict:
         "archived": node.get("isArchived", False),
         "fork": node.get("isFork", False),
         "homepage": node.get("homepageUrl"),
-        "license": {"spdx_id": (node.get("licenseInfo") or {}).get("spdxId")},
         "language": (node.get("primaryLanguage") or {}).get("name"),
         "topics": [t["topic"]["name"] for t in (node.get("repositoryTopics") or {}).get("nodes", [])],
         "default_branch": (node.get("defaultBranchRef") or {}).get("name"),

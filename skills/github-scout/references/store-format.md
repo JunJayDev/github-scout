@@ -76,7 +76,6 @@ repo: https://github.com/jackwener/OpenCLI
 kind: software           # skill | software | list | other
 form: cli                # detail: skill-pack, mcp, cli, library, framework, app, extension, ...
 summary: "Turns websites into CLI commands through your logged-in Chrome"
-license: Apache-2.0
 stars: 30264
 created: 2026-03-14
 pushed: 2026-10-13
@@ -117,7 +116,7 @@ repo's stars reach twice the recorded count (and at least 200 more).
 {"id": "20261015-004320", "date": "2026-10-15", "project": "ops", "question": "browser-ops",
  "lenses": "EPMCQTRHKSDNUG", "dropped": 12,
  "searches": [{"lens": "P", "kind": "repos", "query": "reddit xiaohongshu in:readme pushed:>2026-04-15", "hits": 30}],
- "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…", "license": "MIT",
+ "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…",
                  "lang": "Go", "topics": [], "archived": false, "fork": false, "lenses": ["E", "P"],
                  "installs": 4200, "fit": 2, "score": 9.1}]}
 ```

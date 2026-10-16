@@ -453,6 +453,28 @@ class FlowTests(Base):
         self.assertEqual(mine.get("jackwener/OpenCLI"), "short")
         self.assertNotIn("xpzouying/xiaohongshu-mcp", mine)
 
+    def test_import_keeps_the_search_log(self):
+        self.seed()
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("## 2. Search and candidates\n\n### Access\n| entry point | worked | fallback used |\n|---|---|---|\n"
+                          "| GitHub search page | yes | |\n\n### Search log\n"
+                          "| # | lens | direction | lang | query or URL | looked at | kept |\n|---|---|---|---|---|---|---|\n"
+                          "| 1 | words | D1 | zh | `小红书 登录态` | 30 | xpzouying/xiaohongshu-mcp |\n"
+                          "| 2 | list | D1 | en | https://github.com/jackwener/OpenCLI | 12 | |\n\n### Candidates\n"
+                          "| repo | kind | direction | lang | why it may help | last commit | stars | found by |\n"
+                          "|---|---|---|---|---|---|---|---|\n"
+                          "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | D1 | zh | 登录态复用 | unknown | 9k | 1 |\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 searches from its search log", out)
+        scan = json.loads(sorted((self.root / "scans" / "ops" / "browser-ops").glob("*.json"))[-1].read_text())
+        logged = [s for s in scan["searches"] if s["kind"].startswith("cloud")]
+        self.assertEqual([(s["kind"], s["query"], s["hits"]) for s in logged],
+                         [("cloud words", "D1 · zh · 小红书 登录态", 1),
+                          ("cloud list", "D1 · en · https://github.com/jackwener/OpenCLI", 12)])
+        cand = {c["repo"]: c for c in scan["candidates"]}
+        self.assertEqual(cand["xpzouying/xiaohongshu-mcp"].get("said"), "登录态复用")
+
     def test_import_creates_the_question_from_the_report(self):
         self.seed()
         report = Path(self.tmp.name) / "cloud.md"
@@ -553,11 +575,6 @@ class DogfoodFixTests(Base):
         found = {**relevant, "repo": "d/x", "desc": "Reddit tool", "lenses": ["E"]}
         self.assertGreater(discover.score(added, QUESTION), discover.score(found, QUESTION))
 
-    def test_license_hint_catches_non_commercial(self):
-        self.assertEqual(examine.license_hint("# PolyForm Noncommercial License 1.0.0\n..."), ("PolyForm-Noncommercial", True))
-        self.assertEqual(examine.license_hint("MIT License\n\nCopyright"), ("MIT", False))
-        self.assertIsNone(examine.license_hint("All rights reserved."))
-
     def test_note_idea_and_ask_update(self):
         slug = "a/b"
         self.api.add(repo(slug, pushed=ago(1)))
@@ -565,13 +582,12 @@ class DogfoodFixTests(Base):
         self.api.paths[f"repos/{slug}/commits/main"] = {"sha": sha}
         self.api.paths[f"repos/{slug}/git/trees/{sha}"] = {"tree": [{"path": "LICENSE", "type": "blob", "size": 10}]}
         self.api.paths[f"repos/{slug}/contents/LICENSE"] = "PolyForm Noncommercial License 1.0.0"
-        self.api.repos[slug]["license"] = None
         code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
                                     "--idea", "Judge pairs, not scores.", "--note", "judge design")
         self.assertEqual(code, 0, out)
-        self.assertIn("LICENSE WARNING: PolyForm-Noncommercial", out)
+        self.assertNotIn("LICENSE", out)                     # licences are not part of the research
         card = self.store.card(slug)
-        self.assertEqual(card.data["license"], "PolyForm-Noncommercial")
+        self.assertNotIn("license", card.data)
         self.assertIn("## The idea\nJudge pairs, not scores.", card.body)
         code, out, _ = self.run_cli("ask", "ops/browser-ops", "A sharper question", "--stage", "prototype", "--update")
         self.assertEqual(code, 0, out)

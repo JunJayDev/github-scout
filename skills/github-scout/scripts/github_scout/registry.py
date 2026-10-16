@@ -90,7 +90,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 (By our stage: idea, practice, parameter or component, with file paths; or how we run or adapt it.)
 
 ## Risks
-(Permissions, data it can reach, license, lock-in.)
+(Permissions, data it can reach, lock-in.)
 
 ## Read first
 """,
@@ -166,7 +166,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （按我们的阶段：思路、做法、参数还是组件，写到文件；或者怎么直接用、怎么改了用。）
 
 ## 风险
-（权限、能碰到的数据、许可证、锁定。）
+（权限、能碰到的数据、锁定。）
 
 ## 先读
 """,
@@ -197,7 +197,7 @@ def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[d
         raise StoreError(f"kind must be one of {', '.join(KINDS)}")
     data = {
         "id": slug, "repo": f"https://github.com/{slug}", "kind": kind, "form": form,
-        "summary": summary or meta.get("desc") or "", "license": meta.get("license") or "none",
+        "summary": summary or meta.get("desc") or "",
         "stars": meta.get("stars"), "created": meta.get("created") or None, "pushed": meta.get("pushed") or None,
         "branch": meta.get("branch"), "commit": meta.get("commit"), "reviewed": today(), "level": level,
         "watch": watch, "uses": uses,
@@ -254,8 +254,8 @@ def new_project(store: Store, pid: str, name: str, summary: str, code: str = "")
     data = {"id": pid, "name": name, "summary": summary, "code": code, "stack": [], "constraints": [],
             "languages": ["en"]}
     body = ("\n# {name}\n\n(What this project is, who it serves, where its code is, and what we would never adopt: "
-            "licenses, platforms, hosting, data handling. Agents read this before judging fit.)\n" if store.lang == "en" else
-            "\n# {name}\n\n（这个项目是什么、给谁用、代码在哪；哪些东西绝不采用：许可证、平台、托管、数据处理。"
+            "platforms, hosting, data handling. Agents read this before judging fit.)\n" if store.lang == "en" else
+            "\n# {name}\n\n（这个项目是什么、给谁用、代码在哪；哪些东西绝不采用：平台、托管、数据处理。"
             "agent 判断合不合适之前先读这里。）\n").format(name=name)
     write_doc(path, data, body, PROJECT_ORDER)
     return path

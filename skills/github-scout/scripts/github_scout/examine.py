@@ -34,35 +34,6 @@ FORM_KIND = {"skill": "skill", "skill-pack": "skill", "rules": "skill", "list": 
              "data": "other"}
 
 
-# Licenses GitHub reports as NOASSERTION or not at all, recognised from the file itself.
-LICENSE_HINTS = [
-    (r"PolyForm Noncommercial", "PolyForm-Noncommercial", True),
-    (r"PolyForm Shield", "PolyForm-Shield", True),
-    (r"PolyForm", "PolyForm", True),
-    (r"Commons Clause", "Commons-Clause", True),
-    (r"Business Source License", "BUSL", True),
-    (r"Server Side Public License", "SSPL", True),
-    (r"Elastic License", "Elastic", True),
-    (r"Attribution-NonCommercial|CC BY-NC", "CC-BY-NC", True),
-    (r"non-?commercial", "custom (non-commercial)", True),
-    (r"MIT License|Permission is hereby granted, free of charge", "MIT", False),
-    (r"Apache License[\s\S]{0,80}Version 2\.0", "Apache-2.0", False),
-    (r"GNU AFFERO GENERAL PUBLIC", "AGPL-3.0", False),
-    (r"GNU GENERAL PUBLIC LICENSE", "GPL", False),
-    (r"BSD", "BSD", False),
-]
-LICENSE_FILES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING", "license", "License.md")
-
-
-def license_hint(text: str) -> tuple[str, bool] | None:
-    """(name, non-commercial?) from a license file's first lines."""
-    head = text[:3000]
-    for pattern, name, nc in LICENSE_HINTS:
-        if re.search(pattern, head, re.I if name.startswith("custom") else 0):
-            return name, nc
-    return None
-
-
 def kind_of(form: str) -> str:
     """The four kinds the registry uses: skill, software, list, other."""
     return FORM_KIND.get(form, "software")
@@ -190,24 +161,13 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
     top_share = round(100 * int(people[0].get("contributions") or 0) / total) if people and total else None
     skills = [p for p in paths if p.endswith("SKILL.md")]
     pkg = _json(files.get("package.json"))
-    lic = (r.get("license") or {}).get("spdx_id")
-    lic_note = None
-    if lic in (None, "NOASSERTION"):
-        lf = next((f for f in LICENSE_FILES if f in paths), None)
-        hint = license_hint(client.file(slug, lf, sha) or "") if lf else None
-        if hint:
-            lic, nc = hint
-            lic_note = "NON-COMMERCIAL: learn from it, do not copy or run it in a commercial project" if nc else None
-        else:
-            lic = "custom (read LICENSE)" if lf else None
-            lic_note = None if lf else "no license file: all rights reserved, read only"
     return {
         "repo": slug, "url": r.get("html_url") or f"https://github.com/{slug}",
         "desc": r.get("description") or "", "homepage": r.get("homepage") or "",
         "stars": r.get("stargazers_count", 0), "forks": r.get("forks_count", 0),
         "open_issues": r.get("open_issues_count", 0),
         "created": (r.get("created_at") or "")[:10], "pushed": (r.get("pushed_at") or "")[:10],
-        "license": lic, "license_note": lic_note, "archived": r.get("archived", False),
+        "archived": r.get("archived", False),
         "lang": r.get("language"), "topics": r.get("topics", []), "branch": branch, "commit": sha[:12],
         "release": {"tag": rel.get("tag_name"), "date": (rel.get("published_at") or "")[:10]} if rel else None,
         "kind": kind_of(kind), "form": kind, "evidence": evidence, "files": len(paths),
@@ -237,8 +197,7 @@ def render_peek(p: dict) -> str:
     lines = [f"## {p['repo']}  ({p['kind']}: {p['form']}?)  {p['url']}",
              f"{p['desc']}",
              f"stars {p['stars']} · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
-             f" · license {p['license'] or 'none'} · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else "")
-             + (f"\nLICENSE WARNING: {p['license_note']}" if p.get("license_note") else ""),
+             f" · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else ""),
              f"head {p['branch']}@{p['commit']}" + (f" · release {p['release']['tag']} {p['release']['date']}" if p["release"] else " · no releases"),
              f"maintenance: {maintenance(a['idle_months'])} · {a['commits_30d']}{'+' if a['commits_30d'] >= 100 else ''} commits in 30 days"
              f" · {a['releases_90d']} releases in 90 days · {a['contributors']}{'+' if a['contributors'] >= 10 else ''} contributors"
@@ -336,9 +295,6 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
         row["stars"], row["stars_then"] = r.get("stargazers_count", 0), d.get("stars")
         if r["full_name"].lower() != slug.lower():
             row["renamed"] = r["full_name"]
-        lic = (r.get("license") or {}).get("spdx_id")
-        if lic and d.get("license") and lic != d.get("license") and lic != "NOASSERTION":
-            row["license_changed"] = f"{d.get('license')} -> {lic}"
         if r.get("archived"):
             row["archived"] = True
         idle = months_since((r.get("pushed_at") or "")[:10])
@@ -356,10 +312,9 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
             row["head"] = (cmp.get("commits") or [{}])[-1].get("sha", "")[:12] if cmp.get("commits") else row["commit"]
         rels = [x for x in client.releases(r["full_name"]) if (x.get("published_at") or "")[:10] > str(d.get("reviewed") or "")]
         row["releases"] = [x.get("tag_name") for x in rels][:6]
-        if row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") and not row.get("license_changed") \
-                and not row.get("unmaintained"):
+        if row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") and not row.get("unmaintained"):
             row["state"] = "up to date"
-        elif row.get("watched_changed") or row.get("archived") or row.get("license_changed") or row.get("unmaintained"):
+        elif row.get("watched_changed") or row.get("archived") or row.get("unmaintained"):
             row["state"] = "review"
         elif row.get("ahead") or row["releases"]:
             row["state"] = "changed (not in watched paths)" if as_list(d.get("watch")) else "changed (card watches no paths)"
@@ -379,7 +334,7 @@ def render_outdated(rows: list[dict]) -> str:
             bits.append("watched: " + ", ".join(w[:5]) + (f" +{len(w) - 5}" if len(w) > 5 else ""))
         if r.get("releases"):
             bits.append("releases " + ", ".join(r["releases"]))
-        for k in ("archived", "unmaintained", "license_changed", "renamed"):
+        for k in ("archived", "unmaintained", "renamed"):
             if r.get(k):
                 bits.append(f"{k}: {r[k]}" if r[k] is not True else k)
         if r.get("stars") and r.get("stars_then") and r["stars"] != r["stars_then"]:
@@ -435,8 +390,5 @@ def bump(store: Store, client: Client, slug: str, to: str | None = None) -> dict
     old = card.data.get("commit")
     card.data.update(commit=str(sha)[:12], reviewed=today(), stars=r.get("stargazers_count", 0),
                      pushed=(r.get("pushed_at") or "")[:10])
-    lic = (r.get("license") or {}).get("spdx_id")
-    if lic and lic != "NOASSERTION":
-        card.data["license"] = lic
     store.save_card(card)
     return {"repo": card.id, "from": old, "to": card.data["commit"]}

@@ -6,7 +6,7 @@ do not exist are listed, since a chat model may invent them. Table columns it re
 verdict, reason) ride along as notes.
 
 `brief`: an answered question becomes a hand-off for the agent that will change the code. It
-copies the answer's own sections and adds the facts from the cards (licence, reviewed commit),
+copies the answer's own sections and adds the facts from the cards (take, reviewed commit),
 so the coding agent gets what to change, why, and from where, without reading the registry.
 """
 
@@ -26,6 +26,15 @@ COLUMNS = {
     "reason": ("why", "reason", "idea", "what to take", "notes", "理由", "为什么", "能借什么", "思路", "说明", "备注"),
     "direction": ("direction", "lens", "方向"),
 }
+# A search log (one row per search) is told apart by its query column; its rows are searches, not repos.
+LOG_COLUMNS = {
+    "query": ("query", "search", "检索词", "搜索词", "查询", "关键词"),
+    "lens": ("lens", "method", "方法", "方式", "途径"),
+    "direction": ("direction", "方向"),
+    "lang": ("lang", "language", "语言"),
+    "looked": ("looked", "results", "看了", "结果"),
+    "kept": ("kept", "保留", "留下"),
+}
 TAKE_WORDS = {
     "shortlist": ("shortlist", "short", "入选", "值得看", "深入看"),
     "use": ("use", "直接用", "用"), "adapt": ("adapt", "改了用", "改用", "改造"), "learn": ("learn", "学思路", "学", "借鉴"),
@@ -38,8 +47,8 @@ def _cells(line: str) -> list[str]:
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
-def _column(header: list[str], key: str) -> int | None:
-    names = COLUMNS[key]
+def _column(header: list[str], key: str, table: dict = COLUMNS) -> int | None:
+    names = table[key]
     for i, h in enumerate(header):
         low = re.sub(r"[*_`]", "", h).strip().lower()
         if any(low == n or low.startswith(n) for n in names):
@@ -66,13 +75,8 @@ def report_goal(text: str) -> tuple[str | None, str | None]:
     return goal, st.group(1) if st else None
 
 
-def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
-    """Every GitHub repo linked in the text, in order, and per repo the fields found in table rows.
-
-    A verdict counts only outside the Candidates section: a candidate list is not triaged yet, and
-    a chat model fills such a column with one word for every row (84 rows of "learn" in one test).
-    """
-    rows: dict[str, dict] = {}
+def _tables(text: str):
+    """(in the Candidates section?, header cells, row cells) for every Markdown table."""
     lines = text.splitlines()
     candidates = False
     i = 0
@@ -81,26 +85,64 @@ def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
         if h:
             candidates = bool(re.search(r"candidates|候选", h.group(2), re.I))
         if lines[i].lstrip().startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|?\s*:?-{2,}", lines[i + 1]):
-            header = _cells(lines[i])
-            cols = {k: _column(header, k) for k in COLUMNS}
+            header, body = _cells(lines[i]), []
             i += 2
             while i < len(lines) and lines[i].lstrip().startswith("|"):
-                cells = _cells(lines[i])
-                found = slugs_in_text(cells[cols["repo"]] if cols["repo"] is not None and cols["repo"] < len(cells)
-                                      else lines[i])
-                if found:
-                    entry = rows.setdefault(found[0].lower(), {"repo": found[0]})
-                    for key in ("kind", "reason", "direction"):
-                        j = cols[key]
-                        if j is not None and j < len(cells) and cells[j] and key not in entry:
-                            entry[key] = cells[j][:300]
-                    j = cols["take"]
-                    if not candidates and j is not None and j < len(cells) and _take(cells[j]):
-                        entry["take"] = _take(cells[j])
+                body.append((_cells(lines[i]), lines[i]))
                 i += 1
+            yield candidates, header, body
             continue
         i += 1
+
+
+def _cell(cells: list[str], j: int | None) -> str:
+    return cells[j] if j is not None and j < len(cells) else ""
+
+
+def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
+    """Every GitHub repo linked in the text, in order, and per repo the fields found in table rows.
+
+    A verdict counts only outside the Candidates section: a candidate list is not triaged yet, and
+    a chat model fills such a column with one word for every row (84 rows of "learn" in one test).
+    Search logs are skipped here; `parse_search_log` reads them.
+    """
+    rows: dict[str, dict] = {}
+    for candidates, header, body in _tables(text):
+        if _column(header, "query", LOG_COLUMNS) is not None:
+            continue
+        cols = {k: _column(header, k) for k in COLUMNS}
+        for cells, line in body:
+            found = slugs_in_text(_cell(cells, cols["repo"]) if cols["repo"] is not None else line)
+            if not found:
+                continue
+            entry = rows.setdefault(found[0].lower(), {"repo": found[0]})
+            for key in ("kind", "reason", "direction"):
+                v = _cell(cells, cols[key])
+                if v and key not in entry:
+                    entry[key] = v[:300]
+            take = _take(_cell(cells, cols["take"])) if cols["take"] is not None else None
+            if not candidates and take:
+                entry["take"] = take
     return slugs_in_text(text), rows
+
+
+def parse_search_log(text: str) -> list[dict]:
+    """The searches a report says it ran: lens, direction, language, query, results looked at, repos kept."""
+    out = []
+    for _, header, body in _tables(text):
+        cols = {k: _column(header, k, LOG_COLUMNS) for k in LOG_COLUMNS}
+        if cols["query"] is None:
+            continue
+        for cells, _ in body:
+            query = re.sub(r"`", "", _cell(cells, cols["query"])).strip()
+            if not query:
+                continue
+            looked = re.search(r"\d+", _cell(cells, cols["looked"]))
+            out.append({"lens": _cell(cells, cols["lens"]), "direction": _cell(cells, cols["direction"]),
+                        "lang": _cell(cells, cols["lang"]), "query": query[:200],
+                        "looked": int(looked.group()) if looked else None,
+                        "kept": re.findall(r"[\w.-]+/[\w.-]+", re.sub(r"https?://github\.com/", "", _cell(cells, cols["kept"])))})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -144,23 +186,21 @@ T = {
     "en": {
         "title": "Brief for the coding agent: {ask}", "from": "From github-scout question `{ref}` ({path}), {date}.",
         "rule": "This brief only advises. Make the changes in the project yourself, check each one, and keep "
-                "what the user decided before. Where an idea comes from a repository with a non-commercial or "
-                "missing licence, write your own code from the idea; do not copy theirs.",
+                "what the user decided before.",
         "goal": "## Goal and where we stand", "code": "Project code: {code}", "nocode": "No local project was given; "
                 "map each step onto the code it would change before starting.",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
-        "repos": "## Sources", "head": "| repo | take | licence | reviewed at | what we take |",
+        "repos": "## Sources", "head": "| repo | take | reviewed at | what we take |",
         "empty": "(the answer has no such section yet)", "noanswer": "{ref} has no answer yet: write its answer section first",
     },
     "zh": {
         "title": "给开发 agent 的简报：{ask}", "from": "来自 github-scout 问题 `{ref}`（{path}），{date}。",
-        "rule": "这份简报只给建议，改动由你在项目里做，每一步做完要验证，用户以前定过的规矩照旧。"
-                "思路来自非商用许可或没有许可证的仓库时，照思路自己写，不复制它的代码。",
+        "rule": "这份简报只给建议，改动由你在项目里做，每一步做完要验证，用户以前定过的规矩照旧。",
         "goal": "## 目标和现状", "code": "项目代码：{code}", "nocode": "没有给本地项目；动手前先把每一步对应到要改的代码。",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",
-        "repos": "## 参考仓库", "head": "| 仓库 | 取舍 | 许可证 | 审查时的版本 | 我们拿什么 |",
+        "repos": "## 参考仓库", "head": "| 仓库 | 取舍 | 审查时的版本 | 我们拿什么 |",
         "empty": "（答案里还没有这一节）", "noanswer": "{ref} 还没有答案：先写问题文件里的答案",
     },
 }
@@ -187,19 +227,16 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
         lines += [t["compare"], "", parts["compare"], ""]
     picked = [str(x) for x in as_list(q.get("picked"))]
     if picked:
-        lines += [t["repos"], "", t["head"], "|---|---|---|---|---|"]
+        lines += [t["repos"], "", t["head"], "|---|---|---|---|"]
         for slug in picked:
             card = store.card(slug)
             if not card:
-                lines.append(f"| [{slug}](https://github.com/{slug}) | - | - | - | - |")
+                lines.append(f"| [{slug}](https://github.com/{slug}) | - | - | - |")
                 continue
             d = card.data
             use = next((u for u in as_list(d.get("uses")) if isinstance(u, dict) and u.get("question") == q["id"]), {})
-            lic = d.get("license") or "?"
-            if d.get("license_note"):
-                lic += f" ({d['license_note']})"
             note = str(use.get("note") or d.get("summary") or "").replace("|", "/").replace("\n", " ")[:220]
-            lines.append(f"| [{card.id}](https://github.com/{card.id}) | {use.get('take', '-')} | {lic} | "
+            lines.append(f"| [{card.id}](https://github.com/{card.id}) | {use.get('take', '-')} | "
                          f"{d.get('commit', '-')} | {note} |")
         lines.append("")
     path = out or store.root / "projects" / q["project"] / "briefs" / f"{q['id']}.md"

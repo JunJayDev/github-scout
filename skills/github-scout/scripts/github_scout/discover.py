@@ -236,14 +236,12 @@ def months_since(iso: str | None) -> float:
 
 
 def compact(r: dict) -> dict:
-    lic = (r.get("license") or {}).get("spdx_id") if isinstance(r.get("license"), dict) else r.get("license")
     return {
         "repo": r["full_name"],
         "desc": (r.get("description") or "")[:200],
         "stars": int(r.get("stargazers_count") or 0),
         "created": (r.get("created_at") or "")[:10],
         "pushed": (r.get("pushed_at") or "")[:10],
-        "license": None if lic in (None, "NOASSERTION") else lic,
         "lang": r.get("language"),
         "topics": (r.get("topics") or [])[:8],
         "archived": bool(r.get("archived")),
@@ -361,7 +359,6 @@ def score(c: dict, q: dict | None = None) -> float:
             s += 0.3
     s -= 3 if c.get("archived") else 0
     s -= 1 if c.get("fork") else 0
-    s -= 0.3 if not c.get("license") else 0
     return round(s, 2)
 
 

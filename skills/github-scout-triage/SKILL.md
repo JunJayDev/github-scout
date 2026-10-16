@@ -23,12 +23,11 @@ The candidates from `github-scout-search`.
 | kind | route |
 |---|---|
 | skill, prompt pack, rules | read SKILL.md, its references and scripts in full; judge the method and its safety |
-| cli, mcp, library, app | map the code and find the module that implements the mechanism; check the licence; if we would run it, try it on one real task |
+| cli, mcp, library, app | map the code and find the module that implements the mechanism; if we would run it, try it on one real task |
 | example, template | read only the files that show the technique |
 | awesome list | expand it into candidates (`scan --expand`); never adopt a list |
 | article, paper | take the idea and its evidence |
 | official docs, hosted service | read the pages that answer a direction; note limits, cost and lock-in; list as another source |
-| non-commercial licence, or none | idea only; never copy the code |
 
 Pick 5 to 12 for the shortlist. Prefer repos that answer a direction directly, are young and
 maintained, and come from different approaches; three variants of one idea teach less than three ideas.

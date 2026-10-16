@@ -486,7 +486,7 @@ def _card(c: Doc, link, day: _dt.date, root: Path) -> dict:
         url = f"https://github.com/{c.id}" if SLUG.match(c.id) else ""
     return {
         "id": c.id, "url": url, "kind": _s(d.get("kind")), "form": _s(d.get("form")), "summary": _s(d.get("summary")),
-        "license": _s(d.get("license")), "stars": _int(d.get("stars")), "created": _s(d.get("created")),
+        "stars": _int(d.get("stars")), "created": _s(d.get("created")),
         "pushed": _s(d.get("pushed")), "age": age, "stale": age is not None and age >= 3,
         "reviewed": _s(d.get("reviewed")), "level": _s(d.get("level")),
         "commit": _s(d.get("commit")) if SHA.match(_s(d.get("commit"))) else "", "branch": _s(d.get("branch")),
@@ -591,7 +591,7 @@ UI = {
         "allQuestions": "All questions", "count": "{n} of {total}", "clear": "Clear",
         "noRepos": "No repos match these filters.",
         "created": "created", "pushed": "pushed", "reviewed": "reviewed", "stale": "no push for {n} months",
-        "license": "License", "level": "Review depth", "commit": "Reviewed commit", "file": "File",
+        "level": "Review depth", "commit": "Reviewed commit", "file": "File",
         "uses": "Taken by", "github": "GitHub", "stars": "stars",
         "labels": {
             "stage": {}, "status": {}, "take": {}, "verdict": {},
@@ -611,7 +611,7 @@ UI = {
         "allQuestions": "全部问题", "count": "{n} / {total}", "clear": "清除",
         "noRepos": "没有符合筛选的仓库。",
         "created": "创建", "pushed": "推送", "reviewed": "审阅", "stale": "{n} 个月没有推送",
-        "license": "许可证", "level": "看到哪一步", "commit": "审阅的提交", "file": "文件",
+        "level": "看到哪一步", "commit": "审阅的提交", "file": "文件",
         "uses": "用在哪", "github": "GitHub", "stars": "星",
         "labels": {
             "stage": {"idea": "想法", "prototype": "雏形", "working": "能用", "polishing": "打磨"},
@@ -848,7 +848,7 @@ function repoRow(c) {
       c.reviewed ? U.reviewed + " " + c.reviewed : null].filter(Boolean), " · ")),
     body);
   const row = {c, li, btn, body, open: false, filled: false,
-    text: [c.id, c.summary, c.idea, c.kind, lab("kind", c.kind), c.form, c.license,
+    text: [c.id, c.summary, c.idea, c.kind, lab("kind", c.kind), c.form,
       ...c.uses.flatMap((u) => [u.project, u.question, u.take, lab("take", u.take), u.where, u.note]),
       new DOMParser().parseFromString(c.body, "text/html").body.textContent].join(" ").toLowerCase()};
   btn.addEventListener("click", () => toggle(row, !row.open, true));
@@ -859,7 +859,6 @@ function fill(row) {
   const c = row.c, link = web(c.url);
   row.body.append(
     h("dl", {class: "facts"},
-      c.license ? fact(U.license, c.license) : null,
       c.level ? fact(U.level, lab("level", c.level)) : null,
       c.commit ? fact(U.commit, link ? h("a", {href: link.replace(/\/+$/, "") + "/tree/" + c.commit, target: "_blank",
         rel: "noopener noreferrer"}, h("code", null, c.commit.slice(0, 7))) : c.commit.slice(0, 7), c.branch ? " (" + c.branch + ")" : "") : null,

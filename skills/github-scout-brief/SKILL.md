@@ -26,8 +26,7 @@ otherwise what the user said exists.
 3. **Write the steps for the coding agent, in order.** Each step gives:
    - the files in our project it touches and what to change;
    - why: which idea, from which repo and file;
-   - how to check it worked;
-   - what not to copy because of its licence.
+   - how to check it worked.
 
    Keep only what our stage needs.
 4. **Without a local project,** write the steps as a build plan: the parts to build or adopt, in

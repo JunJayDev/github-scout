@@ -49,75 +49,92 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
 
 ## Without the command line (cloud chat)
 
-A chat has room for about 60 searches and page fetches. Spread them over the directions and
-languages, and keep 10 to 30 candidates whose pages you opened. If the user asks for a complete
-register, list more, but spend the budget on what they would not find alone: tools everyone
-knows (FFmpeg, Blender, Whisper and the like) need no search, so name them with their links in
-one line under the table.
+Run the same lenses as `scan`, through web pages instead of the API. Most of the budget goes to
+finding: at least 40 searches across the lenses before you open candidates one by one. Licences,
+usage rights and pricing pages are not part of the search; do not spend fetches on them.
 
-For every direction, in each language from the plan (English and Chinese always, others when the
-user's audience needs them):
+**1. Check what you can open.** Try each entry point once, with the first term of direction D1,
+and write in the report whether it returned repositories. Use the ones that work. When one fails,
+use its fallback and say so; never write that a lens ran when it did not.
 
-1. **GitHub's own search**, when you can fetch it (JSON, no login, about 10 searches a minute):
-   `https://api.github.com/search/repositories?q=<terms>+pushed:>YYYY-MM-DD&sort=stars&per_page=30`,
-   with the date six months back. Vary the terms as the command line does:
-   - one entity;
-   - two entities with `in:readme`;
-   - a quoted mechanism;
-   - `topic:<topic>`;
-   - `created:>YYYY-MM-DD` for the last year.
-2. **Web search**, when the API is out of reach and for what it cannot see:
-   - `site:github.com <entity> <mechanism>`;
-   - the same without `site:` when results drift to package indexes;
-   - `<中文词> github 开源`;
-   - `site:juejin.cn OR site:zhihu.com <中文词> github`.
-3. **Curated lists:** when a search turns up an awesome list or catalog for the field, read its
-   whole README (raw) and screen every repo it links. One list often holds more than all your
-   searches together; opening a list and not reading it is the most common way to miss the best
-   repos.
-4. **Skills:** `https://skills.sh/api/search?q=<term>` returns JSON with install counts (the web
-   page needs JavaScript). Distrust installs far beyond the repo's stars.
-5. **New and growing fast, without words:**
-   `https://api.github.com/search/repositories?q=topic:agent-skills+created:>YYYY-MM-DD&sort=stars`,
-   or the topic that fits the form you need.
+| entry point | URL | lenses it serves |
+|---|---|---|
+| GitHub search page | `https://github.com/search?q=<terms>&type=repositories&s=stars` | words (E, P, M, C, R) |
+| GitHub search API | `https://api.github.com/search/repositories?q=<terms>&sort=stars` | the same, as JSON; shared chat servers often hit its rate limit |
+| topic page | `https://github.com/topics/<topic>?o=desc&s=updated` | topics (T), rising (H) |
+| trending | `https://github.com/trending?since=monthly` | rising (H) |
+| raw file | `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md` | lists (L), links (G) |
+| owner's repos | `https://github.com/<owner>?tab=repositories&sort=stargazers` | same author (U) |
+| skills.sh | `https://skills.sh/api/search?q=<term>` | installed skills (S) |
+| MCP registry | `https://registry.modelcontextprotocol.io/v0/servers?search=<term>` | MCP servers (D) |
+| npm | `https://registry.npmjs.org/-/v1/search?text=<term>&size=20` | packages (N) |
+| repo facts | `https://ungh.cc/repos/<owner>/<repo>` or `https://api.github.com/repos/<owner>/<repo>` | stars, created, last push |
 
-For each candidate you keep:
-- Fetch `https://api.github.com/repos/<owner>/<repo>` for `stargazers_count`, `pushed_at`,
-  `license` and `archived`.
-- If that fails, try the feed `https://github.com/<owner>/<repo>/commits.atom` (its first
-  `<updated>` is the last commit), then the newest date on the commits page. If none of them
-  loads, write "unknown" and move on: the local import fills in stars and dates and drops repos
-  with no push in 12 months. Do not spend fetches retrying.
+**2. Search every direction with every lens that works,** in each language from the plan
+(English and Chinese always, others when the user's audience needs them):
+
+1. **Words on GitHub's own search (E, P, M, C, R).** Short queries of one to three terms, never
+   a list of tool names you already know: such queries only return those tools. Add
+   `pushed:>YYYY-MM-DD` (six months back). Per direction and language, at least:
+   - each entity alone;
+   - two entities together;
+   - each mechanism, quoted;
+   - a mechanism with an entity;
+   - one of these with `created:>YYYY-MM-DD` (twelve months back) and `&s=updated`, for what is new.
+
+   Search the Chinese words on GitHub too: Chinese projects are found by the words their
+   authors use (`视频 配音 字幕` puts VideoLingo first). Only when neither the search page nor
+   the API opens, fall back to web search: `site:github.com <terms>`.
+2. **Topics (T):** the topic page for each entity and form, such as `remotion`, `claude-skills`,
+   `agent-skills`, `mcp-server`.
+3. **Rising, without words (H):** the topic pages of the form sorted by `updated`, and trending
+   (`/trending?since=monthly`, `/trending/<language>?since=weekly`). Screen every repo there
+   against the goal, even when no search word matches it.
+4. **Curated lists (L):** when a search turns up an awesome list or catalog for the field, read
+   its whole README (raw) and screen every repo it links. One list often holds more than all
+   your searches together; opening a list and not reading it is the most common way to miss
+   the best repos.
+5. **Links from the shortlist (G):** read the README of each repo you shortlist and screen the
+   repos it links ("see also", "inspired by", "alternatives").
+6. **Same author (U):** open the repository list of each shortlisted repo's owner. Authors often
+   have a sibling project that fits better.
+7. **Skills, MCP servers, packages (S, D, N):** the three registries above. Distrust skills.sh
+   installs far beyond the repo's stars.
+8. **Web search (W):** articles and posts that name repos GitHub search does not surface:
+   `<entity> <mechanism> github`, `<中文词> github 开源`,
+   `site:juejin.cn OR site:zhihu.com OR site:bilibili.com <中文词> github`. Follow the repo
+   links in them.
+
+**3. Facts for each candidate you keep:** stars, created and last push from "repo facts"; if
+neither opens, from the repo page or `https://github.com/<owner>/<repo>/commits.atom` (its first
+`<updated>` is the last commit). If nothing loads, write "unknown" and move on: the local import
+fills in stars and dates and drops repos with no push in 12 months.
+
 - A page summary that does not mention something is no proof the repo lacks it. When it matters,
-  read the raw README: `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md`.
+  read the raw README.
+- Keep 10 to 30 candidates whose pages you opened; more if the user asks for a complete register.
+  Tools everyone knows (FFmpeg, Blender, Whisper and the like) need no search: name them with
+  their links in one line under the table.
 - Official documentation and hosted services often answer part of the goal. Keep them as "other
   sources", with their URLs.
 
-Write section 2 of the report: one row per repo, with these columns:
+**4. Write section 2 of the report** (format in `references/report-format.md`):
 
-- repo URL
-- kind
-- direction
-- language of the project (en, zh, ja, ...)
-- why it may help
-- last commit
-- stars
-- found by: the query or the list that surfaced it, word for word, so someone can repeat it
-
-No verdict column here: verdicts belong to triage, and the importer ignores them in this table.
-
-Under the table, write:
-
-- how many searches each direction got in each language (count each search once, under its main
-  direction; page fetches are not counted);
-- repos you saw but did not open: names only, no numbers;
-- which directions found nothing;
-- what you excluded and why.
+- **Access:** each entry point, whether it worked, and the fallback you used.
+- **Search log:** one row per search or list you read: number, lens, direction, language, the
+  query or URL word for word, how many results you looked at, and which repos you kept from it.
+  This is how anyone can see what was searched, repeat it, and find the hole when a repo was
+  missed.
+- **Candidates:** one row per repo: URL, kind, direction, language of the project, why it may
+  help, last commit, stars, found by (the log number or the list). No verdict column: verdicts
+  belong to triage, and the importer ignores them here.
+- Under the table: repos you saw but did not open (names only); directions that found nothing;
+  what you excluded and why.
 
 ## Output
 
-Locally, a ranked table with 30 to 100 rows worth a glance. In a chat, 10 to 30 candidates you
-opened, plus other sources.
+Locally, a ranked table with 30 to 100 rows worth a glance. In a chat, the access table, the
+search log, and 10 to 30 candidates you opened, plus other sources.
 
 ## Next
 
