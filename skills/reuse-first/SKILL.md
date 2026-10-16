@@ -58,10 +58,15 @@ start from its answer. If a repository has a card, read the card, not the reposi
 - In the file, write what we already have (paths in our code) and what is not good enough.
   Read that code first: you cannot judge a difference you have not seen.
 - Write the vocabulary in the frontmatter. It decides what the search can see:
-  - `entities`: concrete things the solution touches (platforms, formats, APIs, products). Synonyms
-    and other-language names in one item with `|`: `"xiaohongshu|小红书|rednote"`. Every synonym is
-    searched on its own; pairs and combinations use the first term of the first six groups, so
-    put the most specific entities first.
+  - `langs`: default `[en, zh]` (`ask --langs` changes it); in real runs Chinese projects supplied
+    half the repos picked. Every entity and mechanism group needs a term in each language, the name
+    those users actually write, not a translation: `小红书|xhs|红书`, `去AI味|活人感|人味`,
+    `宣传片|产品视频`. `scan --plan` and `check` warn about groups that lack one; a name both
+    write the same way (`remotion`) needs nothing.
+  - `entities`: concrete things the solution touches (platforms, formats, APIs, products), synonyms
+    in one item with `|`: `"xiaohongshu|小红书|xhs|红书"`. Every synonym is searched on its own;
+    pairs and combinations use each group's first term in each language, so put the most specific
+    entities first.
   - `mechanisms`: how it would work, in the words a README uses: `"logged-in browser"`, `"remotion"`.
     Add the positive way people name the goal too (`"human writing|活人感"`), not only the negative,
     and neighbours whose output you could reuse (for video: `"explainer|animation|diagram"`).
@@ -69,8 +74,9 @@ start from its answer. If a repository has a card, read the card, not the reposi
   - `problems`: 2–4 short phrases (GitHub ANDs every word), one per language.
   - Changed the question later? `ask <q> "<new ask>" --stage <s> --update`.
 
-**2. Scan.** `scan <q> --plan` shows the searches; `scan <q>` runs about 90 of them across 14
-lenses in a few minutes and prints a ranked table (~2k tokens for 40 rows). Ranking puts
+**2. Scan.** `scan <q> --plan` shows the searches; `scan <q>` runs 120–160 of them across 14
+lenses in about five minutes, each language getting a fair share, and prints a ranked table
+(~2k tokens for 40 rows). Ranking puts
 relevance first (`fit`: vocabulary groups in the repo's own name, description and topics),
 then life (created recently, pushed recently, stars per month), and plain star counts last.
 Maintenance is a hard rule: no push for over 3 months ranks far down, over 6 months is hidden
@@ -161,7 +167,7 @@ Rescan a question after about two months; `scan <q> --show` merges every scan.
 | command | does |
 |---|---|
 | `init DIR [--lang zh]` / `new-project ID --name N --code PATH` | create a registry / a project |
-| `ask P/Q "question" --stage S` | start a question (template in the registry's language) |
+| `ask P/Q "question" --stage S [--langs en,zh]` | start a question (template in the registry's language) |
 | `find WORDS…` | search questions, cards and the ledger |
 | `scan P/Q [--plan / --show / --add SRC… / --expand LIST…]` | search; see the plan; reprint; add outside links; expand a list |
 | `pick P/Q ITEMS… [--rest REASON]` | verdicts on table rows |

@@ -44,14 +44,24 @@ project: ops
 ask: "Make product videos that cut and move like an editor's, with an agent doing the work"
 stage: working            # idea | prototype | working | polishing
 status: open              # open | answered
-entities: ["remotion", "after effects"]
-mechanisms: ["programmatic video", "html to video"]
+langs: [en, zh]           # en | zh | ja | ko; default [en, zh]
+entities: ["remotion", "product video|宣传片|产品视频"]
+mechanisms: ["programmatic video|代码做视频", "html to video"]
 forms: [skill, library]
-problems: ["agent video editing"]
+problems: ["agent video editing", "AI 视频 剪辑"]
 topics: []
 picked: [heygen-com/hyperframes]   # repos the answer relies on
 scanned: 2026-10-15
 ```
+
+`langs` lists the languages the vocabulary must cover; a question without it searches `[en, zh]`,
+because in real runs Chinese projects supplied half of the repos picked. A term's language is told
+by its script: CJK ideographs are `zh`, kana `ja`, hangul `ko`, anything else `en` (so a
+Latin-script language counts as `en`). Each entity and mechanism group should hold a term in every
+language listed, written as those users write it, not translated. `check` warns about a group that
+lacks one; a name written the same way in every language, like `remotion` above, needs nothing.
+The scan builds pairs and combinations within one language, and the capped lenses take turns
+between languages. Topics and the MCP registry take Latin-script terms only (both are ASCII names).
 
 Body sections (template in the registry's language): where we are (what we have, what is not
 good enough), the answer (one paragraph; ideas worth taking; practices and components; a

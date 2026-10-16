@@ -37,17 +37,24 @@ STAGES = ["idea", "prototype", "working", "polishing"]
 QUESTION_STATUS = ["open", "answered"]
 VERDICTS = ["peeked", "short", "list", "later", "skip", "card"]
 LEVELS = ["meta", "look", "read", "trial"]
+# Languages a question searches in. Terms are told apart by script, so Latin-script languages count as en.
+# Default en + zh: in real runs Chinese projects supplied half of the repos picked.
+LANGS = ["en", "zh", "ja", "ko"]
+DEFAULT_LANGS = ["en", "zh"]
 
 CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars", "created", "pushed", "branch", "commit",
               "reviewed", "level", "watch", "aliases", "uses"]
-QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "entities", "mechanisms", "forms", "problems", "topics",
-                  "picked", "scanned"]
+QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "langs", "entities", "mechanisms", "forms", "problems",
+                  "topics", "picked", "scanned"]
 PROJECT_ORDER = ["id", "name", "summary", "code", "stack", "constraints", "languages"]
 
 SLUG = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9_.-]+$")
 ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
+KANA = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]")
+HANGUL = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]")
+HAN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
 
 
 class StoreError(RuntimeError):
@@ -80,6 +87,54 @@ def strongest(takes: list[str]) -> str | None:
 
 def card_takes(data: dict) -> list[str]:
     return [str(u.get("take")) for u in as_list(data.get("uses")) if isinstance(u, dict)]
+
+
+def groups(items) -> list[list[str]]:
+    """Vocabulary items as groups of synonyms: "xiaohongshu|小红书|xhs" -> ["xiaohongshu", "小红书", "xhs"]."""
+    out = []
+    for item in as_list(items):
+        terms = [t.strip() for t in str(item).split("|") if t.strip()]
+        if terms:
+            out.append(terms)
+    return out
+
+
+def lang_of(text: str) -> str:
+    """ja for kana, ko for hangul, zh for CJK ideographs, else en. Kana first: Japanese mixes both."""
+    if KANA.search(text):
+        return "ja"
+    if HANGUL.search(text):
+        return "ko"
+    if HAN.search(text):
+        return "zh"
+    return "en"
+
+
+def question_langs(data: dict) -> list[str]:
+    langs = [str(x).strip().lower() for x in as_list(data.get("langs")) if str(x).strip()]
+    return list(dict.fromkeys(langs)) or list(DEFAULT_LANGS)
+
+
+def parse_langs(text: str) -> list[str]:
+    langs = list(dict.fromkeys(x.strip().lower() for x in text.split(",") if x.strip()))
+    bad = [x for x in langs if x not in LANGS]
+    if bad or not langs:
+        raise StoreError(f"--langs takes codes from {', '.join(LANGS)}, comma-separated (got {text!r}); "
+                         "terms are told apart by script, so Latin-script languages count as en")
+    return langs
+
+
+def lang_gaps(data: dict) -> list[str]:
+    """One line per language in `langs` that some entity or mechanism group has no term in."""
+    gs = groups(data.get("entities")) + groups(data.get("mechanisms"))
+    out = []
+    for lang in question_langs(data):
+        miss = [g[0] for g in gs if not any(lang_of(t) == lang for t in g)]
+        if miss:
+            out.append(f"{len(miss)} of {len(gs)} vocabulary groups have no {lang} term: "
+                       f"{', '.join(miss[:6])}{' ...' if len(miss) > 6 else ''} "
+                       f"(add what {lang} users write, after |; a name they write the same way needs nothing)")
+    return out
 
 
 @dataclass
@@ -379,11 +434,15 @@ class Store:
                 errors.append(f"{r}: stage must be one of {', '.join(STAGES)}")
             if d.get("status") not in QUESTION_STATUS:
                 errors.append(f"{r}: status must be one of {', '.join(QUESTION_STATUS)}")
-            for key in ("entities", "mechanisms", "forms", "problems", "topics", "picked"):
+            for key in ("langs", "entities", "mechanisms", "forms", "problems", "topics", "picked"):
                 if d.get(key) is not None and not isinstance(d.get(key), list):
                     errors.append(f"{r}: {key} must be a list")
+            if [x for x in as_list(d.get("langs")) if str(x).strip().lower() not in LANGS]:
+                errors.append(f"{r}: langs must be codes from {', '.join(LANGS)} "
+                              "(terms are told apart by script, so Latin-script languages count as en)")
             if not (as_list(d.get("entities")) or as_list(d.get("mechanisms")) or as_list(d.get("problems"))):
                 warns.append(f"{r}: no search vocabulary yet (entities, mechanisms, problems)")
+            warns += [f"{r}: {w}" for w in lang_gaps(d)]
             for slug in as_list(d.get("picked")):
                 if not self.card(str(slug)):
                     warns.append(f"{r}: picked {slug} has no card")

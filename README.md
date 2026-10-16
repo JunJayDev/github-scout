@@ -56,6 +56,12 @@ top ten held several closely related projects the team had never heard of, one w
   any of your words), `SKILL.md` files, skills.sh (with install counts),
   the official MCP registry, npm, the stars of builders you trust, and links from repos you picked.
   Links found on the web or X and awesome lists feed into the same ranking.
+- **Searches in Chinese as much as in English.** In real runs, Chinese projects supplied half of
+  the repositories picked, and they describe themselves in Chinese. Each question lists its
+  languages (`langs`, default `[en, zh]`); every vocabulary group should hold a term in each, the
+  name those users write (`小红书|xhs|红书`, `去AI味|活人感|人味`), not a translation. Pairs and
+  combinations are built within one language, the other lenses give each language a fair share
+  of their searches, and `check` warns about a group with no term in a listed language.
 - **Remembers.** Every verdict is recorded with its reason. Each card keeps the commit it was
   reviewed at and the upstream paths you depend on; `updates` shows only what changed there.
 
@@ -91,7 +97,7 @@ reuse-first new-project shop --name "Shop backend" --code ~/code/shop
 reuse-first ask shop/payments "Take card payments with 3-D Secure from our Python service" --stage prototype
 # edit projects/shop/questions/payments.md: what we have, what is not good enough, the vocabulary
 reuse-first scan shop/payments --plan     # the searches, no network
-reuse-first scan shop/payments            # ~80 searches, a few minutes, ranked table
+reuse-first scan shop/payments            # ~150 searches, about five minutes, ranked table
 reuse-first pick shop/payments 1 3 8 --rest "not payments"
 reuse-first look --q shop/payments stripe/stripe-python
 reuse-first look stripe/stripe-python --source

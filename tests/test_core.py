@@ -433,6 +433,125 @@ class DogfoodFixTests(Base):
         self.assertEqual((q["ask"], q["stage"]), ("A sharper question", "prototype"))
 
 
+BILINGUAL = {
+    "entities": ["reddit|红迪", "xiaohongshu|小红书|xhs|红书", "bilibili|B站|哔哩哔哩", "zhihu|知乎", "douyin|抖音",
+                 "weibo|微博", "wechat|公众号", "twitter|推特"],
+    "mechanisms": ["logged-in browser|登录态", "chrome extension|浏览器插件|浏览器扩展", "browser cookies|cookie 登录",
+                   "browser automation|浏览器自动化", "website to cli|网站变命令行", "cdp|调试协议"],
+    "forms": ["cli", "skill", "mcp"],
+    "problems": ["social media automation", "自媒体 自动化"],
+}
+
+
+def words(query: str) -> str:
+    """A query without its operators."""
+    return " ".join(w for w in query.split() if ":" not in w or w.startswith('"')).replace('"', "")
+
+
+class LanguageTests(Base):
+    """Chinese projects supplied half the repos picked in real runs; the plan must search Chinese as much as English."""
+
+    def test_language_of_a_term(self):
+        from reuse_first.store import lang_of
+        for term, lang in [("小红书", "zh"), ("AIGC检测", "zh"), ("写作 skill", "zh"), ("ノート", "ja"),
+                           ("日本語のテスト", "ja"), ("한국어", "ko"), ("note.com", "en"), ("résumé", "en")]:
+            self.assertEqual(lang_of(term), lang, term)
+
+    def test_pairs_and_combos_per_language_within_bounds(self):
+        q = discover.plan(BILINGUAL)
+        lang = discover.lang_of
+        pairs = [x["query"] for x in q if x["lens"] == "P"]
+        combos = [x["query"] for x in q if x["lens"] == "C"]
+        self.assertEqual(len(pairs), 15)                                 # the same total as one language
+        self.assertEqual(len(combos), 9)
+        for query in pairs + combos:                                     # never mixes languages
+            terms = words(query).split()
+            self.assertEqual(len({lang(t) for t in terms}), 1, query)
+        zh_pairs = [p for p in pairs if lang(p) == "zh"]
+        self.assertIn(7, (len(zh_pairs), len(pairs) - len(zh_pairs)))   # 8 + 7: languages take turns
+        self.assertTrue(any(p.startswith("红迪 小红书 in:readme") for p in pairs))   # first term in that language
+        self.assertTrue(any(c.startswith("登录态 红迪 in:readme") for c in combos))
+        self.assertTrue(any(c.startswith('"logged-in browser" reddit in:readme') for c in combos))
+
+    def test_capped_lenses_share_slots_fairly(self):
+        q = discover.plan(BILINGUAL)
+        for lens, cap in (("R", 12), ("K", 10), ("S", 10), ("N", 8)):
+            got = [x["query"] for x in q if x["lens"] == lens]
+            zh = sum(discover.lang_of(s) == "zh" for s in got)
+            self.assertEqual(len(got), cap, lens)
+            self.assertEqual(zh, cap // 2, f"{lens}: {got}")
+        mcp = [x["query"] for x in q if x["lens"] == "D"]           # the MCP registry matches ASCII names only
+        self.assertEqual((len(mcp), {discover.lang_of(s) for s in mcp}), (7, {"en"}))   # every English lead term
+        readme = [x["query"] for x in q if x["lens"] == "M" and "in:readme" in x["query"]]
+        self.assertEqual(sum(discover.lang_of(s) == "zh" for s in readme), 5)
+        # a language that runs out leaves its slots to the others
+        one_zh = {**BILINGUAL, "entities": ["reddit", "xiaohongshu|小红书", "bilibili", "zhihu"], "mechanisms": ["cdp"]}
+        k = [x["query"] for x in discover.plan(one_zh) if x["lens"] == "K"]
+        self.assertEqual([discover.lang_of(s) for s in k].count("zh"), 1)
+        self.assertEqual(len(k), 6)
+
+    def test_invariants_hold_in_two_languages(self):
+        q = discover.plan(BILINGUAL)
+        queries = [(x["lens"], x["query"]) for x in q]
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        self.assertEqual(len(set(queries)), len(queries))
+        self.assertTrue(all(s.endswith(alive) for x, (lens, s) in zip(q, queries) if x["kind"] == "repos"))
+        single = {words(s) for lens, s in queries if lens in "EM"}
+        for key in ("entities", "mechanisms"):
+            for g in discover.groups(BILINGUAL[key]):
+                for term in g:
+                    self.assertIn(term, single, term)                    # every synonym, in either language
+        self.assertEqual([words(s) for lens, s in queries if lens == "Q"], ["social media automation", "自媒体 自动化"])
+
+    def test_langs_order_the_turns(self):
+        first = [x["query"] for x in discover.plan({**BILINGUAL, "langs": ["zh", "en"]}) if x["lens"] == "E"][0]
+        self.assertTrue(first.startswith("红迪 "), first)
+        en_only = {"entities": ["reddit", "bilibili"], "mechanisms": ["cdp"], "langs": ["en"]}
+        self.assertEqual(set(discover.search_langs(discover.plan(en_only))), {"en"})
+
+    def test_warnings_for_groups_missing_a_language(self):
+        doc = self.store.question("ops/browser-ops")
+        self.assertEqual(doc.data["langs"], ["en", "zh"])               # every new question
+        _, warns = self.store.check()
+        gap = [w for w in warns if "have no zh term" in w]
+        self.assertEqual(len(gap), 1, warns)
+        self.assertIn("4 of 5 vocabulary groups have no zh term: reddit, twitter, logged-in browser, chrome extension", gap[0])
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--plan")
+        self.assertEqual(code, 0, out)
+        self.assertIn("warn  4 of 5 vocabulary groups have no zh term", out)
+        code, out, _ = self.run_cli("ask", "ops/browser-ops", "Drive our sites", "--stage", "working", "--update", "--langs", "en")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("warn", out)
+        self.assertEqual(self.store.question("ops/browser-ops").data["langs"], ["en"])
+        code, out, _ = self.run_cli("ask", "ops/browser-ops", "Drive our sites", "--stage", "working", "--update",
+                                    "--langs", "en,zh")
+        self.assertIn("warn  4 of 5 vocabulary groups have no zh term", out)
+        self.assertEqual(self.store.check()[0], [])                     # a warning, never an error
+        code, out, err = self.run_cli("ask", "ops/other", "x", "--stage", "idea", "--langs", "en,es")
+        self.assertEqual(code, 1)
+        self.assertIn("Latin-script languages count as en", err)
+        code, out, _ = self.run_cli("ask", "ops/jp", "x", "--stage", "idea", "--langs", "en,ja")
+        self.assertEqual(code, 0, out)
+        self.assertIn("every language of langs (en, ja)", out)
+        self.assertEqual(self.store.question("ops/jp").data["langs"], ["en", "ja"])
+        doc = self.store.question("ops/jp")
+        doc.data["langs"] = ["en", "es"]
+        self.store.save_question(doc)
+        self.assertTrue(any("langs must be codes from en, zh, ja, ko" in e for e in self.store.check()[0]))
+
+    def test_header_counts_languages_and_chinese_descriptions(self):
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        self.api.search["小红书" + alive] = [repo("a/xhs-cli", 900, "小红书命令行工具：用浏览器登录态发帖", pushed=ago(0.2)),
+                                           repo("b/rednote", 300, "Xiaohongshu CLI", pushed=ago(0.2))]
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        plan = discover.plan(self.store.question("ops/browser-ops").data)
+        n = discover.search_langs(plan)
+        line = next(ln for ln in out.splitlines() if ln.startswith("languages: "))
+        self.assertEqual(line, f"languages: en {n['en']}, zh {n['zh']} searches with words; "
+                               "1 of 2 rows shown have a Chinese description")
+
+
 class ExamineTests(unittest.TestCase):
     def test_guess_form_and_kind(self):
         g = examine.guess_kind

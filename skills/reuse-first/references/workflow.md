@@ -22,8 +22,10 @@ Then, in the file: what we have (`tools/reddit/chrome.ts` drives Chrome through 
 costs 580k tokens and 16 subreddits get blocked), and the vocabulary:
 
 ```yaml
-entities: ["reddit", "xiaohongshu|小红书|rednote", "twitter|x.com", "bilibili", "zhihu"]
-mechanisms: ["logged-in browser", "chrome extension", "browser cookies", "CDP"]
+langs: [en, zh]
+entities: ["reddit", "xiaohongshu|小红书|rednote|xhs", "twitter|x.com|推特", "bilibili|B站|哔哩哔哩", "zhihu|知乎"]
+mechanisms: ["logged-in browser|登录态", "chrome extension|浏览器插件|Chrome 插件", "browser cookies", "CDP",
+             "browser automation|浏览器自动化"]
 forms: [cli, mcp, skill]
 problems: ["social media automation", "自媒体 自动化", "website to cli"]
 ```
@@ -35,7 +37,14 @@ Why each part works:
   in:readme` put the target first.
 - **Mechanisms** find a tool by how it works. `"logged-in browser"` also put it first.
 - **Topics plus a 12-month window** find young projects that best-match search buries.
-- **Other-language synonyms** (`小红书`) reach communities that do not write in English.
+- **Every group in both languages.** Chinese projects describe themselves in Chinese, and in real
+  runs they supplied half of the repos picked. Pairs and combinations are built within one
+  language and the capped lenses take turns between languages, so a group without a Chinese term
+  leaves Chinese searches unmade. Mechanisms carry the most: `登录态` found a tool that lets any
+  agent drive your own Chrome with its logins, described only in Chinese. Platform pairs are
+  noisier in Chinese, because many Chinese READMEs link the author's own 小红书 and B站 accounts.
+  Write the name Chinese users write, not a translation: `登录态`, not `已登录的浏览器`. Names
+  written the same way (`reddit`, `CDP`) need nothing; `scan --plan` warns about the rest.
 - **Problem phrases** find the least. Keep them short.
 
 Writing mechanisms: picture the solution's README. What would it say it uses? "headless
@@ -54,6 +63,8 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
 - `fit` is the number of vocabulary groups in the repo's own name, description and topics.
 - Lens letters show why a row is there; several letters mean several independent routes found it.
 - The header line says how many repos were dropped (no push in 12 months) or hidden (6 months).
+- The `languages:` line counts the searches per language and the rows with a Chinese
+  description. Few Chinese searches or rows usually mean the vocabulary lacks Chinese terms.
 - `seen:skip@other/question` means another question already judged it; read that reason first.
 - The `rising` block under the table (`h1`, `h2`...) holds new repos growing fast that match no
   vocabulary. Words cannot find a tool whose description never names your use, so read these

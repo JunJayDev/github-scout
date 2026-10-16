@@ -20,7 +20,7 @@ from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
 )
-from .store import KINDS, LEVELS, STAGES, TAKES, Store, StoreError, locate, today
+from .store import KINDS, LEVELS, STAGES, TAKES, Store, StoreError, lang_gaps, locate, parse_langs, question_langs, today
 
 EPILOG = """the loop (see SKILL.md):
   find -> ask -> scan -> pick -> look -> note -> write the answer -> check
@@ -111,20 +111,29 @@ def cmd_new_project(args):
 def cmd_ask(args):
     store = _store(args)
     project, qid = store.split_ref(args.ref)
+    langs = parse_langs(args.langs) if args.langs else None
     if args.update:
         doc = store.question(args.ref)
         doc.data["ask"] = args.question
         doc.data["stage"] = args.stage
+        if langs:
+            doc.data["langs"] = langs
         store.save_question(doc)
-        print(f"{doc.path}: ask and stage updated (edit the body's stage line by hand if it differs)")
+        print(f"{doc.path}: {'ask, stage and langs' if langs else 'ask and stage'} updated "
+              "(edit the body's stage line by hand if it differs)")
+        for w in lang_gaps(doc.data):
+            print(f"warn  {w}")
         return
-    path = new_question(store, args.ref, args.question, args.stage)
+    path = new_question(store, args.ref, args.question, args.stage, langs)
+    langs = question_langs(store.question(args.ref).data)
     print(f"{path}\n"
           f"stage {args.stage}: {stage_help(store, args.stage)}\n"
           "before searching, edit the file:\n"
           "  1. Where we are: what we already have (paths) and what is not good enough.\n"
-          "  2. Vocabulary: entities (platforms, formats, products; synonyms and other languages with |),\n"
-          "     mechanisms (how a solution would work, in README words), forms, 2-4 short problem phrases.\n"
+          "  2. Vocabulary: entities (platforms, formats, products) and mechanisms (how a solution would work,\n"
+          f"     in README words), each group with a term in every language of langs ({', '.join(langs)}), synonyms\n"
+          "     with |, in the words those users write, not translations: \"xiaohongshu|小红书|xhs|红书\".\n"
+          "     Then forms, and 2-4 short problem phrases, one per language.\n"
           f"then: reuse-first scan {args.ref} --plan")
 
 
@@ -150,13 +159,16 @@ def cmd_scan(args):
     doc = store.question(args.ref)
     q = doc.data
     ref = f"{q['project']}/{q['id']}"
+    gaps = [f"warn  {w}" for w in lang_gaps(q)]
     if args.plan:
         rows = plan(q, args.lenses)
         for r in rows:
             print(f"{r['lens']} {LENS_NAMES[r['lens']]:<12} {r['query']}")
-        print(f"{len(rows)} searches. Run them: reuse-first scan {ref}")
+        print("\n".join(gaps + [f"{len(rows)} searches. Run them: reuse-first scan {ref}"]))
         return
     if not args.show:
+        if gaps and not (args.add or args.expand):
+            print("\n".join(gaps), file=sys.stderr)
         client = make_client(args, store)
         sc = Scan(store, client, q)
         if args.add or args.expand:
@@ -418,7 +430,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("ref", help="<project>/<question-id>")
     p.add_argument("question", help="one sentence: the result we want, not the tool we imagine")
     p.add_argument("--stage", required=True, choices=STAGES, help="where our own work stands")
-    p.add_argument("--update", action="store_true", help="change the ask and stage of an existing question")
+    p.add_argument("--update", action="store_true", help="change the ask and stage (and --langs) of an existing question")
+    p.add_argument("--langs", metavar="CODES", help="languages every vocabulary group should cover, comma-separated "
+                   "from en, zh, ja, ko (default en,zh)")
 
     p = add("find", cmd_find, "search questions, cards and the ledger: has anyone looked at this?", (common, js))
     p.add_argument("words", nargs="+")
@@ -433,7 +447,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--note", help="with --add: where the links came from")
     p.add_argument("--expand", nargs="+", metavar="LIST", help="add the repos an awesome list links to")
     p.add_argument("--lenses", default=DEFAULT_LENSES, help=lens_help)
-    p.add_argument("--budget", type=int, default=150, help="max API calls (default 150)")
+    p.add_argument("--budget", type=int, default=250, help="max API calls (default 250)")
     p.add_argument("--per-query", type=int, default=30)
     p.add_argument("--top", type=int, default=40)
     p.add_argument("--all", action="store_true", help="also show decided and stale rows; with --expand keep every link")

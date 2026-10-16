@@ -11,12 +11,18 @@ vocabularies and the tool crosses them:
     forms       what shape it ships in: cli, mcp, skill, library, app
     problems    short problem phrases, in every language you search in
 
+Every entity and mechanism group should carry a term in each language of the question's `langs`
+(default en and zh: in real runs Chinese projects supplied half of the repos picked). Terms are
+told apart by script. Pairs and combos are built per language, and the capped lenses take turns
+between languages, so each language gets a fair share of the searches. Topics (T) and the MCP
+registry (D) take Latin-script terms only: both are ASCII names.
+
 Lenses (one letter each, kept with every candidate):
 
     E entity        each entity term, name/description/topics, by stars
-    P pair          two entities together in the README (multi-platform tools)
-    M mechanism     each mechanism phrase, in name/description and in README
-    C combo         mechanism x entity in the README
+    P pair          two entities of one language together in the README (multi-platform tools)
+    M mechanism     each mechanism phrase in name/description; the leading ones also in README
+    C combo         mechanism x entity of one language in the README
     Q problem       each problem phrase as typed
     T topic         GitHub topics derived from the vocabulary (+ last 12 months)
     R recent        entity / mechanism terms created in the last 12 months
@@ -53,7 +59,7 @@ import re
 import sys
 
 from .github import Client, GitHubError, github_slug
-from .store import Store, as_list, now_stamp, today
+from .store import HAN, Store, as_list, groups, lang_of, now_stamp, question_langs, today
 
 LENSES = "EPMCQTRHKSDNUGWL"
 LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "problem", "T": "topic",
@@ -71,15 +77,6 @@ RISE_TOPIC_SET = {t for ts in RISE_TOPICS.values() for t in ts}
 SLOW, HIDE, DROP = 3, 6, 12  # months since the last push: penalised, hidden by default, dropped
 
 
-def groups(items) -> list[list[str]]:
-    out = []
-    for item in as_list(items):
-        terms = [t.strip() for t in str(item).split("|") if t.strip()]
-        if terms:
-            out.append(terms)
-    return out
-
-
 def quote(term: str) -> str:
     return f'"{term}"' if re.search(r"\s", term) else term
 
@@ -93,20 +90,66 @@ def window(months: int = 12) -> str:
     return (_dt.date.today() - _dt.timedelta(days=int(months * 30.4))).isoformat()
 
 
-def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dict]:
+def _in(gs: list[list[str]], lang: str) -> list[list[str]]:
+    """The groups that have terms in `lang`, cut down to those terms."""
+    return [x for x in ([t for t in g if lang_of(t) == lang] for g in gs) if x]
+
+
+def _breadth(gs: list[list[str]]) -> list[str]:
+    """First terms of every group, then second terms, and so on: a capped lens reaches more groups."""
+    return [g[i] for i in range(max(map(len, gs), default=0)) for g in gs if i < len(g)]
+
+
+def _turns(lists: list[list], limit: int | None = None) -> list:
+    """Round robin over the lists, without repeats: each language gets a fair share of the slots,
+    and a language that runs out leaves its slots to the others."""
+    out: list = []
+    for row in itertools.zip_longest(*lists):
+        for x in row:
+            if x is not None and x not in out:
+                out.append(x)
+    return out[:limit] if limit is not None else out
+
+
+def _top_first(a: list, b: list | None = None) -> list[tuple]:
+    """Pairs ordered so the leading items meet first: (0,1) (0,2) (1,2) (0,3)... or, from two lists,
+    (0,0) (0,1) (1,0) (1,1) (0,2)..."""
+    if b is None:
+        return [(a[i], a[j]) for j in range(1, len(a)) for i in range(j)]
+    return sorted(((x, y) for x in a for y in b), key=lambda p: (max(a.index(p[0]), b.index(p[1])), a.index(p[0])))
+
+
+def vocab_langs(q: dict) -> list[str]:
+    """The question's languages, then any other language its vocabulary is written in."""
+    terms = [t for key in ("entities", "mechanisms") for g in groups(q.get(key)) for t in g]
+    return list(dict.fromkeys(question_langs(q) + [lang_of(t) for t in terms]))
+
+
+def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos: int = 9) -> list[dict]:
     """The searches a scan will run. Pure: no network.
 
-    Every synonym in a `|` group is searched by the single-term lenses. Pairs and combos use
-    the first term of each group, in the order written, so put the most specific entities first."""
+    Every synonym in a `|` group is searched by the single-term lenses (E, M). The capped lenses
+    take turns between languages (the question's `langs` first), so each gets a fair share of the
+    slots. Pairs and combos are built per language from each group's first term in that language,
+    never mixing languages; adding a language shares the same totals (max_pairs, max_combos)
+    instead of growing them."""
+    langs = vocab_langs(q)
     ents = groups(q.get("entities"))
     mech_groups = groups(q.get("mechanisms"))
     forms = [g[0].lower() for g in groups(q.get("forms"))]
     probs = [g[0] for g in groups(q.get("problems"))]
-    heads = [g[0] for g in ents]
-    mech_heads = [g[0] for g in mech_groups]
     ent_terms = [t for g in ents for t in g]
     mech_terms = [t for g in mech_groups for t in g]
-    lead_terms = [t for g in ents[:4] for t in g] + [t for g in mech_groups[:2] for t in g]
+
+    def spread(gs: list[list[str]], limit: int | None = None) -> list[str]:
+        return _turns([_breadth(_in(gs, lang)) for lang in langs], limit)
+
+    def lead(limit: int, only: list[str] | None = None) -> list[str]:   # per language: first 4 entity, 2 mechanism groups
+        return _turns([_breadth(_in(ents, lang)[:4] + _in(mech_groups, lang)[:2]) for lang in only or langs], limit)
+
+    def heads(gs: list[list[str]], lang: str, n: int) -> list[str]:
+        return list(dict.fromkeys(g[0] for g in _in(gs, lang)))[:n]
+
     since = window(12)
     alive = f" pushed:>{window(HIDE)}"
     out: list[dict] = []
@@ -117,16 +160,16 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dic
         if lens in lenses and not any(x["lens"] == lens and x["query"] == query for x in out):
             out.append({"lens": lens, "kind": kind, "query": query})
 
-    for term in ent_terms:
+    for term in spread(ents):
         add("E", "repos", quote(term))
-    for a, b in itertools.islice(itertools.combinations(heads[:6], 2), max_pairs):
+    for a, b in _turns([_top_first(heads(ents, lang, 6)) for lang in langs], max_pairs):
         add("P", "repos", f"{quote(a)} {quote(b)} in:readme")
-    for m in mech_terms[:10]:
+    for m in spread(mech_groups):
         add("M", "repos", quote(m))
+    for m in spread(mech_groups, 10):
         add("M", "repos", f"{quote(m)} in:readme")
-    for m in mech_heads[:3]:
-        for e in heads[:3]:
-            add("C", "repos", f"{quote(m)} {quote(e)} in:readme")
+    for m, e in _turns([_top_first(heads(mech_groups, lang, 3), heads(ents, lang, 3)) for lang in langs], max_combos):
+        add("C", "repos", f"{quote(m)} {quote(e)} in:readme")
     for p in probs:
         add("Q", "repos", p)
     topics = [t for t in (slugify(x) for x in as_list(q.get("topics"))) if t]
@@ -134,7 +177,7 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dic
     for t in topics[:12]:
         add("T", "repos", f"topic:{t}")
         add("T", "repos", f"topic:{t} created:>{since}")
-    for term in (ent_terms + mech_terms)[:12]:
+    for term in spread(ents + mech_groups, 12):
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
     rise = window(RISE_MONTHS)
     if not forms or any(f in SKILL_FORMS for f in forms):
@@ -146,17 +189,30 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15) -> list[dic
     if not forms or any(f not in SKILL_FORMS and f != "mcp" for f in forms):
         add("H", "repos", f"created:>{window(BREAKOUT_MONTHS)} stars:>{BREAKOUT_STARS}")
     if not forms or any(f in SKILL_FORMS for f in forms):
-        for term in lead_terms[:10]:
+        for term in lead(10):
             add("K", "code", f"{quote(term)} filename:SKILL.md")
-        for term in lead_terms[:10]:
+        for term in lead(10):
             add("S", "skills", term)
     if not forms or "mcp" in forms:
-        for term in lead_terms[:8]:
+        for term in lead(8, ["en"]):          # the registry matches server names, which are ASCII
             add("D", "mcp", term)
-    for term in lead_terms[:8]:
+    for term in lead(8):
         add("N", "npm", term)
     add("U", "people", "starred by people.txt and owners of picked or shortlisted repos")
     add("G", "graph", "links in READMEs of picked or shortlisted repos")
+    return out
+
+
+WORD_LENSES = "EPMCQRKSDN"   # lenses whose queries carry vocabulary words
+
+
+def search_langs(searches: list[dict]) -> dict[str, int]:
+    """Searches per language of their words; lenses without words (topics, rising, people, graph) are left out."""
+    out: dict[str, int] = {}
+    for s in searches:
+        if s.get("lens") in WORD_LENSES:
+            lang = lang_of(s.get("query") or "")
+            out[lang] = out.get(lang, 0) + 1
     return out
 
 
@@ -335,7 +391,7 @@ class Scan:
                 added += 1
         return added
 
-    def run(self, lenses: str = DEFAULT_LENSES, budget: int = 150, per_query: int = 30) -> dict:
+    def run(self, lenses: str = DEFAULT_LENSES, budget: int = 250, per_query: int = 30) -> dict:
         start = self.client.calls
         for s in plan(self.q, lenses):
             if self.client.calls - start >= budget:
@@ -523,6 +579,11 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
         if s.get("error"):
             errors.append(f"{s['lens']} {s['query'][:60]}: {s['error'][:80]}")
     out.append("lenses: " + "  ".join(f"{k}={v}" for k, v in sorted(by_lens.items(), key=lambda kv: LENSES.index(kv[0]))))
+    rows = visible(scan, show_all)
+    shown = rows[:top]
+    langs = search_langs([s for s in scan["searches"] if s.get("hits") is not None])   # those that ran
+    out.append("languages: " + (", ".join(f"{k} {v}" for k, v in langs.items()) or "none") + " searches with words; "
+               f"{sum(1 for c in shown if HAN.search(c.get('desc') or ''))} of {len(shown)} rows shown have a Chinese description")
     if errors:
         out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]) + (" ..." if len(errors) > 3 else ""))
     carded = [c for c in scan["candidates"] if c.get("card")]
@@ -535,7 +596,6 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c)]
     if lists:
         out.append("lists (scan --expand <list>): " + ", ".join(f"{c['repo']} ({human(c['stars'])})" for c in lists[:8]))
-    rows = visible(scan, show_all)
     hidden = len([c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_stale(c)]) - len(rows)
     out.append("  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics"
                + (f"  ({hidden} already decided, hidden; --all shows them)" if hidden > 0 and not show_all else ""))

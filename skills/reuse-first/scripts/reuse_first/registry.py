@@ -6,8 +6,8 @@ import re
 from pathlib import Path
 
 from .store import (
-    KINDS, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, as_list, card_takes, strongest,
-    today, write_doc,
+    DEFAULT_LANGS, KINDS, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, as_list, card_takes,
+    strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -55,7 +55,10 @@ Stage: {stage} ({stage_help})
 ### Next steps in our project
 
 ## Searched
-(Scans are in scans/{project}/{id}/. Note the web and X pass here.)
+(Scans are in scans/{project}/{id}/. Note the web and X pass here.
+Vocabulary, in the frontmatter: every entity and mechanism group needs a term in each language of `langs`,
+in the words those users actually write, not a translation: "xiaohongshu|小红书|xhs|红书",
+"humanizer|去AI味|活人感|人味", "product video|宣传片|产品视频".)
 """,
         "skill": """
 # {id}
@@ -129,7 +132,9 @@ Stage: {stage} ({stage_help})
 ### 我们接下来改什么
 
 ## 搜过哪些
-（扫描记录在 scans/{project}/{id}/；网页和 X 那一轮写在这里。）
+（扫描记录在 scans/{project}/{id}/；网页和 X 那一轮写在这里。
+词表写在开头的 frontmatter：每组实体和机制都要有 langs 里每种语言的词，写那种语言的用户真正在用的叫法，
+不是翻译：「xiaohongshu|小红书|xhs|红书」「humanizer|去AI味|活人感|人味」「product video|宣传片|产品视频」。）
 """,
         "skill": """
 # {id}
@@ -256,7 +261,7 @@ def new_project(store: Store, pid: str, name: str, summary: str, code: str = "")
     return path
 
 
-def new_question(store: Store, ref: str, ask: str, stage: str) -> Path:
+def new_question(store: Store, ref: str, ask: str, stage: str, langs: list[str] | None = None) -> Path:
     project, qid = store.split_ref(ref)
     if not store.project(project):
         raise StoreError(f"no project {project} (reuse-first new-project {project} --name ...)")
@@ -265,8 +270,9 @@ def new_question(store: Store, ref: str, ask: str, stage: str) -> Path:
     path = store.question_path(project, qid)
     if path.exists():
         raise StoreError(f"question exists: {path}")
-    data = {"id": qid, "project": project, "ask": ask, "stage": stage, "status": "open", "entities": [],
-            "mechanisms": [], "forms": [], "problems": [], "topics": [], "picked": [], "scanned": None}
+    data = {"id": qid, "project": project, "ask": ask, "stage": stage, "status": "open",
+            "langs": list(langs or DEFAULT_LANGS), "entities": [], "mechanisms": [], "forms": [], "problems": [],
+            "topics": [], "picked": [], "scanned": None}
     body = T[store.lang]["question"].format(ask=ask, stage=stage, stage_help=stage_help(store, stage),
                                             project=project, id=qid)
     write_doc(path, data, body, QUESTION_ORDER)
@@ -363,7 +369,7 @@ def show_question(store: Store, ref: str) -> str:
            f"file: {doc.path}",
            f"picked: {', '.join(map(str, as_list(d.get('picked')))) or '-'} · scanned {d.get('scanned') or 'never'}"
            f" · scans {len(cov['scans'])}",
-           "vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("entities", "mechanisms", "forms", "problems", "topics")
+           "vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("langs", "entities", "mechanisms", "forms", "problems", "topics")
                                        if as_list(d.get(k))),
            "looked at: " + (", ".join(f"{k} {v}" for k, v in sorted(cov["verdicts"].items())) or "nothing yet")]
     if cov["open"]:
