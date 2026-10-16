@@ -371,8 +371,8 @@ class Store:
         return self.root / "scans" / project / qid
 
     def scans(self, project: str, qid: str) -> list[Path]:
-        d = self.scan_dir(project, qid)
-        return sorted(d.glob("*.json")) if d.is_dir() else []
+        d = self.scan_dir(project, qid)   # only scan files (named by their id); other files may sit beside them
+        return sorted(p for p in d.glob("*.json") if re.fullmatch(r"\d{8}-\d{6}", p.stem)) if d.is_dir() else []
 
     def save_scan(self, scan: dict) -> Path:
         d = self.scan_dir(scan["project"], scan["question"])

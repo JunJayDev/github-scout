@@ -333,6 +333,15 @@ class FlowTests(Base):
         code, out, _ = self.run_cli("pick", "ops/browser-ops", "h9")
         self.assertNotEqual(code, 0)
 
+    def test_other_files_beside_scans_are_ignored(self):
+        self.seed()
+        self.run_cli("scan", "ops/browser-ops", "--quiet")
+        d = self.root / "scans" / "ops" / "browser-ops"
+        (d / "notes-structure.json").write_text('{"repos": {}}')
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
+        self.assertEqual(code, 0, out)
+        self.assertIn("jackwener/OpenCLI", out)
+
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed()
         self.run_cli("scan", "ops/browser-ops", "--quiet")
