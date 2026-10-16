@@ -1,4 +1,4 @@
-"""`reuse-first site`: one self-contained HTML page for people browsing the registry.
+"""`github-scout site`: one self-contained HTML page for people browsing the registry.
 
 Everything is inline: CSS, JS, and the registry as JSON in a <script type="application/json"> tag.
 Markdown is rendered here by a small renderer that escapes all registry text; the page script inserts
@@ -581,7 +581,7 @@ UI = {
     "en": {
         "questions": "Questions", "repos": "Repos",
         "overview": "{questions} questions · {cards} cards · {verdicts} verdicts in the ledger · {skipped} repos skipped",
-        "built": "Generated on {date} by reuse-first.", "noscript": "This page needs JavaScript to show the registry.",
+        "built": "Generated on {date} by github-scout.", "noscript": "This page needs JavaScript to show the registry.",
         "noQuestions": "No questions yet.", "back": "All questions",
         "stage": "Stage", "status": "Status", "picked": "Picked", "looked": "Looked at", "lastScan": "Last scan",
         "lookedN": "{n} repos", "scansN": "{n} scans", "never": "never", "none": "none",
@@ -601,7 +601,7 @@ UI = {
     "zh": {
         "questions": "问题", "repos": "仓库",
         "overview": "{questions} 个问题 · {cards} 张卡片 · 账本 {verdicts} 条 · 跳过 {skipped} 个仓库",
-        "built": "{date} 由 reuse-first 生成。", "noscript": "这个页面要开 JavaScript 才能显示。",
+        "built": "{date} 由 github-scout 生成。", "noscript": "这个页面要开 JavaScript 才能显示。",
         "noQuestions": "还没有问题。", "back": "全部问题",
         "stage": "阶段", "status": "状态", "picked": "选用", "looked": "看过", "lastScan": "最近扫描",
         "lookedN": "{n} 个仓库", "scansN": "{n} 次扫描", "never": "没扫过", "none": "无",

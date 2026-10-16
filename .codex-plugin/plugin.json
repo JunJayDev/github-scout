@@ -1,0 +1,11 @@
+{
+  "name": "github-scout",
+  "version": "0.2.0",
+  "description": "Find what GitHub already solved for a goal in your project, read the projects that matter, and hand concrete suggestions to your coding agent.",
+  "keywords": ["github", "open-source", "search", "prior-art", "skills"],
+  "skills": "./skills",
+  "interface": {
+    "displayName": "github-scout",
+    "shortDescription": "Find and read what GitHub already solved"
+  }
+}

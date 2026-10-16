@@ -1,10 +1,9 @@
-"""Command line for reuse-first. `reuse-first <command> --help` for details."""
+"""Command line for github-scout. `github-scout <command> --help` for details."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -16,22 +15,30 @@ from .discover import (
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
+from .handoff import VERDICT_OF_TAKE, brief, parse_report, read_source
 from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
 )
-from .store import KINDS, LEVELS, STAGES, TAKES, Store, StoreError, lang_gaps, locate, parse_langs, question_langs, today
+from .store import (
+    KINDS, LEVELS, STAGES, TAKES, Store, StoreError, env, lang_gaps, locate, parse_langs, question_langs, read_config,
+    today,
+)
 
-EPILOG = """the loop (see SKILL.md):
-  find -> ask -> scan -> pick -> look -> note -> write the answer -> check
-  later: updates
+EPILOG = """stages (one skill each; github-scout runs them all):
+  plan    find, ask, scan --plan       the goal, where we stand, search directions
+  search  scan, scan --add/--expand     every lens, merged and ranked; lures and farmed installs left out
+  triage  pick, look                    register and tag each repo, decide how to read it
+  dig     look --source, note --idea    read the code, take the ideas
+  brief   write the answer, brief       a hand-off for the coding agent; the project is not changed
+  also: import (a report from a cloud chat), updates, show, site, check
 
-store: --store DIR, else $REUSE_FIRST_STORE, else the config file, else the nearest
-parent directory that contains reuse-first.json."""
+store: --store DIR, else $GITHUB_SCOUT_STORE, else the config file, else the nearest
+parent directory that contains github-scout.json, else ~/.github-scout (created by the first `ask`)."""
 
 
-def _store(args) -> Store:
-    return Store(locate(args.store))
+def _store(args, create_lang: str | None = None) -> Store:
+    return Store(locate(args.store, create_lang))
 
 
 def make_client(args, store: Store | None = None) -> Client:
@@ -56,7 +63,7 @@ def _entry(args, repo: str, project: str, qid: str, verdict: str, level: str, re
            meta: dict | None = None, scan: str | None = None) -> dict:
     meta = meta or {}
     e = {"date": today(), "repo": repo, "project": project, "question": qid, "verdict": verdict, "level": level,
-         "by": args.by or os.environ.get("REUSE_FIRST_AGENT") or "agent"}
+         "by": args.by or env("AGENT") or "agent"}
     if reason:
         e["reason"] = reason
     for k in ("stars", "pushed"):
@@ -89,7 +96,7 @@ def _merged(store: Store, project: str, qid: str) -> dict:
             else:
                 merged[key] = dict(c)
     if last is None:
-        raise StoreError(f"no scan for {project}/{qid} yet (reuse-first scan {project}/{qid})")
+        raise StoreError(f"no scan for {project}/{qid} yet (github-scout scan {project}/{qid})")
     scan = {**last, "searches": searches, "dropped": dropped, "candidates": list(merged.values())}
     return annotate(store, rescore(scan, store.question(f"{project}/{qid}").data))
 
@@ -98,19 +105,72 @@ def _merged(store: Store, project: str, qid: str) -> dict:
 # commands
 
 
+def cmd_import(args):
+    store = _store(args)
+    project, qid = store.split_ref(args.q)
+    q = store.question(f"{project}/{qid}").data
+    slugs, rows = parse_report(read_source(args.file))
+    if not slugs:
+        raise StoreError(f"no github.com/<owner>/<repo> links in {args.file}")
+    client = make_client(args, store)
+    sc = Scan(store, client, q)
+    n = sc.add_slugs(slugs, "W")
+    missing = [s for s in slugs if s.lower() not in sc.cands and s.lower() not in sc.dropped]
+    for key, r in rows.items():
+        if key in sc.cands and r.get("reason"):
+            sc.cands[key]["said"] = r["reason"]
+    where = args.note or Path(args.file).name
+    sc.log.append({"lens": "W", "kind": "import", "query": f"import {where}"[:200], "hits": n})
+    scan = sc.finish("W")
+    path = store.save_scan(scan)
+    entries = []
+    for key, r in rows.items():
+        if r.get("take") and key in sc.cands:
+            reason = f"{where}: {r['take']}" + (f": {r['reason']}" if r.get("reason") else "")
+            entries.append(_entry(args, sc.cands[key]["repo"], project, qid, VERDICT_OF_TAKE[r["take"]], "meta",
+                                  reason[:300], sc.cands[key], scan["id"]))
+    store.append_ledger(entries)
+    print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root)}); "
+          f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table")
+    if missing:
+        print(f"not on GitHub ({len(missing)}), possibly invented by the report's author: " + ", ".join(missing))
+    print(f"next: github-scout scan {project}/{qid} --show   (they rank high: someone pointed at them)")
+
+
+def cmd_brief(args):
+    path = brief(_store(args), args.ref, Path(args.out).expanduser() if args.out else None)
+    print(f"{path}\nhand this file to the coding agent; nothing in the project was changed")
+
+
 def cmd_init(args):
     store = Store.init(Path(args.dir), args.name, args.lang)
-    print(f"registry created: {store.root}\nnext: export REUSE_FIRST_STORE={store.root}  (or put it in the config file)\n"
-          f"      reuse-first new-project <id> --name \"...\" --code <path to its code>")
+    print(f"registry created: {store.root}\nnext: export GITHUB_SCOUT_STORE={store.root}  (or put it in the config file)\n"
+          f"      github-scout new-project <id> --name \"...\" --code <path to its code>")
 
 
 def cmd_new_project(args):
     print(new_project(_store(args), args.id, args.name, args.summary or "", args.code or ""))
 
 
+def _git_root(path: Path) -> Path | None:
+    for p in [path, *path.parents]:
+        if (p / ".git").exists():
+            return p
+    return None
+
+
 def cmd_ask(args):
-    store = _store(args)
+    cjk = any("\u4e00" <= ch <= "\u9fff" for ch in args.question)
+    store = _store(args, create_lang="zh" if cjk else "en")
+    if "/" not in args.ref and not (store.settings.get("default_project") or read_config().get("GITHUB_SCOUT_PROJECT")):
+        args.ref = f"{_git_root(Path.cwd()).name if _git_root(Path.cwd()) else 'scratch'}/{args.ref}"
     project, qid = store.split_ref(args.ref)
+    if not args.update and not store.project(project):
+        repo = _git_root(Path.cwd())
+        code = args.code or (str(repo) if repo and repo.name.lower() == project.lower() else "")
+        new_project(store, project, project, "", code)
+        print(f"project {project} created" + (f" (code: {code})" if code else
+              " (no code path: pass --code <path> to compare answers with your own code)"))
     langs = parse_langs(args.langs) if args.langs else None
     if args.update:
         doc = store.question(args.ref)
@@ -134,7 +194,7 @@ def cmd_ask(args):
           f"     in README words), each group with a term in every language of langs ({', '.join(langs)}), synonyms\n"
           "     with |, in the words those users write, not translations: \"xiaohongshu|小红书|xhs|红书\".\n"
           "     Then forms, and 2-4 short problem phrases, one per language.\n"
-          f"then: reuse-first scan {args.ref} --plan")
+          f"then: github-scout scan {args.ref} --plan  (show the directions to the user before the full scan)")
 
 
 def cmd_find(args):
@@ -147,7 +207,7 @@ def _read_source(src: str) -> str:
     if src == "-":
         return sys.stdin.read()
     if src.startswith(("http://", "https://")) and not github_slug(src):
-        req = urllib.request.Request(src, headers={"User-Agent": f"reuse-first/{__version__}"})
+        req = urllib.request.Request(src, headers={"User-Agent": f"github-scout/{__version__}"})
         with urllib.request.urlopen(req, timeout=60) as r:
             return r.read().decode("utf-8", "replace")
     p = Path(src)
@@ -164,7 +224,7 @@ def cmd_scan(args):
         rows = plan(q, args.lenses)
         for r in rows:
             print(f"{r['lens']} {LENS_NAMES[r['lens']]:<12} {r['query']}")
-        print("\n".join(gaps + [f"{len(rows)} searches. Run them: reuse-first scan {ref}"]))
+        print("\n".join(gaps + [f"{len(rows)} searches. Run them: github-scout scan {ref}"]))
         return
     if not args.show:
         if gaps and not (args.add or args.expand):
@@ -204,10 +264,10 @@ def cmd_scan(args):
                 continue
             i = index.get(slug.lower())
             print(row(i, c) if i else f"  -  {slug}  ({'decided' if c.get('card') or c.get('seen') else 'stale or a list'})")
-        print(f"full table: reuse-first scan {ref} --show")
+        print(f"full table: github-scout scan {ref} --show")
         return
     _out(args, render(merged, args.top, args.all)
-         + f"\nnext: reuse-first pick {ref} <#>... --rest \"<why the rest do not help>\" "
+         + f"\nnext: github-scout pick {ref} <#>... --rest \"<why the rest do not help>\" "
            f"(numbers refer to this table)", merged)
 
 
@@ -225,12 +285,12 @@ def cmd_pick(args):
         if ref.isdigit():
             i = int(ref)
             if not 1 <= i <= len(rows):
-                raise StoreError(f"#{i} is not in the list (1-{len(rows)}); run `reuse-first scan {args.ref} --show`")
+                raise StoreError(f"#{i} is not in the list (1-{len(rows)}); run `github-scout scan {args.ref} --show`")
             return rows[i - 1], reason or None
         if ref[:1].lower() == "h" and ref[1:].isdigit():
             i = int(ref[1:])
             if not 1 <= i <= len(rise):
-                raise StoreError(f"h{i} is not in the rising list (h1-h{len(rise)}); run `reuse-first scan {args.ref} --show`")
+                raise StoreError(f"h{i} is not in the rising list (h1-h{len(rise)}); run `github-scout scan {args.ref} --show`")
             return rise[i - 1], reason or None
         slug = _slug(ref)
         return by_repo.get(slug.lower(), {"repo": slug}), reason or None
@@ -261,10 +321,10 @@ def cmd_pick(args):
         print("  skip: " + ", ".join(explicit))
     short = [e["repo"] for e in entries if e["verdict"] == "short"]
     if short:
-        print(f"next: reuse-first look --q {project}/{qid} " + " ".join(short))
+        print(f"next: github-scout look --q {project}/{qid} " + " ".join(short))
     for e in entries:
         if e["verdict"] == "list":
-            print(f"next: reuse-first scan {project}/{qid} --expand {e['repo']}")
+            print(f"next: github-scout scan {project}/{qid} --expand {e['repo']}")
 
 
 def cmd_look(args):
@@ -293,7 +353,7 @@ def cmd_look(args):
             project, qid = store.split_ref(args.q)
             entries.append(_entry(args, p["repo"], project, qid, "peeked", "read" if args.source else "look", None, p))
     store.append_ledger(entries)
-    _out(args, "\n\n".join(texts) + ("\n\nnext: reuse-first note <repo> --q <question> --take use|adapt|learn|later|skip"
+    _out(args, "\n\n".join(texts) + ("\n\nnext: github-scout note <repo> --q <question> --take use|adapt|learn|later|skip"
                                      " --note \"...\"" if results else ""), results)
 
 
@@ -346,7 +406,7 @@ def cmd_note(args):
                                 f"{args.take}: {args.note or ''}", meta)])
     print(f"{doc.path}\nkind {kind} ({meta['form']}; {'; '.join(meta['evidence'])})\n"
           "fill the card (the idea first), list upstream paths we depend on under watch:, "
-          "then write the answer in the question file and run reuse-first check")
+          "then write the answer in the question file and run github-scout check")
 
 
 def cmd_show(args):
@@ -369,7 +429,7 @@ def cmd_updates(args):
         print(f"{r['repo']}: {r['from']} -> {r['to']} (reviewed today)")
         return
     rows = outdated(store, client, args.repos or None, args.project)
-    _out(args, render_outdated(rows) + "\nnext: reuse-first updates --diff <repo>, update the card, then --done <repo>", rows)
+    _out(args, render_outdated(rows) + "\nnext: github-scout updates --diff <repo>, update the card, then --done <repo>", rows)
 
 
 def cmd_site(args):
@@ -397,15 +457,15 @@ def cmd_check(args):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="reuse-first", description="Ask a question, find what open source already "
+    ap = argparse.ArgumentParser(prog="github-scout", description="Ask a question, find what open source already "
                                  "answers it, take the ideas and parts that fit, and remember every verdict.",
                                  epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--version", action="version", version=f"reuse-first {__version__}")
+    ap.add_argument("--version", action="version", version=f"github-scout {__version__}")
     ap.add_argument("--store", dest="global_store", metavar="DIR", help="registry directory (also accepted after the command)")
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--store", help="registry directory")
     common.add_argument("--quiet", action="store_true", help="no progress on stderr")
-    common.add_argument("--by", help="who records verdicts (default: $REUSE_FIRST_AGENT or 'agent')")
+    common.add_argument("--by", help="who records verdicts (default: $GITHUB_SCOUT_AGENT or 'agent')")
     js = argparse.ArgumentParser(add_help=False)
     js.add_argument("--json", action="store_true", help="machine-readable output")
     sub = ap.add_subparsers(dest="cmd", metavar="<command>")
@@ -427,8 +487,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--code", help="where the project's code is (path or URL)")
 
     p = add("ask", cmd_ask, "start a question: what we want, where we stand, and its search vocabulary")
-    p.add_argument("ref", help="<project>/<question-id>")
+    p.add_argument("ref", help="<project>/<question-id>, or <question-id> alone: the project is then named after the "
+                   "git repository you are in (its code path recorded), or 'scratch' outside one")
     p.add_argument("question", help="one sentence: the result we want, not the tool we imagine")
+    p.add_argument("--code", help="where the project's code is, when ask creates the project")
     p.add_argument("--stage", required=True, choices=STAGES, help="where our own work stands")
     p.add_argument("--update", action="store_true", help="change the ask and stage (and --langs) of an existing question")
     p.add_argument("--langs", metavar="CODES", help="languages every vocabulary group should cover, comma-separated "
@@ -497,6 +559,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--done", metavar="REPO", help="mark the card reviewed at the current upstream head")
     p.add_argument("--to", help="with --done: a specific commit")
 
+    p = add("import", cmd_import, "read a report made elsewhere (a cloud chat, a teammate): check every GitHub "
+            "link, keep the table's notes and verdicts")
+    p.add_argument("file", help="a Markdown or text file with github.com links (tables with repo / take / why columns are read)")
+    p.add_argument("--q", required=True, metavar="P/Q", help="the question the report answers")
+    p.add_argument("--note", help="where the report came from, e.g. 'ChatGPT Pro 2026-10-17'")
+
+    p = add("brief", cmd_brief, "turn an answered question into a hand-off for the coding agent (changes nothing)")
+    p.add_argument("ref", metavar="P/Q")
+    p.add_argument("--out", help="output file (default <store>/projects/<p>/briefs/<q>.md)")
+
     p = add("site", cmd_site, "write a static page to browse the registry (site/index.html)")
     p.add_argument("--out", help="output file (default <store>/site/index.html)")
 
@@ -515,14 +587,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args.fn(args)
     except (StoreError, LookupError) as exc:
-        print(f"reuse-first: {exc}", file=sys.stderr)
+        print(f"github-scout: {exc}", file=sys.stderr)
         return 1
     except GitHubError as exc:
         hint = " (set GITHUB_TOKEN or run `gh auth login`)" if exc.status in (401, 403) else ""
-        print(f"reuse-first: GitHub {exc}{hint}", file=sys.stderr)
+        print(f"github-scout: GitHub {exc}{hint}", file=sys.stderr)
         return 2
     except OSError as exc:
-        print(f"reuse-first: network or file error: {exc}", file=sys.stderr)
+        print(f"github-scout: network or file error: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
         return 130

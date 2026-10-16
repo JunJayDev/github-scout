@@ -1,6 +1,6 @@
 """The registry store: a plain directory (usually a git repo) of Markdown and JSON.
 
-    reuse-first.json                         marker + settings ({"format", "name", "lang"})
+    github-scout.json                         marker + settings ({"format", "name", "lang"})
     INDEX.md                                 generated overview
     projects/<project>/project.md            what the project is, where its code is, its rules
     projects/<project>/questions/<q>.md      one question: stage, vocabulary, and the answer (the brief)
@@ -8,7 +8,7 @@
     ledger.jsonl                             every verdict, append-only
     scans/<project>/<q>/<stamp>.json         what each search ran and found
     people.txt                               GitHub logins whose stars feed the people lens
-    site/index.html                          generated viewer (reuse-first site)
+    site/index.html                          generated viewer (github-scout site)
     cache/                                   downloaded source (not committed)
 
 See references/store-format.md for the full specification.
@@ -25,7 +25,21 @@ from pathlib import Path
 
 from .yamlish import FormatError, join_frontmatter, split_frontmatter
 
-MARKER = "reuse-first.json"
+MARKER = "github-scout.json"
+LEGACY_MARKERS = ("reuse-first.json",)   # registries made before the rename keep working
+DEFAULT_STORE = Path("~/.github-scout")  # used, and created by `ask`, when nothing else names a registry
+
+
+def env(name: str) -> str | None:
+    """GITHUB_SCOUT_<name>, or the pre-rename REUSE_FIRST_<name>."""
+    return os.environ.get(f"GITHUB_SCOUT_{name}") or os.environ.get(f"REUSE_FIRST_{name}")
+
+
+def marker_of(root: Path) -> Path | None:
+    for name in (MARKER, *LEGACY_MARKERS):
+        if (root / name).is_file():
+            return root / name
+    return None
 FORMAT = 2
 
 # What a repository is. Skills and software are judged differently (references/evaluation.md).
@@ -170,16 +184,18 @@ def _config_files() -> list[Path]:
     home = Path.home()
     xdg = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
     files = []
-    if os.environ.get("REUSE_FIRST_CONFIG"):
-        files.append(Path(os.environ["REUSE_FIRST_CONFIG"]).expanduser())
-    files.append(xdg / "reuse-first" / "config.env")
-    files.append(Path(os.environ.get("AGENT_SKILLS_CONFIG_DIR") or xdg / "agent-skills") / "reuse-first" / "config.env")
+    if env("CONFIG"):
+        files.append(Path(env("CONFIG")).expanduser())
+    skills_cfg = Path(os.environ.get("AGENT_SKILLS_CONFIG_DIR") or xdg / "agent-skills")
+    for name in ("github-scout", "reuse-first"):
+        files += [xdg / name / "config.env", skills_cfg / name / "config.env"]
     return files
 
 
 def read_config() -> dict:
-    """KEY=value lines; parsed, never executed. Unknown keys are an error."""
-    allowed = {"REUSE_FIRST_STORE", "REUSE_FIRST_PROJECT"}
+    """KEY=value lines; parsed, never executed. Unknown keys are an error.
+    Keys come back as GITHUB_SCOUT_*; the pre-rename REUSE_FIRST_* spellings are read too."""
+    allowed = {"GITHUB_SCOUT_STORE", "GITHUB_SCOUT_PROJECT", "REUSE_FIRST_STORE", "REUSE_FIRST_PROJECT"}
     for path in _config_files():
         if not path.is_file():
             continue
@@ -193,29 +209,31 @@ def read_config() -> dict:
             key, val = (x.strip() for x in line.split("=", 1))
             if key not in allowed:
                 raise StoreError(f"{path}:{n}: unknown key {key} (allowed: {', '.join(sorted(allowed))})")
-            out[key] = val.strip("'\"")
+            out[key.replace("REUSE_FIRST_", "GITHUB_SCOUT_")] = val.strip("'\"")
         return out
     return {}
 
 
-def locate(explicit: str | None = None) -> Path:
+def locate(explicit: str | None = None, create_lang: str | None = None) -> Path:
+    """--store, else $GITHUB_SCOUT_STORE, else the config file, else the nearest parent holding a marker,
+    else ~/.github-scout. With create_lang, a missing ~/.github-scout is created in that language."""
     if explicit:
         root = Path(explicit).expanduser()
-    elif os.environ.get("REUSE_FIRST_STORE"):
-        root = Path(os.environ["REUSE_FIRST_STORE"]).expanduser()
+    elif env("STORE"):
+        root = Path(env("STORE")).expanduser()
+    elif read_config().get("GITHUB_SCOUT_STORE"):
+        root = Path(read_config()["GITHUB_SCOUT_STORE"]).expanduser()
     else:
-        cfg = read_config()
-        if cfg.get("REUSE_FIRST_STORE"):
-            root = Path(cfg["REUSE_FIRST_STORE"]).expanduser()
-        else:
-            here = Path.cwd().resolve()
-            found = next((p for p in [here, *here.parents] if (p / MARKER).is_file()), None)
-            if not found:
-                raise StoreError("no registry found. Create one with `reuse-first init <dir>` and set "
-                                 "REUSE_FIRST_STORE=<dir> (or pass --store).")
-            root = found
-    if not (root / MARKER).is_file():
-        raise StoreError(f"{root} is not a registry (no {MARKER}). Run `reuse-first init {root}`.")
+        here = Path.cwd().resolve()
+        found = next((p for p in [here, *here.parents] if marker_of(p)), None)
+        root = found or DEFAULT_STORE.expanduser()
+        if not found and not marker_of(root):
+            if not create_lang:
+                raise StoreError(f"no registry yet. The first `github-scout ask` creates one in {DEFAULT_STORE}; "
+                                 "to keep it elsewhere, set GITHUB_SCOUT_STORE=<dir> or pass --store.")
+            Store.init(root, "github-scout", create_lang)
+    if not marker_of(root):
+        raise StoreError(f"{root} is not a registry (no {MARKER}). Run `github-scout init {root}`.")
     return root.resolve()
 
 
@@ -225,10 +243,13 @@ def locate(explicit: str | None = None) -> Path:
 class Store:
     def __init__(self, root: Path):
         self.root = Path(root)
-        self.settings = json.loads((self.root / MARKER).read_text(encoding="utf-8"))
+        marker = marker_of(self.root)
+        if marker is None:
+            raise StoreError(f"{self.root} is not a registry (no {MARKER})")
+        self.settings = json.loads(marker.read_text(encoding="utf-8"))
         if int(self.settings.get("format", 1)) > FORMAT:
-            raise StoreError(f"{self.root} uses registry format {self.settings['format']}; this reuse-first reads "
-                             f"format {FORMAT}. Upgrade reuse-first.")
+            raise StoreError(f"{self.root} uses registry format {self.settings['format']}; this github-scout reads "
+                             f"format {FORMAT}. Upgrade github-scout.")
         self._cards: list[Doc] | None = None
 
     @property
@@ -241,7 +262,7 @@ class Store:
         root = Path(root).expanduser()
         root.mkdir(parents=True, exist_ok=True)
         marker = root / MARKER
-        if marker.exists():
+        if marker_of(root):
             raise StoreError(f"{root} is already a registry")
         for sub in ("projects", "repos", "scans", "cache"):
             (root / sub).mkdir(exist_ok=True)
@@ -314,7 +335,7 @@ class Store:
         project, qid = self.split_ref(ref)
         p = self.question_path(project, qid)
         if not p.is_file():
-            raise StoreError(f"no question {project}/{qid} (create it: reuse-first ask {project}/{qid} \"...\")")
+            raise StoreError(f"no question {project}/{qid} (create it: github-scout ask {project}/{qid} \"...\")")
         doc = read_doc(p)
         if doc.error:
             raise StoreError(f"{p}: {doc.error}")
@@ -327,7 +348,7 @@ class Store:
         if "/" in ref:
             project, qid = ref.split("/", 1)
         else:
-            project = self.settings.get("default_project") or read_config().get("REUSE_FIRST_PROJECT")
+            project = self.settings.get("default_project") or read_config().get("GITHUB_SCOUT_PROJECT") or env("PROJECT")
             qid = ref
             if not project:
                 raise StoreError(f"write the question as <project>/<question> (no default project set): {ref}")
@@ -505,15 +526,15 @@ class Store:
 
 STORE_README = """# {name}
 
-A reuse-first registry: the questions we asked, what we found on GitHub, what we took from
+A github-scout registry: the questions we asked, what we found on GitHub, what we took from
 it, and every repository we looked at and why we passed.
 
-- `INDEX.md` (generated) and `site/index.html` (`reuse-first site`) give the overview.
+- `INDEX.md` (generated) and `site/index.html` (`github-scout site`) give the overview.
 - `projects/<project>/questions/<q>.md`: one question, where we stand, and the answer.
 - `repos/<owner>__<repo>.md`: one card per repository we looked at closely.
 - `ledger.jsonl`: every verdict, so nobody looks at the same repository twice.
 - `scans/`: what each search ran and found.
 - `cache/`: downloaded source, not committed.
 
-Agents: load the reuse-first skill and run `reuse-first find <words>` before reading anything here.
+Agents: load the github-scout skill and run `github-scout find <words>` before reading anything here.
 """

@@ -3,13 +3,13 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "reuse-first"
-version = "0.1.0"
-description = "Before building, find what open source already solved, take the ideas that fit, record verdicts."
+name = "github-scout"
+version = "0.2.0"
+description = "Find what GitHub already solved for a goal in your project, and hand concrete suggestions to your coding agent."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "reuse-first contributors" }]
+authors = [{ name = "github-scout contributors" }]
 keywords = ["agents", "skills", "open-source", "github", "search", "reuse", "registry", "claude-code", "codex"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -24,11 +24,11 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
-reuse-first = "reuse_first.cli:main"
+github-scout = "github_scout.cli:main"
 
 [tool.setuptools]
-package-dir = { "" = "skills/reuse-first/scripts" }
-packages = ["reuse_first"]
+package-dir = { "" = "skills/github-scout/scripts" }
+packages = ["github_scout"]
 
 [tool.ruff]
 line-length = 130

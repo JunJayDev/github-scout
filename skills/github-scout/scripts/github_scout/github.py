@@ -22,11 +22,11 @@ from pathlib import Path
 
 from . import __version__
 
-API = os.environ.get("REUSE_FIRST_GITHUB_API", "https://api.github.com")
-NPM = os.environ.get("REUSE_FIRST_NPM_API", "https://registry.npmjs.org")
-SKILLS = os.environ.get("REUSE_FIRST_SKILLS_API", "https://skills.sh/api")
-MCP = os.environ.get("REUSE_FIRST_MCP_API", "https://registry.modelcontextprotocol.io/v0")
-UA = f"reuse-first/{__version__}"
+API = (os.environ.get("GITHUB_SCOUT_GITHUB_API") or os.environ.get("REUSE_FIRST_GITHUB_API") or "https://api.github.com")
+NPM = (os.environ.get("GITHUB_SCOUT_NPM_API") or os.environ.get("REUSE_FIRST_NPM_API") or "https://registry.npmjs.org")
+SKILLS = (os.environ.get("GITHUB_SCOUT_SKILLS_API") or os.environ.get("REUSE_FIRST_SKILLS_API") or "https://skills.sh/api")
+MCP = (os.environ.get("GITHUB_SCOUT_MCP_API") or os.environ.get("REUSE_FIRST_MCP_API") or "https://registry.modelcontextprotocol.io/v0")
+UA = f"github-scout/{__version__}"
 
 # Seconds between calls; GitHub allows 30 search/min and 10 code-search/min with a token.
 SEARCH_GAP = 2.2

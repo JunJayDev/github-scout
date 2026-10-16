@@ -1,0 +1,26 @@
+{
+  "about": "Recall cases: repositories a person found that github-scout must find. Each gives the goal as a user would say it and the repos the report or the scan must contain. Add one whenever someone finds a good repo the tool missed.",
+  "evals": [
+    {
+      "id": "logged-in-browser",
+      "prompt": "Use github-scout: our operations scripts must read and post on Reddit, X and Xiaohongshu through the Chrome profile we are already logged into, without a model clicking pages.",
+      "stage": "working",
+      "must_find": ["jackwener/OpenCLI"],
+      "note": "Agents searched 'social media automation' and missed it; a person found it on X. Entity pairs and 'logged-in browser' put it first."
+    },
+    {
+      "id": "explainer-figures",
+      "prompt": "Use github-scout: let an agent (Opus 5.5) make short explainer videos that show how a machine or a system works.",
+      "stage": "idea",
+      "must_find": ["wheresryan22/anatomy"],
+      "note": "Its own words never say video; people make explainer videos with its interactive figures. Found only by the rising lens."
+    },
+    {
+      "id": "chinese-human-writing",
+      "prompt": "用 github-scout：让 agent 写的中文公众号长文读不出 AI 味。",
+      "stage": "working",
+      "must_find": ["KKKKhazix/human-writing", "alchaincyf/tramstop-skill", "larashero3-dotcom/lieflat-less-ai-tone"],
+      "note": "Chinese projects; tramstop is found by the Chinese term 人味, not by an English translation."
+    }
+  ]
+}

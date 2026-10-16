@@ -6,10 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "reuse-first" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "github-scout" / "scripts"))
 
-from reuse_first import registry, site  # noqa: E402
-from reuse_first.store import Store  # noqa: E402
+from github_scout import registry, site  # noqa: E402
+from github_scout.store import Store  # noqa: E402
 
 EVIL = '<script>alert("summary")</script>'
 CARD_BODY = """

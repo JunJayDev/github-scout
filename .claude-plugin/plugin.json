@@ -1,18 +1,8 @@
 {
-  "name": "reuse-first",
-  "version": "0.1.0",
-  "description": "Before building, find what open source already solved, take the ideas that fit, record verdicts.",
+  "name": "github-scout",
+  "version": "0.2.0",
+  "description": "Find what GitHub already solved for a goal in your project, and hand concrete suggestions to your coding agent.",
   "license": "MIT",
-  "keywords": [
-    "reuse",
-    "open-source",
-    "github",
-    "search",
-    "registry",
-    "skills",
-    "prior-art"
-  ],
-  "author": {
-    "name": "reuse-first contributors"
-  }
+  "keywords": ["github", "open-source", "search", "prior-art", "reuse", "registry", "skills"],
+  "author": {"name": "github-scout contributors"}
 }

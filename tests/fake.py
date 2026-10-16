@@ -9,9 +9,9 @@ import tarfile
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "reuse-first" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "github-scout" / "scripts"))
 
-from reuse_first.github import Client  # noqa: E402
+from github_scout.github import Client  # noqa: E402
 
 
 def repo(slug, stars=100, desc="", created="2026-01-01T00:00:00Z", pushed="2026-10-01T00:00:00Z", topics=(),

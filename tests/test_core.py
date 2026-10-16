@@ -10,9 +10,9 @@ from pathlib import Path
 
 from fake import FakeAPI, client, repo, tarball
 
-from reuse_first import cli, discover, examine, registry, yamlish
-from reuse_first.github import github_slug
-from reuse_first.store import Store, StoreError, card_filename
+from github_scout import cli, discover, examine, registry, yamlish
+from github_scout.github import github_slug
+from github_scout.store import Store, StoreError, card_filename
 
 QUESTION = {
     "entities": ["reddit", "xiaohongshu|小红书|rednote", "twitter|x.com"],
@@ -115,6 +115,29 @@ class PlanAndRankTests(unittest.TestCase):
         self.assertEqual([c["repo"] for c in out["candidates"]], ["a/alive"])
         self.assertEqual(out["dropped"], 1)
 
+    def test_lures_and_farmed_installs_are_excluded(self):
+        lures = [("imthegamer404-bot/KCD2-Forge-Mod-Suite", "Kingdom Come Deliverance 2 Trainer 2026 Companion Tool for Enhanced Gameplay"),
+                 ("fiyinjj123-lang/Paralives-Mod-Forge", "Paralives Studio Suite 2026: Ultimate Mod Hub for Infinite Money and Building"),
+                 ("c/Skewb-Mastery-Lab", "Skewb Skills Advanced Trainer 2026: Learn Layers, Algs and Speedcubing Fast")]
+        for repo_, desc in lures:
+            self.assertTrue(discover.is_lure({"repo": repo_, "desc": desc}), repo_)
+        for repo_, desc in [("bmaltais/kohya_ss", "LoRA trainer for Stable Diffusion"), ("a/mod-tools", "Minecraft mod tools"),
+                            ("b/hack-week", "Projects from our 2026 hack week")]:
+            self.assertFalse(discover.is_lure({"repo": repo_, "desc": desc}), repo_)
+        self.assertTrue(discover.is_farmed({"repo": "magentosh/superpowers", "stars": 2, "installs": 2773960}))
+        self.assertFalse(discover.is_farmed({"repo": "obra/superpowers", "stars": 300000, "installs": 3501140}))
+        self.assertFalse(discover.is_farmed({"repo": "larksuite/cli", "stars": 17705, "installs": 11732527}))
+        base = {"desc": "Reddit skill", "created": ago(1)[:10], "pushed": ago(0.1)[:10], "license": "MIT", "lenses": ["S"],
+                "topics": [], "fit": 1, "score": 5}
+        scan = {"candidates": [{**base, "repo": "a/real", "stars": 900, "installs": 4000},
+                               {**base, "repo": "b/copy", "stars": 1, "installs": 900000},
+                               {**base, "repo": "c/Mod-Hub", "desc": "Ultimate Mod Hub for Infinite Money", "stars": 60}],
+                "searches": [], "id": "x", "project": "p", "question": "q"}
+        self.assertEqual([c["repo"] for c in discover.visible(scan)], ["a/real"])
+        self.assertIn("excluded: 1 look like lures", discover.render(scan))
+        self.assertLess(discover.score({**base, "repo": "b/copy", "stars": 1, "installs": 900000}),
+                        discover.score({**base, "repo": "b/copy", "stars": 1, "installs": 0}) + 0.01)
+
     def test_lists_are_set_apart(self):
         self.assertTrue(discover.is_list({"repo": "public/apis", "desc": "A collective list of free APIs"}))
         self.assertTrue(discover.is_list({"repo": "x/awesome-mcp", "desc": ""}))
@@ -136,7 +159,7 @@ class Base(unittest.TestCase):
         self.api = FakeAPI()
         self.old_factory = cli.make_client
         cli.make_client = lambda args, store=None: client(self.api)
-        self.env = {k: os.environ.pop(k) for k in ["REUSE_FIRST_STORE"] if k in os.environ}
+        self.env = {k: os.environ.pop(k) for k in ["GITHUB_SCOUT_STORE", "REUSE_FIRST_STORE"] if k in os.environ}
 
     def tearDown(self):
         cli.make_client = self.old_factory
@@ -152,7 +175,7 @@ class Base(unittest.TestCase):
 
 class StoreTests(Base):
     def test_init_and_check_clean(self):
-        self.assertEqual(json.loads((self.root / "reuse-first.json").read_text())["format"], 2)
+        self.assertEqual(json.loads((self.root / "github-scout.json").read_text())["format"], 2)
         self.assertEqual(self.store.check()[0], [])
 
     def test_question_template_carries_the_stage(self):
@@ -170,7 +193,7 @@ class StoreTests(Base):
             self.assertIn(needle, text)
 
     def test_locate_by_marker_in_parent(self):
-        from reuse_first.store import locate
+        from github_scout.store import locate
         cwd = os.getcwd()
         try:
             os.chdir(self.root / "projects" / "ops")
@@ -180,6 +203,39 @@ class StoreTests(Base):
             os.chdir(cwd)
         with self.assertRaises(StoreError):
             locate(str(Path(self.tmp.name)))
+
+
+class FirstRunTests(unittest.TestCase):
+    def test_ask_creates_the_registry_and_the_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            repo = Path(tmp) / "myapp"
+            (repo / ".git").mkdir(parents=True)
+            cwd = os.getcwd()
+            env = {"HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"), "GITHUB_SCOUT_STORE": "", "REUSE_FIRST_STORE": ""}
+            try:
+                os.chdir(repo)
+                with unittest.mock.patch.dict(os.environ, env), \
+                        unittest.mock.patch("github_scout.store.DEFAULT_STORE", home / ".github-scout"):
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                        code = cli.main(["ask", "video", "让 agent 做出像剪辑师做的宣传片", "--stage", "working"])
+                    self.assertEqual(code, 0, out.getvalue())
+                    store = Store(home / ".github-scout")
+                    self.assertEqual(store.lang, "zh")                       # the goal was written in Chinese
+                    self.assertEqual(store.project("myapp").data["code"], str(repo.resolve()))
+                    self.assertTrue(store.question_path("myapp", "video").is_file())
+            finally:
+                os.chdir(cwd)
+
+    def test_registries_made_before_the_rename_still_open(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "old"
+            Store.init(root, "old", "en")
+            (root / "github-scout.json").rename(root / "reuse-first.json")
+            self.assertEqual(Store(root).settings["name"], "old")
+            from github_scout.store import locate
+            self.assertEqual(locate(str(root)), root.resolve())
 
 
 class ChineseStoreTests(Base):
@@ -342,6 +398,37 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("jackwener/OpenCLI", out)
 
+    def test_import_checks_links_and_keeps_table_notes(self):
+        self.seed()
+        self.run_cli("scan", "ops/browser-ops", "--quiet")
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("# report\n\n| 仓库 | 类型 | 结论 | 能借什么 |\n|---|---|---|---|\n"
+                          "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | 学思路 | 登录态复用 |\n"
+                          "| https://github.com/nobody/invented-repo | cli | 直接用 | 编的 |\n\n"
+                          "Also see github.com/jackwener/OpenCLI.\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops", "--note", "ChatGPT Pro")
+        self.assertEqual(code, 0, out)
+        self.assertIn("3 repos linked; 2 exist on GitHub", out)
+        self.assertIn("possibly invented by the report's author: nobody/invented-repo", out)
+        e = [x for x in self.store.ledger() if x["repo"] == "xpzouying/xiaohongshu-mcp"][-1]
+        self.assertEqual((e["verdict"], e["reason"]), ("short", "ChatGPT Pro: learn: 登录态复用"))
+
+    def test_brief_packs_the_answer_for_the_coding_agent(self):
+        doc = self.store.question("ops/browser-ops")
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertNotEqual(code, 0)                                  # no answer yet
+        doc.body = doc.body.replace("### In one paragraph\n", "### In one paragraph\nUse OpenCLI for reads.\n")
+        doc.body = doc.body.replace("### Next steps in our project\n", "### Next steps in our project\n1. Pin OpenCLI 1.8.\n")
+        doc.data["picked"] = ["jackwener/OpenCLI"]
+        self.store.save_question(doc)
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text()
+        self.assertIn("# Brief for the coding agent:", text)
+        self.assertIn("1. Pin OpenCLI 1.8.", text)
+        self.assertIn("Project code: /src/ops", text)
+        self.assertIn("[jackwener/OpenCLI](https://github.com/jackwener/OpenCLI)", text)
+
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed()
         self.run_cli("scan", "ops/browser-ops", "--quiet")
@@ -461,7 +548,7 @@ class LanguageTests(Base):
     """Chinese projects supplied half the repos picked in real runs; the plan must search Chinese as much as English."""
 
     def test_language_of_a_term(self):
-        from reuse_first.store import lang_of
+        from github_scout.store import lang_of
         for term, lang in [("小红书", "zh"), ("AIGC检测", "zh"), ("写作 skill", "zh"), ("ノート", "ja"),
                            ("日本語のテスト", "ja"), ("한국어", "ko"), ("note.com", "en"), ("résumé", "en")]:
             self.assertEqual(lang_of(term), lang, term)

@@ -1,6 +1,6 @@
 # Security
 
-reuse-first downloads source archives from GitHub and reads them. It never executes
+github-scout downloads source archives from GitHub and reads them. It never executes
 downloaded code. Archives are extracted with path-traversal checks, and symbolic links are
 skipped.
 

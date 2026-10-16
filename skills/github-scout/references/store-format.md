@@ -1,11 +1,11 @@
 # Registry format (version 2)
 
 A registry is a directory of Markdown and JSON, usually a git repository so several agents and
-machines share it. `reuse-first check` validates it and writes `INDEX.md`; `reuse-first site`
+machines share it. `github-scout check` validates it and writes `INDEX.md`; `github-scout site`
 writes `site/index.html`.
 
 ```
-reuse-first.json                         {"format": 2, "name": "...", "lang": "en" | "zh", "default_project": null}
+github-scout.json                         {"format": 2, "name": "...", "lang": "en" | "zh", "default_project": null}
 README.md                                what the registry is (written by init)
 INDEX.md                                 generated overview; do not edit
 people.txt                               GitHub logins whose stars feed the people lens

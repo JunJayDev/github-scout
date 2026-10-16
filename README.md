@@ -1,186 +1,121 @@
-# reuse-first
+**English** · [中文](./README.zh-CN.md)
 
-**Agents know a lot, then search the web like a newcomer. reuse-first teaches them where good
-ideas live on GitHub, how to recognise them, and to remember what they have seen.**
+# github-scout
 
-It is an agent skill with a small command-line tool. Before an agent builds a tool, a pipeline
-or an integration, it writes down the question (the result we want, and how far our own work
-has got), searches GitHub in dozens of targeted ways, reads the few repositories that matter,
-and writes an answer: which ideas, practices or parts to take from whom, and what we still
-have to build. Every verdict goes into a shared registry, so the next agent starts from it.
+**Before your agent builds something, it finds what GitHub already solved, reads the few
+projects that matter, and hands your coding agent a brief: which ideas to take from whom, and
+where they go in your code.**
 
-## Why
+Agents rebuild things that exist because they search like newcomers. One project needed to
+read and post on Reddit, X and Xiaohongshu through a logged-in browser. The right tool had
+30,000 stars and described itself as "Make any website into CLI & use your logged-in browser by
+AI agent". GitHub search, sorted by stars, put it here:
 
-Agents rebuild things that already exist. Usually the search is the problem, not laziness.
-
-In one real case, a project needed to read and post on Reddit, X and Xiaohongshu through a
-logged-in browser. Agents searched for "social media automation" and "自媒体 运营" and found
-old bots and tutorials, so they started writing a scraper. The right tool was a
-30,000-star project created that year. Its description reads "Make any website into CLI &
-use your logged-in browser by AI agent", and none of the agents' words are in it. A person
-found it on X.
-
-On that same question, GitHub repository search gives these results:
-
-| query | where the right tool lands |
+| search | where the right tool landed |
 |---|---|
 | `social media automation` | not in the top 8 |
 | `自媒体 运营` | not in the top 8 |
-| `xiaohongshu` | not in the top 8 |
-| `"reddit xiaohongshu" in:readme` (two concrete platforms) | **#1** |
+| `"reddit" "xiaohongshu" in:readme` (two concrete sites) | **#1** |
 | `"logged-in browser"` (how it works) | **#1** |
-| `topic:browser-automation created:>2026-01-01` | **#2** |
 
-Good projects describe themselves with concrete nouns and mechanisms, not with the problem a
-newcomer types. reuse-first writes those queries for you from a short vocabulary you define
-for each question, runs them all, and merges the results. On this question, a full scan found
-1,237 candidates, dropped the unmaintained ones (801 left) and ranked the tool ninth. The same
-top ten held several closely related projects the team had never heard of, one with 97k stars.
-
-## What it does differently
-
-- **The question comes first.** "Find a video tool" and "make our product videos cut like an
-  editor's, with an agent doing the work" find different repositories. A question also carries
-  its stage (`idea`, `prototype`, `working`, `polishing`), because what is worth borrowing depends
-  on how far you are: framing and approach early on, parameters and edge cases later.
-- **The output is an answer, not a list.** A table of twenty repositories leaves all the work
-  to you. The answer says what to take from whom, compares it with the code you already have,
-  and names the part nobody covers.
-- **Ideas before code.** An agent writes code at will; an approach it never thought of, it never
-  writes. Cards start with the idea: the design decision, where it lives, why it is not obvious.
-- **New and maintained beats old and famous.** Ranking is relevance first, then whether the repo
-  is young and moving, and star counts last. No push in 3 months ranks far down, 6 months is hidden,
-  12 months is dropped. Searches ask GitHub for maintained repos only, so no slot is wasted.
-- **Searches through 14 lenses**: entities, entity pairs in READMEs, mechanisms, combinations,
-  problem phrases, topics, the last 12 months, new repos rising fast in your form (found without
-  any of your words), `SKILL.md` files, skills.sh (with install counts),
-  the official MCP registry, npm, the stars of builders you trust, and links from repos you picked.
-  Links found on the web or X and awesome lists feed into the same ranking.
-- **Searches in Chinese as much as in English.** In real runs, Chinese projects supplied half of
-  the repositories picked, and they describe themselves in Chinese. Each question lists its
-  languages (`langs`, default `[en, zh]`); every vocabulary group should hold a term in each, the
-  name those users write (`小红书|xhs|红书`, `去AI味|活人感|人味`), not a translation. Pairs and
-  combinations are built within one language, the other lenses give each language a fair share
-  of their searches, and `check` warns about a group with no term in a listed language.
-- **Remembers.** Every verdict is recorded with its reason. Each card keeps the commit it was
-  reviewed at and the upstream paths you depend on; `updates` shows only what changed there.
+Good projects describe themselves by what they touch and how they work. github-scout writes
+those searches for you, in English and Chinese, runs about 140 of them, and reads the results.
 
 ## Install
 
-Requirements: Python 3.9+ (standard library only) and a GitHub token, either in
-`GITHUB_TOKEN` or from a logged-in [`gh`](https://cli.github.com/) CLI. Network: api.github.com,
-codeload.github.com, skills.sh, registry.modelcontextprotocol.io and registry.npmjs.org.
-
-**Claude Code plugin**
-
-```
-/plugin marketplace add <owner>/reuse-first
-/plugin install reuse-first@reuse-first
-```
-
-**Any agent that reads skills** (Claude Code, Codex and others): copy `skills/reuse-first/`
-into your agent's skills directory, for example `~/.claude/skills/` or `.agents/skills/`. The
-folder is self-contained. The agent runs `python3 scripts/reuse-first.py <command>` from it.
-
-**The CLI on its own**
-
 ```bash
-pipx install git+https://github.com/<owner>/reuse-first
-# or: uv tool install git+https://github.com/<owner>/reuse-first
+npx skills add <owner>/github-scout -g
 ```
 
-## Quick start
+Or tell your agent: *"Install the skills from https://github.com/<owner>/github-scout"*.
+In Claude Code, the plugin works too: `/plugin marketplace add <owner>/github-scout`, then
+`/plugin install github-scout@github-scout`.
 
-```bash
-reuse-first init ~/oss-registry --lang en && export REUSE_FIRST_STORE=~/oss-registry
-reuse-first new-project shop --name "Shop backend" --code ~/code/shop
-reuse-first ask shop/payments "Take card payments with 3-D Secure from our Python service" --stage prototype
-# edit projects/shop/questions/payments.md: what we have, what is not good enough, the vocabulary
-reuse-first scan shop/payments --plan     # the searches, no network
-reuse-first scan shop/payments            # ~150 searches, about five minutes, ranked table
-reuse-first pick shop/payments 1 3 8 --rest "not payments"
-reuse-first look --q shop/payments stripe/stripe-python
-reuse-first look stripe/stripe-python --source
-reuse-first note stripe/stripe-python --q shop/payments --take use --where services/billing
-# write the answer in the question file, then:
-reuse-first check && reuse-first site     # INDEX.md and site/index.html
-```
+The command-line part needs Python 3.9+ and a logged-in `gh` (or `GITHUB_TOKEN`). Nothing else
+to set up: the first question creates its registry in `~/.github-scout`.
 
-Later: `reuse-first find "3-d secure"` (has anyone looked at this?), `reuse-first updates`
-(what changed upstream since review), `updates --diff <repo>`, `updates --done <repo>`.
+## Use
 
-The full procedure for agents is in [`skills/reuse-first/SKILL.md`](skills/reuse-first/SKILL.md),
-with a [worked example](skills/reuse-first/references/workflow.md) and the
-[evaluation rubric](skills/reuse-first/references/evaluation.md).
+Open your agent inside your project and say what you want:
+
+> Use github-scout: make the product videos our agent renders cut and move like an editor's.
+
+It reads your project, proposes search directions, and **stops for you to confirm them**. Then
+it searches, picks, reads the code of the few that matter, and writes a brief for your coding
+agent. It does not change your project.
+
+**No local setup?** In ChatGPT or Claude on the web, upload
+[`cloud/github-scout.md`](cloud/github-scout.md) and write your goal (add a zip of your project
+if you can). It runs on web search alone, does not stop unless you ask, and ends with one report
+file. Back home, `github-scout import report.md --q <project>/<question>` takes it over and
+checks every link against GitHub.
+
+## Five stages
+
+Each stage is a skill and runs on its own; `github-scout` runs them in order.
+
+| skill | does |
+|---|---|
+| `github-scout-plan` | reads your project, restates the goal as a result, sets the stage, writes search directions in English and Chinese |
+| `github-scout-search` | searches every direction many ways: names, pairs, mechanisms, topics, SKILL.md files, skills.sh, the MCP registry, npm, fast-rising new repos |
+| `github-scout-triage` | registers and tags each repo, decides how to read it (a skill, a CLI and a list are read differently) |
+| `github-scout-dig` | reads the code, pulls out the ideas with file paths |
+| `github-scout-brief` | compares with your code, writes the answer and the hand-off for your coding agent |
+
+## What it believes
+
+- **The goal decides what you find.** "Find a video tool" and "make our videos cut like an
+  editor's" find different projects. The stage of your own work decides what to borrow: the
+  approach early on, parameters and edge cases later.
+- **Ideas over code.** An agent writes code at will; it never writes an approach it did not
+  think of. Cards start with the idea, where it lives, and why it is not obvious.
+- **A brief, not a list.** Twenty repos with star counts leave all the work to you.
+- **New and moving beats old and famous.** No push in 3 months ranks far down, 6 months is set
+  aside, 12 months is dropped. Lures (game cheats, cracks) and farmed install counts are left out.
+- **English and Chinese, always.** Chinese projects supplied half the repos picked in real runs,
+  and they describe themselves in Chinese.
+- **Never read the same repo twice.** Every verdict goes into the registry with its reason; later
+  searches start from it, and `updates` shows only what changed in the files you depend on.
 
 ## The registry
 
-A directory of Markdown and JSON, best kept in git so several agents and machines share it:
+A folder of Markdown and JSON, best kept in git:
 
 ```
-projects/<project>/project.md            what the project is and where its code is
-projects/<project>/questions/<q>.md      the question, its stage, its vocabulary, and the answer
-repos/<owner>__<repo>.md                 one card per repository looked at closely
+projects/<project>/questions/<q>.md      the goal, its stage, the directions, the answer
+projects/<project>/briefs/<q>.md         the hand-off for the coding agent
+repos/<owner>__<repo>.md                 one card per repo read closely: the idea first
 ledger.jsonl                             every verdict, append-only
 scans/<project>/<q>/<stamp>.json         what each search ran and found
-INDEX.md, site/index.html                generated overviews
 ```
 
-One repository has one card, whichever projects use it. Each records what it takes: `use`,
-`adapt`, `learn`, `later` or `skip`. Templates come in English or Chinese (`init --lang zh`).
-The format is specified in [`references/store-format.md`](skills/reuse-first/references/store-format.md).
+`github-scout site` writes one web page to browse it. Formats:
+[`store-format.md`](skills/github-scout/references/store-format.md).
 
-## Tell your agents
+## Costs and limits
 
-Add [`examples/AGENTS.snippet.md`](examples/AGENTS.snippet.md) to your `AGENTS.md` or
-`CLAUDE.md`. The skill tells an agent how to search. The snippet makes searching a rule
-before building.
+- Each search costs API calls, not tokens. A full search takes about five minutes within
+  GitHub's free limits. The table the agent reads is about 2,000 tokens; one repo's facts about 1,300.
+- It sees public GitHub, npm, skills.sh, the MCP registry, and links you add. GitLab, Codeberg
+  and closed-source options need the web pass the search stage describes.
+- A clean search proves nothing is missing only for the sources it checked, which it lists.
 
-## What it costs
+## Related
 
-| step | tokens the agent reads |
-|---|---|
-| `find` in the registry | a few hundred |
-| `scan` table, 40 rows | ~2k (the searches cost API calls, not tokens) |
-| `look`, per repo | ~1.3k |
-| reading source | whatever the size map says you need, usually a few files |
-
-GitHub allows 30 searches a minute and 10 code searches a minute with a token. A scan
-throttles itself (also across processes sharing a registry) and takes a few minutes.
-
-## Limits
-
-- It sees public GitHub, npm, skills.sh, the MCP registry, and whatever you `scan --add`. GitLab, Codeberg, PyPI-only and
-  closed-source options need the web pass described in the skill.
-- GitHub search returns at most 1,000 results per query; the tool reads the top 30 of each.
-- A clean scan proves nothing is missing only for the sources checked. The scan file lists them.
-- Ranking is a heuristic. The `fit` column and the lens letters show why each row is there.
-
-## Related projects
-
-"Search before you build" skills are common. Most of them guide one search and end at one
-decision. reuse-first keeps going after that: it remembers every verdict, tracks the repos you
-chose, and makes the next search start from what is already known.
-
-- [ECC `search-first`](https://github.com/affaan-m/ECC) (the most-installed
-  skill of this kind on skills.sh), [`reuse-before-build`](https://github.com/Ai-Eastern/reuse-before-build)
-  and [`oss-scout`](https://github.com/Saeyeon-developer/oss-scout): research-then-decide
-  workflows for one task at a time. They work well alongside a registry.
-- [`deja-vu`](https://github.com/vishnujayvel/deja-vu): keeps an append-only log of decisions
-  with review dates. It is the closest in spirit, but it records decisions, not repositories, and
-  revalidation is manual.
-- [`patent`](https://github.com/r14dd/patent): from one plain-English idea, checks 19 package
-  registries plus GitHub and Hacker News with semantic ranking. Good for "has this tool been built?".
-- [`neuroarxiv`](https://github.com/UditAkhourii/neuroarxiv): checks arXiv papers before an
-  agent designs something new. It covers papers; reuse-first covers code.
-- [repomix](https://github.com/yamadashy/repomix) (`look --source --pack`), DeepWiki and gitingest
-  help with reading a large codebase after `fetch`.
+Many "search before you build" skills guide one search to one decision, such as ECC's
+`search-first` (the most installed on skills.sh), `reuse-before-build` and `oss-scout`.
+github-scout adds what comes before and after that decision:
+- reading your own project first;
+- the stage-based question;
+- the registry that remembers every verdict;
+- tracking the repos you depend on;
+- a brief your coding agent can act on.
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Tests run
-offline: `python -m unittest discover -s tests`.
+Issues and pull requests welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+Tests run offline: `python -m unittest discover -s tests`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.

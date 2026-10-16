@@ -140,7 +140,7 @@ def clean_readme(text: str, limit: int) -> str:
                 continue
         lines.append(s)
     out = "\n".join(lines).strip()
-    return out if len(out) <= limit else out[:limit].rsplit("\n", 1)[0] + "\n[... README cut; reuse-first look --readme N for more]"
+    return out if len(out) <= limit else out[:limit].rsplit("\n", 1)[0] + "\n[... README cut; github-scout look --readme N for more]"
 
 
 def tree_summary(paths: list[tuple[str, int]], depth: int = 1, width: int = 14) -> list[str]:

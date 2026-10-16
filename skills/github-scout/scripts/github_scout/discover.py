@@ -301,6 +301,35 @@ def fit(c: dict, q: dict) -> int:
     return n
 
 
+# Lures: repos that pose as game cheats, cracks or key generators to get downloads (often malware).
+LURE = re.compile(r"\b(infinite|unlimited) (money|gold|coins?|gems?|robux)\b|\bfree (robux|v-?bucks)\b|\bkeygen\b|"
+                  r"\bcrack(ed)? (version|download)\b|\baimbot\b|\bspoofer\b|\bmod (menu|hub|suite|forge)\b|"
+                  r"\bcheat(s| engine| menu| tool)\b|\bserial key\b|外挂|破解版|激活码|无限金币", re.I)
+LURE_WEAK = re.compile(r"\b(trainer|executor|unlocker)\b", re.I)
+PITCH = re.compile(r"\b(ultimate|pro|advanced|companion|gameplay|mastery|guide|boosts?|mods?)\b", re.I)
+YEAR = re.compile(r"\b20[2-3]\d\b")
+FARM_MIN, FARM_RATIO = 20000, 2000   # skills.sh installs that far beyond the repo's stars were bought or scripted
+
+
+def is_lure(c: dict) -> bool:
+    """Game-cheat and crack lures. A weak word (trainer, executor) counts only with a year and a sales
+    word in the description ("Advanced Trainer 2026"); "LoRA trainer" and "our 2026 hack week" pass."""
+    desc = c.get("desc") or ""
+    text = c["repo"].split("/")[-1].replace("-", " ").replace("_", " ") + " " + desc
+    return bool(LURE.search(text) or (LURE_WEAK.search(text) and YEAR.search(desc) and PITCH.search(desc)))
+
+
+def is_farmed(c: dict) -> bool:
+    """skills.sh installs far beyond the stars: in October 2026 six copies of one popular skill pack,
+    each with 0-8 stars and flat weekly counts, showed 0.7-3.8 million installs."""
+    installs = c.get("installs") or 0
+    return installs >= FARM_MIN and installs > FARM_RATIO * ((c.get("stars") or 0) + 1)
+
+
+def excluded(c: dict) -> bool:
+    return is_lure(c) or is_farmed(c)
+
+
 def is_list(c: dict) -> bool:
     name = c["repo"].split("/")[1].lower()
     desc = (c.get("desc") or "").lower()
@@ -323,7 +352,7 @@ def score(c: dict, q: dict | None = None) -> float:
     s += 0.2 * math.log10(stars + 1)                                  # reach
     s += (0.3 if f > 0 else 0.1) * len(lenses - {"W", "L"})           # independent routes found it
     s += 3.0 if "W" in lenses else 0.5 if "L" in lenses else 0        # a person or a curated list pointed at it
-    inst = math.log10((c.get("installs") or 0) + 1)                   # skills.sh installs: real use
+    inst = 0.0 if c.get("fork") or is_farmed(c) else math.log10((c.get("installs") or 0) + 1)   # real use
     s += 0.4 * inst if f > 0 else min(0.4, 0.1 * inst)
     if q is not None:
         forms = [g[0].lower() for g in groups(q.get("forms"))]
@@ -355,7 +384,7 @@ GITHUB_URL = re.compile(r"github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/([A-Za
 def slugs_in_text(text: str) -> list[str]:
     out, seen = [], set()
     for m in GITHUB_URL.finditer(text):
-        slug = github_slug(f"github.com/{m.group(1)}/{m.group(2)}")
+        slug = github_slug(f"github.com/{m.group(1)}/{m.group(2).rstrip('.')}")   # a link ending a sentence
         if slug and slug.lower() not in seen:
             seen.add(slug.lower())
             out.append(slug)
@@ -529,7 +558,7 @@ def is_stale(c: dict) -> bool:
 
 def is_rising(c: dict) -> bool:
     """Found only because it is new and growing fast: none of the vocabulary is in its own words."""
-    return "H" in c.get("lenses", []) and not c.get("fit") and not c.get("list")
+    return "H" in c.get("lenses", []) and not c.get("fit") and not c.get("list") and not excluded(c)
 
 
 def momentum(c: dict) -> float:
@@ -539,13 +568,13 @@ def momentum(c: dict) -> float:
 def visible(scan: dict, show_all: bool = False) -> list[dict]:
     """Rows `render` numbers; `pick` resolves numbers against the same list."""
     return [c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_rising(c)
-            and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c)))]
+            and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c) and not excluded(c)))]
 
 
 def rising(scan: dict, show_all: bool = False) -> list[dict]:
     """Rows `render` lists apart as h1, h2...: fastest-growing first, those in the form's topics
     (skills, MCP servers) ahead of breakouts from anywhere, which keep a third of the shown rows."""
-    rows = sorted((c for c in scan["candidates"] if is_rising(c) and not c.get("card")
+    rows = sorted((c for c in scan["candidates"] if is_rising(c) and not c.get("card") and not excluded(c)
                    and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c)))),
                   key=lambda c: -momentum(c))
     form = [c for c in rows if RISE_TOPIC_SET & set(c.get("topics") or [])]
@@ -602,10 +631,16 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     if scan.get("dropped") or stale:
         out.append(f"maintenance: {scan.get('dropped', 0)} dropped (no push in {DROP} months), "
                    f"{len(stale)} hidden (no push in {HIDE} months; --all shows them)")
-    lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c)]
+    lures = [c for c in scan["candidates"] if is_lure(c)]
+    farmed = [c for c in scan["candidates"] if is_farmed(c) and not is_lure(c)]
+    if lures or farmed:
+        out.append(f"excluded: {len(lures)} look like lures (game cheats, cracks; do not download), "
+                   f"{len(farmed)} have install counts far beyond their stars (--all shows them)")
+    lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c) and not excluded(c)]
     if lists:
         out.append("lists (scan --expand <list>): " + ", ".join(f"{c['repo']} ({human(c['stars'])})" for c in lists[:8]))
-    hidden = len([c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_stale(c)]) - len(rows)
+    hidden = len([c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_stale(c)
+                  and not excluded(c) and not is_rising(c)]) - len(rows)
     out.append("  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics"
                + (f"  ({hidden} already decided, hidden; --all shows them)" if hidden > 0 and not show_all else ""))
     out += [row(i, c) for i, c in enumerate(rows[:top], 1)]

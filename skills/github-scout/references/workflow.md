@@ -1,5 +1,7 @@
 # Workflow, with a worked example
 
+Sections 1 to 5 follow the stages: plan (1), search (2, 3), triage and dig (4), brief (5).
+
 The example is a real case. An operations project needed to read and post on Reddit, X and
 Xiaohongshu through a logged-in browser, with no model in the loop. Agents searched for
 "social media automation" and "自媒体 运营", found old bots and tutorials, and started writing
@@ -15,7 +17,7 @@ someone else's problem.
 A strong question asks for a result, says where we stand, and what is not good enough:
 
 ```
-reuse-first ask ops/browser-ops "Drive our logged-in accounts on Reddit, X and Xiaohongshu from scripts, no model clicking pages" --stage prototype
+github-scout ask ops/browser-ops "Drive our logged-in accounts on Reddit, X and Xiaohongshu from scripts, no model clicking pages" --stage prototype
 ```
 
 Then, in the file: what we have (`tools/reddit/chrome.ts` drives Chrome through a model; one run
@@ -88,9 +90,9 @@ projects hosted elsewhere. Do one pass outside GitHub search:
 | the user | links they shared or bookmarked |
 
 ```bash
-reuse-first scan ops/browser-ops --add notes.txt --note "web: site:github.com xiaohongshu cli"
-pbpaste | reuse-first scan ops/browser-ops --add - --note "X: xiaohongshu github"
-reuse-first scan ops/browser-ops --expand someone/awesome-browser-agents
+github-scout scan ops/browser-ops --add notes.txt --note "web: site:github.com xiaohongshu cli"
+pbpaste | github-scout scan ops/browser-ops --add - --note "X: xiaohongshu github"
+github-scout scan ops/browser-ops --expand someone/awesome-browser-agents
 ```
 
 ## 4. Looking, reading, trying
@@ -119,7 +121,9 @@ Write it in the question file. A good one, for a project at `prototype`:
 >
 > **Against what we have.** | model-driven page reading, 580k tokens a run | one JSON request per subreddit | ... | take |
 
-That tells the next agent what to run, what not to rebuild, and where the gap is.
+That tells the next agent what to run, what not to rebuild, and where the gap is. Then
+`github-scout brief ops/browser-ops` packs it, with each source's licence and reviewed commit,
+into a file for the coding agent. The project itself is not changed.
 
 ## 6. Upkeep
 

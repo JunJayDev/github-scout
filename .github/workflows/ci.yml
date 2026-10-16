@@ -26,11 +26,13 @@ jobs:
       - name: Install and run the CLI
         run: |
           python -m pip install .
-          reuse-first --version
-          reuse-first init _registry --name ci
-          reuse-first --store _registry check
+          github-scout --version
+          github-scout init _registry --name ci
+          github-scout --store _registry check
       - name: Run from a copied skill folder
-        run: python skills/reuse-first/scripts/reuse-first.py --help
+        run: python skills/github-scout/scripts/github-scout.py --help
+      - name: Cloud bundle is up to date
+        run: python tools/build-cloud.py --check
 
   lint:
     runs-on: ubuntu-latest

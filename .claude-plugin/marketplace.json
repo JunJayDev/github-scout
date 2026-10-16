@@ -1,14 +1,12 @@
 {
-  "name": "reuse-first",
-  "description": "reuse-first: find and vet existing open-source repos before building",
-  "owner": {
-    "name": "reuse-first contributors"
-  },
+  "name": "github-scout",
+  "description": "github-scout: find, read and register open-source projects before building",
+  "owner": {"name": "github-scout contributors"},
   "plugins": [
     {
-      "name": "reuse-first",
+      "name": "github-scout",
       "source": "./",
-      "description": "Before building, find what open source already solved, take the ideas that fit, record verdicts."
+      "description": "Find what GitHub already solved for a goal in your project, and hand concrete suggestions to your coding agent."
     }
   ]
 }
