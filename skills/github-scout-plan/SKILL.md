@@ -40,8 +40,9 @@ which project?" and wait.
 
    Write every entity and mechanism in English and in Chinese, as each community writes it, not
    translated: `xiaohongshu|小红书|xhs|红书`, `humanizer|去AI味|活人感|人味`. Chinese projects
-   supplied half of the useful repositories in real runs. Single-word names written the same
-   way everywhere (`remotion`, `CDP`) need nothing more.
+   supplied half of the useful repositories in real runs. Add another language when the user's
+   audience needs it, for example Japanese for a product sold in Japan (`ask --langs en,zh,ja`).
+   Single-word names written the same way everywhere (`remotion`, `CDP`) need nothing more.
 
    Problem phrases ("social media automation") find the least: good projects describe
    themselves by what they touch and how they work. Keep two or three short ones, one per language.
@@ -68,8 +69,8 @@ change them, unless they said not to stop.
 ## Without the command line (cloud chat)
 
 Write section 1 of the report (`../github-scout/references/report-format.md`): the goal as a
-result, where we stand, the stage, and the directions in a table (direction, entities en/zh,
-mechanisms en/zh, forms). Then go straight to the search, unless the user asked to confirm the
+result, where we stand, the stage, and the directions in a table: direction, entities and
+mechanisms in each language, and forms. Then go straight to the search, unless the user asked to confirm the
 directions first.
 
 ## Next

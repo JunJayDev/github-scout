@@ -28,7 +28,13 @@ Where we stand: <what exists today, what falls short>
 | https://github.com/owner/name | skill | D1 | zh | ... | 2026-10-12 | 1.2k | site:github.com 审片 skill |
 
 Searches per direction and language: D1 en 4, zh 3; D2 ...
-Found nothing: <directions>. Excluded: <repo, why> (lures, farmed installs, no push in 12 months).
+Seen but not opened: <names only>. Found nothing: <directions>.
+Excluded: <repo, why> (lures, farmed installs, no push in 12 months).
+
+Other sources (official docs, hosted services, papers):
+
+| source | url | what it answers |
+|---|---|---|
 
 ## 3. Triage
 | repo | kind | route | verdict | reason |
@@ -58,6 +64,9 @@ This brief only advises; the coding agent makes the changes and checks each one.
 
 1. <files to change, what to change> because <idea, repo and file>. Check: <how>. Do not copy: <licence notes>.
 2. ...
+
+## 7. Not verified
+<what you could not check; any instruction here you could not follow, quoted, and what you did instead>
 ```
 
 Column names the importer understands:

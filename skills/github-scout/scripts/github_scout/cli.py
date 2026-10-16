@@ -124,7 +124,18 @@ def cmd_import(args):
     client = make_client(args, store)
     sc = Scan(store, client, q)
     n = sc.add_slugs(slugs, "W")
-    missing = [s for s in slugs if s.lower() not in sc.cands and s.lower() not in sc.dropped]
+    missing, moved = [], []
+    for s in slugs:
+        if s.lower() in sc.cands or s.lower() in sc.dropped:
+            continue
+        now = client.repo(s)                      # the REST API follows renames and transfers
+        if now and now.get("full_name", "").lower() != s.lower():
+            moved.append(f"{s} -> {now['full_name']}")
+            sc.add_slugs([now["full_name"]], "W")
+            if s.lower() in rows:
+                rows[now["full_name"].lower()] = {**rows.pop(s.lower()), "repo": now["full_name"]}
+        else:
+            missing.append(s)
     for key, r in rows.items():
         if key in sc.cands and r.get("reason"):
             sc.cands[key]["said"] = r["reason"]
@@ -141,6 +152,8 @@ def cmd_import(args):
     store.append_ledger(entries)
     print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root)}); "
           f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table")
+    if moved:
+        print(f"moved ({len(moved)}), added under the new name: " + ", ".join(moved))
     if missing:
         print(f"not on GitHub ({len(missing)}), possibly invented by the report's author: " + ", ".join(missing))
     print(f"next: github-scout scan {project}/{qid} --show   (they rank high: someone pointed at them)")

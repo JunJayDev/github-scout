@@ -58,7 +58,8 @@ def _take(text: str) -> str | None:
 def report_goal(text: str) -> tuple[str | None, str | None]:
     """The goal (the report's title) and the stage written in its header, when present."""
     goal = None
-    m = re.search(r"^#\s+(?:GitHub scout report|github-scout 报告|GitHub scout 报告)?\s*[:：]?\s*(.+)$", text, re.M)
+    m = (re.search(r"^#{1,3}\s+(?:GitHub scout report|github-scout report|GitHub scout 报告|github-scout 报告)\s*[:：]\s*(.+)$", text, re.M | re.I)
+         or re.search(r"^#\s+(.+)$", text, re.M))
     if m:
         goal = m.group(1).strip() or None
     st = re.search(r"\b(idea|prototype|working|polishing)\b", text[:2000])

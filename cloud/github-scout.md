@@ -12,6 +12,8 @@ skip the commands.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
 - Open every repository page you list. Never invent a repository, a star count or a date.
+- Skip the commands (`github-scout ...`, `scripts/report-problem.sh`); there is no registry here.
+  Write anything in these instructions you could not follow into the report's last section.
 
 Generated from the skills in this repository by tools/build-cloud.py; edit the skills, not this file.
 
@@ -62,9 +64,11 @@ Each stage is its own skill and can run alone. This skill runs them in order.
 
 - Never change the user's project. The deliverable is the brief; the coding agent does the work.
 - List only repositories whose page you opened. Never invent names, stars or dates.
-- Search every direction in English and in Chinese, with the words each community uses.
-- Maintenance decides more than stars: no push in 3 months ranks far down, 6 months is set
-  aside, 12 months is dropped. New and moving beats old and famous.
+- Search every direction in English and in Chinese, with the words each community uses, and in
+  any other language the user's audience needs.
+- Maintenance decides more than stars: no push in 3 months ranks far down; 6 months is set
+  aside unless nothing maintained covers the need; 12 months is dropped. New and moving beats
+  old and famous.
 - Leave out lures (game cheats, cracks, "Ultimate Trainer 2026") and install counts far beyond a
   repo's stars. Never download them.
 - A repo with a non-commercial licence or none: take the idea, not the code.
@@ -141,8 +145,9 @@ which project?" and wait.
 
    Write every entity and mechanism in English and in Chinese, as each community writes it, not
    translated: `xiaohongshu|小红书|xhs|红书`, `humanizer|去AI味|活人感|人味`. Chinese projects
-   supplied half of the useful repositories in real runs. Single-word names written the same
-   way everywhere (`remotion`, `CDP`) need nothing more.
+   supplied half of the useful repositories in real runs. Add another language when the user's
+   audience needs it, for example Japanese for a product sold in Japan (`ask --langs en,zh,ja`).
+   Single-word names written the same way everywhere (`remotion`, `CDP`) need nothing more.
 
    Problem phrases ("social media automation") find the least: good projects describe
    themselves by what they touch and how they work. Keep two or three short ones, one per language.
@@ -169,8 +174,8 @@ change them, unless they said not to stop.
 ### Without the command line (cloud chat)
 
 Write section 1 of the report (`report-format.md`): the goal as a
-result, where we stand, the stage, and the directions in a table (direction, entities en/zh,
-mechanisms en/zh, forms). Then go straight to the search, unless the user asked to confirm the
+result, where we stand, the stage, and the directions in a table: direction, entities and
+mechanisms in each language, and forms. Then go straight to the search, unless the user asked to confirm the
 directions first.
 
 ### Next
@@ -192,7 +197,9 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
 
 ### Rules
 
-- **Maintenance:** no push in 3 months ranks far down, 6 months is set aside, 12 months is dropped.
+- **Maintenance:** no push in 3 months ranks far down; 6 months is set aside unless nothing
+  maintained covers the need; 12 months is dropped. For model repositories, the date of the
+  latest weights or release counts too.
 - **Exclude lures:** game cheats, cracks, key generators, "Ultimate Trainer 2026" and the like.
   They are bait, often malware. Never download them.
 - **Exclude farmed installs:** a skill directory count far beyond the repo's stars (for example
@@ -224,20 +231,47 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
 
 ### Without the command line (cloud chat)
 
-For every direction, in English and in Chinese:
+A chat has room for about 60 searches and page fetches. Spread them over the directions and
+languages, and keep 10 to 30 candidates whose pages you opened.
 
-1. Search the web: `site:github.com <entity> <mechanism>`, `site:github.com <entity> skill OR cli OR mcp`.
-2. Open GitHub topic pages sorted by recent updates: `https://github.com/topics/<topic>?o=desc&s=updated`.
-3. For skills, search `https://skills.sh`; distrust install counts far beyond the stars.
-4. Look for recent posts and articles that link GitHub projects for this need.
+For every direction, in each language from the plan (English and Chinese always, others when the
+user's audience needs them):
 
-Open each candidate's page, apply the rules above, and write section 2 of the report: one row per
-repo, with these columns:
+1. **GitHub's own search**, when you can fetch it (JSON, no login, about 10 searches a minute):
+   `https://api.github.com/search/repositories?q=<terms>+pushed:>YYYY-MM-DD&sort=stars&per_page=30`,
+   with the date six months back. Vary the terms as the command line does:
+   - one entity;
+   - two entities with `in:readme`;
+   - a quoted mechanism;
+   - `topic:<topic>`;
+   - `created:>YYYY-MM-DD` for the last year.
+2. **Web search**, when the API is out of reach and for what it cannot see:
+   - `site:github.com <entity> <mechanism>`;
+   - the same without `site:` when results drift to package indexes;
+   - `<中文词> github 开源`;
+   - `site:juejin.cn OR site:zhihu.com <中文词> github`.
+3. **Skills:** `https://skills.sh/api/search?q=<term>` returns JSON with install counts (the web
+   page needs JavaScript). Distrust installs far beyond the repo's stars.
+4. **New and growing fast, without words:**
+   `https://api.github.com/search/repositories?q=topic:agent-skills+created:>YYYY-MM-DD&sort=stars`,
+   or the topic that fits the form you need.
+
+For each candidate you keep:
+- Fetch `https://api.github.com/repos/<owner>/<repo>` for `stargazers_count`, `pushed_at`,
+  `license` and `archived`.
+- If that fails, read the newest date on `https://github.com/<owner>/<repo>/commits`. Write
+  "unknown" rather than guess.
+- A page summary that does not mention something is no proof the repo lacks it. When it matters,
+  read the raw README: `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md`.
+- Official documentation and hosted services often answer part of the goal. Keep them as "other
+  sources", with their URLs.
+
+Write section 2 of the report: one row per repo, with these columns:
 
 - repo URL
 - kind
 - direction
-- language of the project (en or zh)
+- language of the project (en, zh, ja, ...)
 - why it may help
 - last commit
 - stars
@@ -245,13 +279,16 @@ repo, with these columns:
 
 Under the table, write:
 
-- how many searches each direction got in each language;
+- how many searches each direction got in each language (count each search once, under its main
+  direction; page fetches are not counted);
+- repos you saw but did not open: names only, no numbers;
 - which directions found nothing;
 - what you excluded and why.
 
 ### Output
 
-A ranked list of candidates, about 30 to 100 worth a glance.
+Locally, a ranked table with 30 to 100 rows worth a glance. In a chat, 10 to 30 candidates you
+opened, plus other sources.
 
 ### Next
 
@@ -273,7 +310,7 @@ The candidates from `github-scout-search`.
 ### Tag each candidate
 
 - **Kind:** skill or prompt pack · cli · mcp server · library · app · framework · example or
-  template · awesome list · article or paper.
+  template · awesome list · article or paper · official docs or hosted service.
 - **Relevance:** answers a direction directly · adjacent · not useful.
 - **Route:** how stage 4 will read it.
 
@@ -284,6 +321,7 @@ The candidates from `github-scout-search`.
 | example, template | read only the files that show the technique |
 | awesome list | expand it into candidates (`scan --expand`); never adopt a list |
 | article, paper | take the idea and its evidence |
+| official docs, hosted service | read the pages that answer a direction; note limits, cost and lock-in; list as another source |
 | non-commercial licence, or none | idea only; never copy the code |
 
 Pick 5 to 12 for the shortlist. Prefer repos that answer a direction directly, are young and
@@ -362,9 +400,14 @@ The take for each repo:
 
 ### Without the command line (cloud chat)
 
-Open the files on GitHub (`https://github.com/<owner>/<repo>/blob/<branch>/<path>`). If your
-sandbox can reach GitHub, `git clone --depth 1` is faster. Write section 4 of the report, one
-block per repo:
+- **The file list:** `https://api.github.com/repos/<owner>/<repo>/git/trees/HEAD?recursive=1`.
+- **One file, exactly as written:**
+  `https://raw.githubusercontent.com/<owner>/<repo>/HEAD/<path>`. A page fetch may return a
+  summary instead of the file. If your sandbox can reach GitHub, `git clone --depth 1` is faster.
+- **Citing:** cite the paths you read. Mark claims you saw only in a README as self-reported.
+- **Takes:** without reading the code, the take is at most `learn` or `later`.
+
+Write section 4 of the report, one block per repo, and one block per other source you relied on:
 - idea;
 - where (file paths);
 - why not obvious;
@@ -453,35 +496,41 @@ Write in the user's language. Keep the section titles and the column names. The 
 both the English names and the Chinese names given here.
 
 ```markdown
-## GitHub scout report: <the goal as a result>
+# GitHub scout report: <the goal as a result>
 
 - Project: <name, or "none"> · Stage: idea | prototype | working | polishing · Date: <YYYY-MM-DD>
 - Made by: <model and tool>
 
-### 1. Directions
+## 1. Directions
 Where we stand: <what exists today, what falls short>
 
 | direction | entities (en / zh) | mechanisms (en / zh) | forms |
 |---|---|---|---|
 | D1 <sub-problem> | remotion / 宣传片, 产品视频 | video understanding / 视频理解, 审片 | skill, cli |
 
-### 2. Candidates
+## 2. Candidates
 | repo | kind | direction | lang | why it may help | last commit | stars | found by |
 |---|---|---|---|---|---|---|---|
 | https://github.com/owner/name | skill | D1 | zh | ... | 2026-10-12 | 1.2k | site:github.com 审片 skill |
 
 Searches per direction and language: D1 en 4, zh 3; D2 ...
-Found nothing: <directions>. Excluded: <repo, why> (lures, farmed installs, no push in 12 months).
+Seen but not opened: <names only>. Found nothing: <directions>.
+Excluded: <repo, why> (lures, farmed installs, no push in 12 months).
 
-### 3. Triage
+Other sources (official docs, hosted services, papers):
+
+| source | url | what it answers |
+|---|---|---|
+
+## 3. Triage
 | repo | kind | route | verdict | reason |
 |---|---|---|---|---|
 | https://github.com/owner/name | skill | read SKILL.md and scripts in full | shortlist | ... |
 
 The rest: <one line on why they were left>.
 
-### 4. Findings
-#### owner/name
+## 4. Findings
+### owner/name
 - Idea: <the design decision that makes it work>
 - Where: <file paths>
 - Why it is not obvious: ...
@@ -490,17 +539,20 @@ The rest: <one line on why they were left>.
 - Risks: <licence, maintenance, network, credentials>
 - Take: use | adapt | learn | later | skip
 
-### 5. Answer
+## 5. Answer
 <one paragraph: what to take from whom; the part nobody covers>
 
 | ours | theirs | the difference | take it or not |
 |---|---|---|---|
 
-### 6. Brief for the coding agent
+## 6. Brief for the coding agent
 This brief only advises; the coding agent makes the changes and checks each one.
 
 1. <files to change, what to change> because <idea, repo and file>. Check: <how>. Do not copy: <licence notes>.
 2. ...
+
+## 7. Not verified
+<what you could not check; any instruction here you could not follow, quoted, and what you did instead>
 ```
 
 Column names the importer understands:
@@ -528,8 +580,9 @@ our own work stands (the question's stage). Every verdict goes into the ledger o
 ### What makes a repository worth taking from
 
 - **It is alive.** Created recently and pushed recently beats old and famous. No push for over
-  3 months is a warning, over 6 months is ignored unless nothing newer exists, over 12 months is
-  out (the scan drops it).
+  3 months ranks far down; over 6 months is set aside unless nothing maintained covers the need;
+  over 12 months is out (the scan drops it). For model repositories, the date of the latest
+  weights or release counts too.
 - **It carries an idea we did not have.** The most valuable take is often `learn`: a framing, a
   workflow, a trick, a parameter. Name it, find where it lives in the code, and say why it is not
   obvious. Code we can write ourselves; ideas we did not think of we never write.

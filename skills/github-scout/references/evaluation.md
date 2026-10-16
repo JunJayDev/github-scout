@@ -8,8 +8,9 @@ our own work stands (the question's stage). Every verdict goes into the ledger o
 ## What makes a repository worth taking from
 
 - **It is alive.** Created recently and pushed recently beats old and famous. No push for over
-  3 months is a warning, over 6 months is ignored unless nothing newer exists, over 12 months is
-  out (the scan drops it).
+  3 months ranks far down; over 6 months is set aside unless nothing maintained covers the need;
+  over 12 months is out (the scan drops it). For model repositories, the date of the latest
+  weights or release counts too.
 - **It carries an idea we did not have.** The most valuable take is often `learn`: a framing, a
   workflow, a trick, a parameter. Name it, find where it lives in the code, and say why it is not
   obvious. Code we can write ourselves; ideas we did not think of we never write.

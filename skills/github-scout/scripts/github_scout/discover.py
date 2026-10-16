@@ -620,8 +620,9 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     rows = visible(scan, show_all)
     shown = rows[:top]
     langs = search_langs([s for s in scan["searches"] if s.get("hits") is not None])   # those that ran
-    out.append("languages: " + (", ".join(f"{k} {v}" for k, v in langs.items()) or "none") + " searches with words; "
-               f"{sum(1 for c in shown if HAN.search(c.get('desc') or ''))} of {len(shown)} rows shown have a Chinese description")
+    zh_rows = f"{sum(1 for c in shown if HAN.search(c.get('desc') or ''))} of {len(shown)} rows shown have a Chinese description"
+    out.append("languages: " + (", ".join(f"{k} {v}" for k, v in langs.items()) + " searches with words; " if langs else "")
+               + zh_rows)
     if errors:
         out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]) + (" ..." if len(errors) > 3 else ""))
     carded = [c for c in scan["candidates"] if c.get("card")]

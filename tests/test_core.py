@@ -424,6 +424,18 @@ class FlowTests(Base):
         e = [x for x in self.store.ledger() if x["repo"] == "xpzouying/xiaohongshu-mcp"][-1]
         self.assertEqual((e["verdict"], e["reason"]), ("short", "ChatGPT Pro: learn: 登录态复用"))
 
+    def test_import_follows_renamed_repos(self):
+        self.seed()
+        self.api.add(repo("qwen/voice", 2400, "Multi-lingual voice generation", pushed=ago(1)))
+        self.api.paths["repos/oldorg/voice"] = repo("qwen/voice", 2400, "Multi-lingual voice generation", pushed=ago(1))
+        report = Path(self.tmp.name) / "r.md"
+        report.write_text("| repo | verdict |\n|---|---|\n| https://github.com/oldorg/voice | learn |\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        self.assertIn("moved (1), added under the new name: oldorg/voice -> qwen/voice", out)
+        self.assertNotIn("possibly invented", out)
+        self.assertIn(("qwen/voice", "short"), {(e["repo"], e["verdict"]) for e in self.store.ledger()})
+
     def test_import_creates_the_question_from_the_report(self):
         self.seed()
         report = Path(self.tmp.name) / "cloud.md"

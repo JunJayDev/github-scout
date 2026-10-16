@@ -38,6 +38,8 @@ skip the commands.
 - Write everything into one report file in the format given near the end, in the user's language,
   and offer it for download.
 - Open every repository page you list. Never invent a repository, a star count or a date.
+- Skip the commands (`github-scout ...`, `scripts/report-problem.sh`); there is no registry here.
+  Write anything in these instructions you could not follow into the report's last section.
 
 Generated from the skills in this repository by tools/build-cloud.py; edit the skills, not this file.
 """
@@ -47,7 +49,12 @@ def body(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)   # drop frontmatter
     text = text.replace("../github-scout/references/", "").replace("references/", "")
-    return re.sub(r"^#", "##", text.strip(), flags=re.M)        # nest every heading one level down
+    out, fenced = [], False
+    for line in text.strip().splitlines():                       # nest headings one level down,
+        if line.startswith("```"):                               # but never inside code blocks:
+            fenced = not fenced                                  # the report template must stay as written
+        out.append("#" + line if line.startswith("#") and not fenced else line)
+    return "\n".join(out)
 
 
 def build() -> str:

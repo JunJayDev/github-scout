@@ -16,7 +16,7 @@ The candidates from `github-scout-search`.
 ## Tag each candidate
 
 - **Kind:** skill or prompt pack · cli · mcp server · library · app · framework · example or
-  template · awesome list · article or paper.
+  template · awesome list · article or paper · official docs or hosted service.
 - **Relevance:** answers a direction directly · adjacent · not useful.
 - **Route:** how stage 4 will read it.
 
@@ -27,6 +27,7 @@ The candidates from `github-scout-search`.
 | example, template | read only the files that show the technique |
 | awesome list | expand it into candidates (`scan --expand`); never adopt a list |
 | article, paper | take the idea and its evidence |
+| official docs, hosted service | read the pages that answer a direction; note limits, cost and lock-in; list as another source |
 | non-commercial licence, or none | idea only; never copy the code |
 
 Pick 5 to 12 for the shortlist. Prefer repos that answer a direction directly, are young and
