@@ -8,6 +8,8 @@ verdict, reason) ride along as notes.
 `brief`: an answered question becomes a hand-off for the agent that will change the code. It
 copies the answer's own sections and adds the facts from the cards (take, reviewed commit),
 so the coding agent gets what to change, why, and from where, without reading the registry.
+It ends with one `github-scout adopt` line per picked repo, for the coding agent to fill in as it
+adopts (stage 6), so the registry learns which repo went where. The brief itself changes nothing.
 """
 
 from __future__ import annotations
@@ -255,23 +257,43 @@ SECTIONS = {
 T = {
     "en": {
         "title": "Brief for the coding agent: {ask}", "from": "From github-scout question `{ref}` ({path}), {date}.",
-        "rule": "This brief only advises. Make the changes in the project yourself, check each one, and keep "
-                "what the user decided before.",
+        "rule": "This brief only advises; by itself it changes nothing. Adopt it with the github-scout-adopt skill: "
+                "make the changes in the project by the project's own rules, check each one, keep what the user "
+                "decided before, and record each repo you took from (last section).",
         "goal": "## Goal and where we stand", "code": "Project code: {code}", "nocode": "No local project was given; "
                 "map each step onto the code it would change before starting.",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
         "repos": "## Sources", "head": "| repo | take | reviewed at | what we take |",
         "empty": "(the answer has no such section yet)", "noanswer": "{ref} has no answer yet: write its answer section first",
+        "adopt": "## Adopt and record",
+        "adopt_how": "Use the github-scout-adopt skill. For each repo pick a mode: `depend` (package manager, pinned "
+                     "version), `vendor` (copy files at the reviewed commit, with a provenance line), `port` (rewrite "
+                     "the idea in our code, naming the upstream file at the top), `skill` (install an agent skill as "
+                     "is), `tool` (call their CLI or app as is, pinned), `data` (datasets, fonts, prompts, assets, with "
+                     "provenance). Once a repo's change is committed and checked, fill in its line below and run it; "
+                     "`--from` names the upstream files we took, so `github-scout updates` can watch them. For a repo "
+                     "you did not take, run `github-scout note` with the reason instead.",
+        "mode": "<mode>", "into": "<our paths>", "src": "<their files>", "repo": "<owner/repo>",
+        "nocard": "# no card yet: github-scout note {repo} --q {ref} first",
     },
     "zh": {
         "title": "给开发 agent 的简报：{ask}", "from": "来自 github-scout 问题 `{ref}`（{path}），{date}。",
-        "rule": "这份简报只给建议，改动由你在项目里做，每一步做完要验证，用户以前定过的规矩照旧。",
+        "rule": "这份简报只给建议，本身不改任何东西。用 github-scout-adopt skill 落地：按项目自己的规矩在项目里改，"
+                "每一步做完要验证，用户以前定过的规矩照旧，最后一节记下从哪些仓库拿了东西。",
         "goal": "## 目标和现状", "code": "项目代码：{code}", "nocode": "没有给本地项目；动手前先把每一步对应到要改的代码。",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",
         "repos": "## 参考仓库", "head": "| 仓库 | 取舍 | 审查时的版本 | 我们拿什么 |",
         "empty": "（答案里还没有这一节）", "noanswer": "{ref} 还没有答案：先写问题文件里的答案",
+        "adopt": "## 落地和登记",
+        "adopt_how": "用 github-scout-adopt skill。每个仓库选一种方式：`depend`（用包管理器装，锁定版本）、`vendor`"
+                     "（按审查时的提交复制文件，注明出处）、`port`（用我们的代码重写思路，文件开头写明上游文件）、`skill`"
+                     "（原样安装 agent skill）、`tool`（原样调用它的命令行或应用，锁定版本）、`data`（数据集、字体、"
+                     "提示词、素材，注明出处）。一个仓库的改动提交并验证之后，填好下面它那一行再运行；`--from` 写我们拿了"
+                     "上游的哪些文件，`github-scout updates` 才能盯住它们。没采用的仓库改用 `github-scout note` 记下原因。",
+        "mode": "<方式>", "into": "<我们的路径>", "src": "<他们的文件>", "repo": "<owner/repo>",
+        "nocard": "# 还没有卡片：先运行 github-scout note {repo} --q {ref}",
     },
 }
 
@@ -296,19 +318,35 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
     if parts["compare"]:
         lines += [t["compare"], "", parts["compare"], ""]
     picked = [str(x) for x in as_list(q.get("picked"))]
+    cards = {slug: store.card(slug) for slug in picked}
+
+    def use_of(card) -> dict:
+        return next((u for u in as_list(card.data.get("uses")) if isinstance(u, dict) and u.get("question") == q["id"]), {})
+
     if picked:
         lines += [t["repos"], "", t["head"], "|---|---|---|---|"]
         for slug in picked:
-            card = store.card(slug)
+            card = cards[slug]
             if not card:
                 lines.append(f"| [{slug}](https://github.com/{slug}) | - | - | - |")
                 continue
             d = card.data
-            use = next((u for u in as_list(d.get("uses")) if isinstance(u, dict) and u.get("question") == q["id"]), {})
+            use = use_of(card)
             note = str(use.get("note") or d.get("summary") or "").replace("|", "/").replace("\n", " ")[:220]
             lines.append(f"| [{card.id}](https://github.com/{card.id}) | {use.get('take', '-')} | "
                          f"{d.get('commit', '-')} | {note} |")
         lines.append("")
+    # Stage 6 happens in the project: one line per picked repo for the coding agent to fill in and run.
+    ref = f"{q['project']}/{q['id']}"
+    lines += [t["adopt"], "", t["adopt_how"], "", "```bash"]
+    for slug in picked or [""]:
+        card = cards.get(slug)
+        where = str(use_of(card).get("where") or "") if card else ""
+        into = where if re.fullmatch(r"[\w./@+,-]+", where) else t["into"]       # where it lands, when it is a path
+        line = (f"github-scout adopt {(card.id if card else '') or slug or t['repo']} --q {ref} --mode {t['mode']} "
+                f"--into {into} --from {t['src']}")
+        lines.append(line + (f"   {t['nocard'].format(repo=slug, ref=ref)}" if slug and not card else ""))
+    lines += ["```", ""]
     path = out or store.root / "projects" / q["project"] / "briefs" / f"{q['id']}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

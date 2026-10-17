@@ -182,7 +182,8 @@ def cmd_import(args):
 
 def cmd_brief(args):
     path = brief(_store(args), args.ref, Path(args.out).expanduser() if args.out else None)
-    print(f"{path}\nhand this file to the coding agent; nothing in the project was changed")
+    print(f"{path}\nhand this file to the coding agent, which adopts it with the github-scout-adopt skill; "
+          "nothing in the project was changed")
 
 
 def cmd_init(args):

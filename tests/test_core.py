@@ -269,6 +269,18 @@ class ChineseStoreTests(Base):
         self.assertIn("阶段：working（已经能用：借技巧", body)
         self.assertIn("### 值得借的思路", body)
 
+    def test_chinese_brief_ends_with_the_adopt_section(self):
+        doc = self.store.question("ops/browser-ops")
+        doc.body = doc.body.replace("### 一段话结论\n", "### 一段话结论\n读用 OpenCLI。\n")
+        doc.data["picked"] = ["z/no-card"]
+        self.store.save_question(doc)
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
+        self.assertIn("本身不改任何东西。用 github-scout-adopt skill 落地", text)
+        self.assertIn("\n## 落地和登记\n", text)
+        self.assertIn("github-scout adopt z/no-card --q ops/browser-ops --mode <方式> --into <我们的路径> --from <他们的文件>", text)
+
 
 class FlowTests(Base):
     def seed(self):
@@ -752,6 +764,22 @@ class AdoptTests(Base):
         _, out, _ = self.run_cli("updates", "--diff", self.slug)            # the card watches nothing; we took read.js
         self.assertIn("--- clis/reddit/read.js (modified, +1 -1)", out)
         self.assertNotIn("README.md (", out)
+
+    def test_brief_ends_with_one_adopt_line_per_picked_repo(self):
+        doc = self.store.question("ops/browser-ops")
+        doc.body = doc.body.replace("### In one paragraph\n", "### In one paragraph\nUse OpenCLI for reads.\n")
+        doc.data["picked"] = [self.slug, "z/no-card"]
+        self.store.save_question(doc)
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
+        self.assertIn("by itself it changes nothing. Adopt it with the github-scout-adopt skill", text)
+        tail = text.split("\n## Adopt and record\n", 1)[1]
+        self.assertNotIn("\n## ", tail)                                      # the closing section
+        self.assertEqual([ln for ln in tail.splitlines() if ln.startswith("github-scout adopt ")], [
+            "github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode <mode> --into tools --from <their files>",
+            "github-scout adopt z/no-card --q ops/browser-ops --mode <mode> --into <our paths> --from <their files>   "
+            "# no card yet: github-scout note z/no-card --q ops/browser-ops first"])
 
     def test_check_accepts_cards_with_and_without_adoptions(self):
         self.assertEqual(self.store.check()[0], [])                          # a card from before stage 6
