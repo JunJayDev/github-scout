@@ -490,7 +490,7 @@ class FlowTests(Base):
         q = self.store.question("ops/videos").data
         self.assertEqual(q["entities"], ["remotion", "宣传片", "剪映", "产品视频"])   # directions take turns
         self.assertEqual(q["mechanisms"], ["video understanding", "审片", "视频理解"])
-        self.assertEqual(q["forms"], ["skill", "cli", "mcp"])
+        self.assertEqual(q["forms"], ["skill", "mcp", "cli"])
         doc = self.store.question("ops/videos")                       # a local plan is never overwritten
         doc.data["entities"] = ["product video|宣传片"]
         self.store.save_question(doc)
