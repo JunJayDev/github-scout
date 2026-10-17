@@ -3,6 +3,8 @@ import datetime as dt
 import io
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 import unittest.mock
@@ -12,7 +14,7 @@ from fake import FakeAPI, client, repo, tarball
 
 from github_scout import cli, discover, examine, registry, yamlish
 from github_scout.github import github_slug
-from github_scout.store import Store, StoreError, card_filename
+from github_scout.store import PROJECT_ORDER, Store, StoreError, card_filename, today, write_doc
 
 QUESTION = {
     "entities": ["reddit", "xiaohongshu|小红书|rednote", "twitter|x.com"],
@@ -24,6 +26,16 @@ QUESTION = {
 
 def ago(months: float) -> str:
     return (dt.date.today() - dt.timedelta(days=int(months * 30.4))).isoformat() + "T00:00:00Z"
+
+
+@contextlib.contextmanager
+def cwd(path: Path):
+    old = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old)
 
 
 class YamlishTests(unittest.TestCase):
@@ -592,6 +604,122 @@ class FlowTests(Base):
         self.assertTrue((self.root / "cache" / "a__b@ddddddd" / "src/main.py").is_file())
         self.assertFalse((self.root / "cache" / "evil.txt").exists())
         self.assertIn("entry points: README.md, src/main.py", out)
+
+
+class AdoptTests(Base):
+    """Stage 6: what came into our project from which repo, and what upstream did to those files since."""
+
+    slug = "jackwener/OpenCLI"
+
+    def setUp(self):
+        super().setUp()
+        self.proj = Path(self.tmp.name) / "ops"
+        (self.proj / "tools").mkdir(parents=True)
+        (self.proj / "tools" / "read.ts").write_text("// port of jackwener/OpenCLI clis/reddit/read.js\n")
+        doc = self.store.project("ops")
+        write_doc(doc.path, {**doc.data, "code": str(self.proj)}, doc.body, PROJECT_ORDER)
+        registry.new_card(self.store, {"repo": self.slug, "desc": "x", "stars": 30000, "branch": "main",
+                                       "commit": "aaaaaaaaaaaa"}, "software", "cli",
+                          [{"project": "ops", "question": "browser-ops", "take": "use", "where": "tools"}], [], "read")
+
+    def adopt(self, *argv):
+        with cwd(self.proj):
+            return self.run_cli("adopt", self.slug, "--q", "ops/browser-ops", *argv)
+
+    def test_adopt_writes_the_card_and_the_ledger_and_replaces_on_repeat(self):
+        code, out, err = self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--from", "clis/reddit/read.js",
+                                    "--ours", "1234abc", "--note", "comment ids kept")
+        self.assertEqual(code, 0, err)
+        self.assertIn("next: github-scout updates jackwener/OpenCLI", out)
+        self.assertEqual(self.store.card(self.slug).data["adopted"], [
+            {"project": "ops", "question": "browser-ops", "mode": "vendor", "into": ["tools/read.ts"],
+             "from": ["clis/reddit/read.js"], "at": "aaaaaaaaaaaa", "ours": "1234abc", "date": today(),
+             "note": "comment ids kept"}])
+        e = self.store.ledger()[-1]
+        self.assertEqual((e["repo"], e["verdict"], e["project"], e["question"]), (self.slug, "card", "ops", "browser-ops"))
+        self.assertTrue(e["reason"].startswith("adopted: vendor: tools/read.ts <- clis/reddit/read.js @aaaaaaaaaaaa"), e)
+        self.adopt("--mode", "port", "--into", "tools/read.ts", "--ours", "1234abc")       # same paths: replaced
+        self.adopt("--mode", "tool", "--into", "tools/run.sh", "--ours", "1234abc")        # other paths: added
+        adopted = self.store.card(self.slug).data["adopted"]
+        self.assertEqual([(a["mode"], a["into"]) for a in adopted], [("port", ["tools/read.ts"]), ("tool", ["tools/run.sh"])])
+        self.assertNotIn("note", adopted[0])
+        self.assertEqual(len([x for x in self.store.ledger() if x.get("reason", "").startswith("adopted")]), 3)
+
+    def test_drop_marks_the_entry_and_keeps_it(self):
+        self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--from", "clis/reddit/read.js", "--ours", "1234abc")
+        code, out, err = self.adopt("--into", "tools/read.ts", "--drop", "--note", "our own parser now")
+        self.assertEqual(code, 0, err)
+        self.assertIn("updates no longer reports it", out)
+        [a] = self.store.card(self.slug).data["adopted"]
+        self.assertEqual((a["mode"], a["dropped"], a["note"]), ("vendor", today(), "our own parser now"))
+        self.assertTrue(self.store.ledger()[-1]["reason"].startswith("dropped adoption: vendor: tools/read.ts"))
+        code, _, err = self.adopt("--into", "tools/other.ts", "--drop")
+        self.assertEqual(code, 1)
+        self.assertIn("no adoption into tools/other.ts under ops/browser-ops (recorded: tools/read.ts)", err)
+        self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--ours", "1234abc")     # adopted again: live
+        self.assertNotIn("dropped", self.store.card(self.slug).data["adopted"][0])
+
+    def test_unknown_repo_question_or_mode_is_refused(self):
+        code, _, err = self.run_cli("adopt", "z/nothing", "--q", "ops/browser-ops", "--mode", "vendor", "--into", "x")
+        self.assertEqual(code, 1)
+        self.assertIn("z/nothing has no card. Look at it and note what we take first: github-scout look --q "
+                      "ops/browser-ops z/nothing, then github-scout note z/nothing", err)
+        for argv, needle in [(["--q", "ops/nope", "--mode", "vendor"], "no question ops/nope"),
+                             (["--q", "ops/browser-ops"], "--mode is required"),
+                             (["--q", "ops/browser-ops", "--mode", "vendor", "--from", "src/*.ts"], "not globs"),
+                             (["--q", "ops/browser-ops", "--mode", "vendor", "--at", "v1.8"], "--at takes their commit sha")]:
+            with cwd(self.proj):
+                code, _, err = self.run_cli("adopt", self.slug, "--into", "tools/read.ts", *argv)
+            self.assertEqual(code, 1, argv)
+            self.assertIn(needle, err)
+        self.assertNotIn("adopted", self.store.card(self.slug).data)
+        self.assertFalse([e for e in self.store.ledger() if "adopt" in e.get("reason", "")])
+
+    @unittest.skipUnless(shutil.which("git"), "needs git")
+    def test_paths_come_from_the_project_and_our_commit_from_git(self):
+        git = ["git", "-C", str(self.proj)]
+        subprocess.run(git + ["init", "-q"], check=True)
+        subprocess.run(git + ["add", "."], check=True)
+        subprocess.run(git + ["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit",
+                              "--no-verify", "-qm", "port reddit read"], check=True)
+        head = subprocess.run(git + ["rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        elsewhere = Path(self.tmp.name) / "elsewhere"
+        elsewhere.mkdir()
+        with cwd(elsewhere):                       # outside the project: read from its code path
+            code, out, err = self.run_cli("adopt", self.slug, "--q", "ops/browser-ops", "--mode", "port", "--into", "tools/read.ts")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("warn", out)
+        a = self.store.card(self.slug).data["adopted"][0]
+        self.assertEqual((a["into"], a["ours"]), (["tools/read.ts"], head))
+        with cwd(self.proj / "tools"):             # inside: read from here, stored from the repository's root
+            code, out, err = self.run_cli("adopt", self.slug, "--q", "ops/browser-ops", "--mode", "data",
+                                          "--into", "read.ts,../NOTICE")
+        self.assertEqual(code, 0, err)
+        self.assertIn("warn  NOTICE: not found", out)
+        self.assertEqual(self.store.card(self.slug).data["adopted"][1]["into"], ["tools/read.ts", "NOTICE"])
+
+    def test_show_lists_adoptions(self):
+        self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--from", "clis/reddit/read.js", "--ours", "1234abc")
+        _, out, _ = self.run_cli("show", self.slug)
+        self.assertIn("adopted:\n  ops/browser-ops vendor: tools/read.ts <- clis/reddit/read.js @aaaaaaaaaaaa, "
+                      f"ours 1234abc, {today()}", out)
+        lines = self.run_cli("show", "ops/browser-ops")[1].splitlines()
+        i = next(n for n, ln in enumerate(lines) if ln.startswith("picked:"))
+        self.assertEqual(lines[i + 1], "adopted: jackwener/OpenCLI (vendor tools/read.ts)")
+
+    def test_check_accepts_cards_with_and_without_adoptions(self):
+        self.assertEqual(self.store.check()[0], [])                          # a card from before stage 6
+        self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--from", "clis/reddit/read.js", "--ours", "1234abc")
+        self.adopt("--into", "tools/read.ts", "--drop")
+        self.assertEqual(self.store.check()[0], [])
+        card = self.store.card(self.slug)
+        card.data["adopted"][0].update(mode="borrow", at="v1.8", dropped="soon")
+        card.data["adopted"].append({"project": "ops", "question": "browser-ops", "mode": "data", "into": "tools/x.json"})
+        self.store.save_card(card)
+        errors = "\n".join(self.store.check()[0])
+        for needle in ("adopted mode must be one of depend, vendor, port, skill, tool, data", "adopted at must be a hex sha",
+                       "adopted dropped must be YYYY-MM-DD", "adopted into must be a list of our paths"):
+            self.assertIn(needle, errors)
 
 
 class DogfoodFixTests(Base):

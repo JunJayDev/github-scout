@@ -17,20 +17,21 @@ from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated,
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
 from .registry import (
-    find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
-    write_index,
+    adoption_text, find, new_card, new_project, new_question, put_idea, render_find, set_adoption, set_use, show_card,
+    show_question, stage_help, write_index,
 )
 from .store import (
-    KINDS, LEVELS, STAGES, TAKES, Store, StoreError, env, lang_gaps, locate, parse_langs, question_langs, read_config,
-    today,
+    KINDS, LEVELS, MODES, SHA, STAGES, TAKES, Store, StoreError, env, lang_gaps, locate, parse_langs, question_langs,
+    read_config, today,
 )
 
-EPILOG = """stages (one skill each; github-scout runs them all):
+EPILOG = """stages (one skill each; github-scout runs 1 to 5, which never change the project):
   plan    find, ask, scan --plan       the goal, where we stand, search directions
   search  scan, scan --add/--expand     every lens, merged and ranked; lures and farmed installs left out
   triage  pick, look                    register and tag each repo, decide how to read it
   dig     look --source, note --idea    read the code, take the ideas
   brief   write the answer, brief       a hand-off for the coding agent; the project is not changed
+  adopt   adopt                         the coding agent brings it into the project; updates then watches it
   also: import (a report from a cloud chat), updates, show, site, check
 
 store: --store DIR, else $GITHUB_SCOUT_STORE, else the config file, else the nearest
@@ -449,6 +450,92 @@ def cmd_note(args):
           "then write the answer in the question file and run github-scout check")
 
 
+def _paths(text: str | None) -> list[str]:
+    return [p.strip() for p in (text or "").split(",") if p.strip()]
+
+
+def _code_dir(store: Store, project: str) -> Path | None:
+    """The project's code directory from its profile, when that is a local folder."""
+    doc = store.project(project)
+    code = str((doc.data.get("code") if doc else None) or "")
+    path = Path(code).expanduser() if code and "://" not in code else None
+    return path.resolve() if path and path.is_dir() else None
+
+
+def _head(repo: Path) -> str:
+    """The short sha of HEAD in a git repository; empty without git or without commits."""
+    import subprocess
+
+    try:
+        r = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                           timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def cmd_adopt(args):
+    store = _store(args)
+    project, qid = store.split_ref(args.q)
+    ref = f"{project}/{qid}"
+    store.question(ref)                                       # refuses a question that does not exist
+    card = store.card(args.repo)
+    if card and card.error:
+        raise StoreError(f"{card.path}: {card.error}")
+    if not card:
+        slug = github_slug(args.repo) or args.repo
+        raise StoreError(f"{slug} has no card. Look at it and note what we take first: github-scout look --q {ref} {slug}, "
+                         f"then github-scout note {slug} --q {ref} --take use|adapt|learn --note \"...\"")
+    if not args.drop and not args.mode:
+        raise StoreError(f"--mode is required: {', '.join(MODES)}")
+    into = _paths(args.into)
+    if not into:
+        raise StoreError("--into takes our paths, comma-separated")
+    src = [(p[2:] if p.startswith("./") else p).strip("/") for p in _paths(args.from_)]
+    if any(ch in p for p in src for ch in "*?["):
+        raise StoreError("--from takes their files or folders, not globs: GitHub's history is asked for one path at a time")
+    # Relative paths are read from here inside the project, else from the project's code path; they are
+    # stored from the root of the git repository that holds them (a worktree counts as its own root).
+    root = _code_dir(store, project)
+    cwd = Path.cwd().resolve()
+    base = cwd if root is None or cwd == root or root in cwd.parents else root
+    full = [(Path(p).expanduser() if Path(p).expanduser().is_absolute() else base / p).resolve() for p in into]
+    repo = _git_root(full[0])
+    top = repo or root or base
+    rel = []
+    for p in full:
+        try:
+            rel.append(p.relative_to(top).as_posix())
+        except ValueError:
+            raise StoreError(f"{p} is outside the project ({top})") from None
+    if args.drop:
+        entry = {"project": project, "question": qid, "into": rel, "note": args.note}
+    else:
+        for p, r in zip(full, rel):
+            if not p.exists():
+                print(f"warn  {r}: not found in {top} (relative paths are read from {base})")
+        at = (args.at or str(card.data.get("commit") or "")).lower()
+        if not SHA.match(at):
+            raise StoreError(f"--at takes their commit sha, 7-40 hex characters (the card's commit is "
+                             f"{card.data.get('commit')!r})")
+        ours = (args.ours or (_head(repo) if repo else "")).lower()
+        if ours and not SHA.match(ours):
+            raise StoreError("--ours takes our commit sha, 7-40 hex characters")
+        entry = {"project": project, "question": qid, "mode": args.mode, "into": rel, "from": src, "at": at,
+                 "ours": ours, "date": today(), "note": args.note}
+    a = set_adoption(store, card.id, entry, args.drop)
+    verb = "dropped adoption" if args.drop else "adopted"
+    store.append_ledger([_entry(args, card.id, project, qid, "card", str(card.data.get("level") or "read"),
+                                f"{verb}: {adoption_text(a, short=True)}"[:300])])
+    print(f"{card.path}: {card.id} {verb} under {ref}: {adoption_text(a, short=True)}")
+    if args.drop:
+        print("kept on the card as history; updates no longer reports it")
+    elif a.get("from"):
+        print(f"next: github-scout updates {card.id}   (reports the upstream commits that touch {', '.join(a['from'])})")
+    else:
+        print(f"next: github-scout updates {card.id}   (the whole repo only; --from <their files> narrows it to what we took)")
+
+
 def cmd_show(args):
     store = _store(args)
     ref = args.ref
@@ -608,6 +695,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("brief", cmd_brief, "turn an answered question into a hand-off for the coding agent (changes nothing)")
     p.add_argument("ref", metavar="P/Q")
     p.add_argument("--out", help="output file (default <store>/projects/<p>/briefs/<q>.md)")
+
+    p = add("adopt", cmd_adopt, "record a repo brought into a project (stage 6): how, into which of our paths, from "
+            "which of theirs, at which commits; updates then watches those files")
+    p.add_argument("repo", help="owner/repo or an alias; it needs a card")
+    p.add_argument("--q", required=True, metavar="P/Q", help="the question whose brief it came from")
+    p.add_argument("--mode", choices=MODES, help="depend: a package at a pinned version · vendor: files copied at a "
+                   "pinned commit · port: the idea rewritten in our code · skill: an agent skill as is · tool: their "
+                   "CLI or app called as is · data: datasets, fonts, prompts, assets")
+    p.add_argument("--into", required=True, metavar="PATHS", help="our paths, comma-separated: read from the current "
+                   "directory inside the project, else from its code path; stored relative to the root of the git repository "
+                   "holding them")
+    p.add_argument("--from", dest="from_", metavar="PATHS", help="their files or folders we took, comma-separated, no "
+                   "globs; updates reports the upstream commits that touch them")
+    p.add_argument("--at", metavar="SHA", help="their commit we took it at (default: the card's reviewed commit)")
+    p.add_argument("--ours", metavar="SHA", help="our commit that brought it in (default: HEAD of the git repository "
+                   "holding the first --into path)")
+    p.add_argument("--note", help="one line: the pinned version, what we changed, why")
+    p.add_argument("--drop", action="store_true", help="mark the adoption with these --q and --into dropped; it stays "
+                   "on the card as history")
 
     p = add("site", cmd_site, "write a static page to browse the registry (site/index.html)")
     p.add_argument("--out", help="output file (default <store>/site/index.html)")

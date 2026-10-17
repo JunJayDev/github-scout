@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .registry import STAGE_HELP, T
-from .store import KINDS, SHA, SLUG, TAKES, Doc, Store, as_list, card_takes, strongest
+from .store import KINDS, SHA, SLUG, TAKES, Doc, Store, adoptions, as_list, card_takes, strongest
 
 # ---------------------------------------------------------------------------
 # Markdown: the subset agents write. Blocks are parsed into tuples first so unfilled template
@@ -474,6 +474,11 @@ def _uses(doc: Doc) -> list[dict]:
             for u in as_list(doc.data.get("uses")) if isinstance(u, dict)]
 
 
+def _adopted(doc: Doc) -> list[dict]:
+    return [{**{k: _s(a.get(k)) for k in ("project", "question", "mode")}, "into": [_s(p) for p in as_list(a.get("into"))]}
+            for a in adoptions(doc.data)]
+
+
 def _card(c: Doc, link, day: _dt.date, root: Path) -> dict:
     d = c.data
     blocks = prune(_untitled(parse(c.body)))
@@ -490,7 +495,7 @@ def _card(c: Doc, link, day: _dt.date, root: Path) -> dict:
         "pushed": _s(d.get("pushed")), "age": age, "stale": age is not None and age >= 3,
         "reviewed": _s(d.get("reviewed")), "level": _s(d.get("level")),
         "commit": _s(d.get("commit")) if SHA.match(_s(d.get("commit"))) else "", "branch": _s(d.get("branch")),
-        "uses": _uses(c), "take": strongest(card_takes(d)) or "",
+        "uses": _uses(c), "adopted": _adopted(c), "take": strongest(card_takes(d)) or "",
         "idea": idea if len(idea) <= 300 else idea[:299].rstrip() + "…",
         "body": render(blocks, link), "file": c.path.relative_to(root).as_posix(),
     }
@@ -593,8 +598,9 @@ UI = {
         "created": "created", "pushed": "pushed", "reviewed": "reviewed", "stale": "no push for {n} months",
         "level": "Review depth", "commit": "Reviewed commit", "file": "File",
         "uses": "Taken by", "github": "GitHub", "stars": "stars",
+        "adopted": "Adopted in", "adoptedIn": "adopted in {project} ({mode})",
         "labels": {
-            "stage": {}, "status": {}, "take": {}, "verdict": {},
+            "stage": {}, "status": {}, "take": {}, "verdict": {}, "mode": {},
             "kind": {}, "level": {"meta": "metadata only", "look": "looked", "read": "read the code", "trial": "tried it"},
         },
     },
@@ -613,6 +619,7 @@ UI = {
         "created": "创建", "pushed": "推送", "reviewed": "审阅", "stale": "{n} 个月没有推送",
         "level": "看到哪一步", "commit": "审阅的提交", "file": "文件",
         "uses": "用在哪", "github": "GitHub", "stars": "星",
+        "adopted": "引入到", "adoptedIn": "已引入 {project}（{mode}）",
         "labels": {
             "stage": {"idea": "想法", "prototype": "雏形", "working": "能用", "polishing": "打磨"},
             "status": {"open": "待答", "answered": "已答"},
@@ -620,6 +627,7 @@ UI = {
             "verdict": {"peeked": "瞄过", "short": "短名单", "list": "清单", "later": "观望", "skip": "跳过",
                         "card": "建卡"},
             "kind": {"skill": "技能", "software": "软件", "list": "清单", "other": "其他"},
+            "mode": {"depend": "依赖", "vendor": "复制", "port": "重写", "skill": "技能", "tool": "工具", "data": "数据"},
             "level": {"meta": "只看了元数据", "look": "看过", "read": "读过代码", "trial": "试用过"},
         },
     },
@@ -650,7 +658,7 @@ footer{color:var(--mut);font-size:12px;padding-bottom:24px}
 .muted{color:var(--mut)}.empty{color:var(--mut)}
 .badge{display:inline-block;font-size:12px;line-height:18px;padding:0 7px;border-radius:999px;background:var(--neu-bg);
 color:var(--mut);white-space:nowrap;font-weight:500;vertical-align:1px}
-.take-use,.status-answered{background:var(--ok-bg);color:var(--ok)}
+.take-use,.status-answered,.adopted{background:var(--ok-bg);color:var(--ok)}
 .take-adapt{background:var(--info-bg);color:var(--ac)}
 .take-learn{background:var(--warn-bg);color:var(--warn)}
 .take-skip,.verdict-skip{background:none;box-shadow:inset 0 0 0 1px var(--bd2)}
@@ -841,7 +849,8 @@ function repoRow(c) {
       web(c.url) ? h("a", {class: "gh", href: c.url, target: "_blank", rel: "noopener noreferrer"}, U.github) : null,
       c.stars != null ? h("span", {class: "stars", title: c.stars + " " + U.stars, html: STAR}, kilo(c.stars)) : null),
     h("div", {class: "tags"}, c.kind ? h("span", {class: "badge kind"}, lab("kind", c.kind) + (c.form ? " · " + c.form : "")) : null,
-      c.uses.map((u) => h("span", {class: "use"}, qname(u.project, u.question), " ", badge("take", u.take)))),
+      c.uses.map((u) => h("span", {class: "use"}, qname(u.project, u.question), " ", badge("take", u.take))),
+      c.adopted.map((a) => h("span", {class: "badge adopted"}, fmt(U.adoptedIn, {project: a.project, mode: lab("mode", a.mode)})))),
     c.summary ? h("p", {class: "summary"}, c.summary) : null,
     c.idea ? h("p", {class: "idea"}, c.idea) : null,
     h("div", {class: "rmeta"}, sep([c.created ? U.created + " " + c.created : null, pushed,
@@ -850,6 +859,7 @@ function repoRow(c) {
   const row = {c, li, btn, body, open: false, filled: false,
     text: [c.id, c.summary, c.idea, c.kind, lab("kind", c.kind), c.form,
       ...c.uses.flatMap((u) => [u.project, u.question, u.take, lab("take", u.take), u.where, u.note]),
+      ...c.adopted.flatMap((a) => [a.project, a.mode, lab("mode", a.mode), ...a.into]),
       new DOMParser().parseFromString(c.body, "text/html").body.textContent].join(" ").toLowerCase()};
   btn.addEventListener("click", () => toggle(row, !row.open, true));
   return row;
@@ -865,6 +875,9 @@ function fill(row) {
       c.uses.length ? fact(U.uses, h("ul", {class: "uselist"}, c.uses.map((u) => h("li", null,
         questionLink(u.project, u.question), " ", badge("take", u.take), u.where ? h("span", {class: "muted"}, " · " + u.where) : null,
         u.note ? h("div", {class: "note"}, u.note) : null)))) : null,
+      c.adopted.length ? fact(U.adopted, h("ul", {class: "uselist"}, c.adopted.map((a) => h("li", null,
+        questionLink(a.project, a.question), " ", h("span", {class: "badge adopted"}, lab("mode", a.mode)),
+        h("span", {class: "muted"}, " · " + a.into.join(", ")))))) : null,
       fact(U.file, h("code", null, c.file))),
     h("div", {class: "md", html: c.body}));
   row.filled = true;

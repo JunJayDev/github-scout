@@ -6,8 +6,8 @@ import re
 from pathlib import Path
 
 from .store import (
-    DEFAULT_LANGS, KINDS, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, as_list, card_takes,
-    strongest, today, write_doc,
+    DEFAULT_LANGS, KINDS, MODES, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, adoptions, as_list,
+    card_takes, strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -228,6 +228,48 @@ def set_use(store: Store, slug: str, use: dict, level: str | None = None) -> Doc
     return card
 
 
+def set_adoption(store: Store, slug: str, entry: dict, drop: bool = False) -> dict:
+    """Record on the card that a repo came into one of our projects (stage 6). The same project, question and
+    paths replace the earlier entry; with drop, that entry is marked dropped instead, so its history stays."""
+    card = store.card(slug)
+    if not card or card.error:
+        raise StoreError(f"{slug}: no card")
+    if not drop and entry.get("mode") not in MODES:
+        raise StoreError(f"mode must be one of {', '.join(MODES)}")
+
+    def key(a: dict) -> tuple:
+        return a.get("project"), a.get("question") or None, sorted(map(str, as_list(a.get("into"))))
+
+    items = [a for a in as_list(card.data.get("adopted")) if isinstance(a, dict)]
+    i = next((n for n, a in enumerate(items) if key(a) == key(entry)), None)
+    if drop:
+        if i is None:
+            same = [", ".join(map(str, as_list(a.get("into")))) for a in items if key(a)[:2] == key(entry)[:2]]
+            raise StoreError(f"{card.id} has no adoption into {', '.join(entry['into'])} under "
+                             f"{entry['project']}/{entry['question']}" + (f" (recorded: {'; '.join(same)})" if same else ""))
+        items[i]["dropped"] = today()
+        if entry.get("note"):
+            items[i]["note"] = entry["note"]
+    elif i is None:
+        items.append({k: v for k, v in entry.items() if v})
+        i = len(items) - 1
+    else:
+        items[i] = {k: v for k, v in entry.items() if v}
+    card.data["adopted"] = items
+    store.save_card(card)
+    return items[i]
+
+
+def adoption_text(a: dict, short: bool = False) -> str:
+    """One adoption as a line: where, how, from what, at which commits; short leaves out the question and date."""
+    into = ", ".join(map(str, as_list(a.get("into"))))
+    src = ", ".join(map(str, as_list(a.get("from"))))
+    return ("" if short else f"{a.get('project')}/{a.get('question') or '-'} ") + f"{a.get('mode')}: {into}" \
+        + (f" <- {src}" if src else "") + (f" @{str(a['at'])[:12]}" if a.get("at") else "") \
+        + (f", ours {a['ours']}" if a.get("ours") else "") + (f", {a['date']}" if a.get("date") and not short else "") \
+        + (f" (dropped {a['dropped']})" if a.get("dropped") else "") + (f": {a['note']}" if a.get("note") else "")
+
+
 def put_idea(store: Store, slug: str, idea: str) -> None:
     """Write the idea into the card's first section, replacing the template hint if it is still there."""
     card = store.card(slug)
@@ -368,10 +410,16 @@ def show_question(store: Store, ref: str) -> str:
            f"stage: {stage_help(store, str(d.get('stage')))}",
            f"file: {doc.path}",
            f"picked: {', '.join(map(str, as_list(d.get('picked')))) or '-'} · scanned {d.get('scanned') or 'never'}"
-           f" · scans {len(cov['scans'])}",
-           "vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("langs", "entities", "mechanisms", "forms", "problems", "topics")
-                                       if as_list(d.get(k))),
-           "looked at: " + (", ".join(f"{k} {v}" for k, v in sorted(cov["verdicts"].items())) or "nothing yet")]
+           f" · scans {len(cov['scans'])}"]
+    adopted = [(c.id, a) for c in store.cards() if not c.error for a in adoptions(c.data, d["project"], dropped=True)
+               if a.get("question") == d["id"]]
+    if adopted:
+        out.append("adopted: " + ", ".join(f"{slug} ({a.get('mode')} {', '.join(map(str, as_list(a.get('into'))))}"
+                                           + (f"; dropped {a['dropped']}" if a.get("dropped") else "") + ")"
+                                           for slug, a in adopted))
+    out += ["vocabulary: " + " · ".join(f"{k}={as_list(d.get(k))}" for k in ("langs", "entities", "mechanisms", "forms", "problems", "topics")
+                                        if as_list(d.get(k))),
+            "looked at: " + (", ".join(f"{k} {v}" for k, v in sorted(cov["verdicts"].items())) or "nothing yet")]
     if cov["open"]:
         out.append("waiting for a decision: " + ", ".join(f"{e['repo']} ({e['verdict']})" for e in cov["open"]))
     if cov["cards"]:
@@ -388,6 +436,10 @@ def show_card(store: Store, ref: str) -> str:
     out = []
     if card:
         out += [f"card: {card.path}", card.path.read_text(encoding="utf-8").strip()]
+        adopted = adoptions(card.data, dropped=True)
+        if adopted:
+            out.append("adopted:")
+            out += [f"  {adoption_text(a)}" for a in adopted]
         cached = store.cached(card.id)
         if cached:
             out.append("cached source: " + ", ".join(str(p) for p in cached))

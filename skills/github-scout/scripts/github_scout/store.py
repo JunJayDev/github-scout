@@ -51,6 +51,8 @@ STAGES = ["idea", "prototype", "working", "polishing"]
 QUESTION_STATUS = ["open", "answered"]
 VERDICTS = ["peeked", "short", "list", "later", "skip", "card"]
 LEVELS = ["meta", "look", "read", "trial"]
+# How a repository came into one of our projects (`adopt`, stage 6).
+MODES = ["depend", "vendor", "port", "skill", "tool", "data"]
 # Languages a question searches in. Terms are told apart by script, so Latin-script languages count as en.
 # Default en + zh: in real runs Chinese projects supplied half of the repos picked.
 LANGS = ["en", "zh", "ja", "ko"]
@@ -58,7 +60,7 @@ DEFAULT_LANGS = ["en", "zh"]
 
 CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars",  # license: old cards only, no longer written
               "created", "pushed", "branch", "commit",
-              "reviewed", "level", "watch", "aliases", "uses"]
+              "reviewed", "level", "watch", "aliases", "uses", "adopted"]
 QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "langs", "entities", "mechanisms", "forms", "problems",
                   "topics", "picked", "scanned"]
 PROJECT_ORDER = ["id", "name", "summary", "code", "stack", "constraints", "languages"]
@@ -102,6 +104,12 @@ def strongest(takes: list[str]) -> str | None:
 
 def card_takes(data: dict) -> list[str]:
     return [str(u.get("take")) for u in as_list(data.get("uses")) if isinstance(u, dict)]
+
+
+def adoptions(data: dict, project: str | None = None, dropped: bool = False) -> list[dict]:
+    """A card's `adopted` entries (what came into our projects), without the dropped ones unless asked."""
+    return [a for a in as_list(data.get("adopted")) if isinstance(a, dict)
+            and (dropped or not a.get("dropped")) and (project is None or a.get("project") == project)]
 
 
 def groups(items) -> list[list[str]]:
@@ -517,6 +525,32 @@ class Store:
                     warns.append(f"{r}: question {u['project']}/{u['question']} does not exist")
                 if u.get("take") in ("skip", "learn", "adapt") and not u.get("note"):
                     warns.append(f"{r}: {u.get('take')} without a note (say what, or why not)")
+            adopted = d.get("adopted")           # optional: cards from before stage 6 have none
+            if adopted is not None and not isinstance(adopted, list):
+                errors.append(f"{r}: adopted must be a list")
+                adopted = []
+            for a in as_list(adopted):
+                if not isinstance(a, dict):
+                    errors.append(f"{r}: each adopted item is a mapping (project, question, mode, into, from, at, ours, date)")
+                    continue
+                if a.get("mode") not in MODES:
+                    errors.append(f"{r}: adopted mode must be one of {', '.join(MODES)}")
+                if not a.get("project"):
+                    errors.append(f"{r}: adopted item without project")
+                elif a["project"] not in projects:
+                    warns.append(f"{r}: adopted into project {a['project']!r}, which has no profile")
+                elif a.get("question") and f"{a['project']}/{a['question']}" not in qids:
+                    warns.append(f"{r}: adopted under question {a['project']}/{a['question']}, which does not exist")
+                if not isinstance(a.get("into"), list) or not a["into"]:
+                    errors.append(f"{r}: adopted into must be a list of our paths")
+                if a.get("from") is not None and not isinstance(a.get("from"), list):
+                    errors.append(f"{r}: adopted from must be a list of upstream paths")
+                for key in ("at", "ours"):
+                    if a.get(key) and not SHA.match(str(a[key])):
+                        errors.append(f"{r}: adopted {key} must be a hex sha (7-40 chars)")
+                for key in ("date", "dropped"):
+                    if a.get(key) and not DATE.match(str(a[key])):
+                        errors.append(f"{r}: adopted {key} must be YYYY-MM-DD")
         for n, e in enumerate(self.ledger(), 1):
             if "_bad" in e:
                 errors.append(f"ledger.jsonl:{n}: not JSON")

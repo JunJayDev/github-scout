@@ -74,6 +74,10 @@ def build(tmp: str, lang: str) -> tuple[Path, str, dict]:
                              [{"project": "shop", "question": "mail", "take": "use", "note": "the mailer"}],
                              [], "read", summary=EVIL)
     card.body = CARD_BODY.format(idea="思路" if zh else "The idea", read="先读" if zh else "Read first")
+    card.data["adopted"] = [{"project": "shop", "question": "mail", "mode": "vendor", "into": ["src/mail/pool.py"],
+                             "from": ["src/send.py"], "at": "abcdef1234567", "date": "2026-10-02"},
+                            {"project": "shop", "question": "mail", "mode": "port", "into": ["src/old.py"],
+                             "dropped": "2026-10-03"}]
     store.save_card(card)
     registry.new_card(store, {"repo": "acme/fresh", "license": "MIT", "stars": 5, "pushed": ago(3), "commit": "1234567"},
                       "skill", None, [{"project": "shop", "question": "mail", "take": "skip", "note": "too small"}], [],
@@ -148,6 +152,19 @@ class SiteTests(unittest.TestCase):
             self.assertFalse(fresh["stale"])
             self.assertTrue(widget["idea"].startswith("Sends mail fast through <smtp> pools"))
             self.assertNotIn("<h3>widget</h3>", widget["body"])       # the title is the row itself
+
+    def test_cards_say_where_they_were_adopted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, text, data = build(tmp, "en")
+            widget, fresh = data["cards"]
+            self.assertEqual(widget["adopted"], [{"project": "shop", "question": "mail", "mode": "vendor",
+                                                  "into": ["src/mail/pool.py"]}])          # the dropped one is left out
+            self.assertEqual(fresh["adopted"], [])
+            self.assertEqual(data["ui"]["adoptedIn"], "adopted in {project} ({mode})")
+            self.assertIn("c.adopted.map(", site.JS)
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, data = build(tmp, "zh")
+            self.assertEqual((data["ui"]["adoptedIn"], data["ui"]["labels"]["mode"]["vendor"]), ("已引入 {project}（{mode}）", "复制"))
 
     def test_ui_follows_the_registry_language(self):
         with tempfile.TemporaryDirectory() as tmp:
