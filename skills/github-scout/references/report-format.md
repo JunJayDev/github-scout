@@ -6,7 +6,8 @@ download at the end. A local agent takes it over with
 `github-scout import <file> --q <project>/<question>`, which checks every GitHub link against
 GitHub and reads the tables below.
 
-Write in the user's language. Keep the section titles and the column names. The importer reads
+Write in the user's language. Keep the section numbers, titles and order, and the column names;
+add no other sections and no licence information anywhere. The importer reads
 both the English names and the Chinese names given here.
 
 ```markdown
@@ -27,9 +28,9 @@ Where we stand: <what exists today, what falls short>
 ### Access
 | check | answer |
 |---|---|
-| `site:github.com <term>` returns repositories | yes |
-| can open a page by its address | no |
-| GitHub connector: our project / a public repo / search across GitHub | yes / yes / no |
+| GitHub connector: search repos / search code / read a public repo / qualifiers (`topic:`, `created:>`) | yes / yes / yes / yes |
+| GitHub connector reads our project | no project given |
+| `site:github.com <term>` on web search returns repositories | partly |
 
 ### Search log
 | # | lens | direction | lang | query or URL | looked at | kept |

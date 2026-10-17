@@ -49,18 +49,16 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
 
 ## Without the command line (cloud chat)
 
-A chat has web search and, when the user connected it, a GitHub connector. It has no browser, so
-GitHub's API, its search page and its topic pages are out of reach. Run the lenses of `scan` as
-search queries instead. Most of the budget goes to finding: at least 40 searches before you read
-candidates one by one. Licences, usage rights and pricing are not part of the search.
+A chat has web search and, when the user connected it, a GitHub connector. It has no browser.
+Most of the budget goes to finding: at least 40 searches before you read candidates one by one.
 
 **1. Check your tools once** and write the answers in the report's access table:
 
-- Does `site:github.com <first term of D1>` return repositories?
-- Can you open a page by its address, for example the raw README of a repo from that search
-  (`https://raw.githubusercontent.com/<owner>/<repo>/HEAD/README.md`)?
-- Is a GitHub connector connected? If so: can it read the user's project; can it read a public
-  repo the user does not own; can it search repositories or code across GitHub?
+- Is a GitHub connector connected? Can it search repositories (in ChatGPT:
+  `github_search_repositories`), search code (`github_search`), and read a public repo the user
+  does not own (`github_fetch`, `github_fetch_file`)? Does it accept GitHub's qualifiers
+  (`topic:`, `created:>`, `user:`)? Try one query with a qualifier.
+- Does `site:github.com <first term of D1>` on web search return repositories?
 
 Use what works. Never write that a lens ran when it did not.
 
@@ -68,26 +66,35 @@ Use what works. Never write that a lens ran when it did not.
 the plan (English and Chinese always, others when the user's audience needs them); the other
 lenses run once or twice for the whole question, with its main terms. Queries of one to three
 terms, never a list of tool names you already know: such queries only return those tools, and
-a long query returns little at all.
+a long query returns little at all. Search the Chinese words too: Chinese projects are found by
+the words their authors use.
 
-| lens | queries |
+With a connector that searches GitHub, it is GitHub's own search: run the lenses as `scan` does.
+Dates: six months back for `pushed:>`, twelve for `created:>` in the recent lens, two months for
+the rising lens.
+
+| lens | connector query |
 |---|---|
-| words (E, P, M, C) | `site:github.com <entity>`; two entities; `"<mechanism>"`; a mechanism with an entity; the same without `site:`, ending in `github` |
-| recent (R) | the same with the year: `site:github.com <term> 2026` |
-| topics (T) | `site:github.com/topics <topic>`: a topic page lists many repos at once |
-| skill files (K) | `site:github.com "SKILL.md" <term>` |
-| rising (H) | `site:trendshift.io <term>`; `site:hellogithub.com <中文词>`; `new open source <field> github <month> <year>` |
+| words (E, P, M, C) | `<entity> pushed:>YYYY-MM-DD`; `"<a>" "<b>" in:readme`; `"<mechanism>"`; `"<mechanism>" "<entity>" in:readme` |
+| recent (R) | `<term> in:name,description,readme created:>YYYY-MM-DD` |
+| topics (T) | `topic:<topic>`, and `topic:<topic> created:>YYYY-MM-DD` |
+| rising (H) | `topic:claude-skills created:>YYYY-MM-DD stars:>20`, the same for `agent-skills`, `claude-code-skill`, `codex-skills`, `mcp-server`; sorted by stars |
+| skill files (K) | code search: `"<term>" filename:SKILL.md` |
+| same author (U) | `user:<owner>` for the owners of shortlisted repos |
+
+Web search covers what GitHub search does not: articles and posts that name repos, and the
+directories.
+
+| lens | web query |
+|---|---|
 | skills (S) | `site:skills.sh <term>` |
-| MCP servers (D) | `site:mcp.so <term>`; `site:glama.ai <term>` |
+| MCP servers (D) | `site:glama.ai <term>`; `site:mcp.so <term>` |
 | packages (N) | `site:npmjs.com <term>` |
-| lists (L) | `site:github.com awesome <field>`; `awesome <中文词>` |
-| communities (W) | `<中文词> github 开源`; `site:zhihu.com OR site:juejin.cn OR site:bilibili.com <中文词> github`; `site:news.ycombinator.com <term> github`; `site:reddit.com <term> github` |
+| lists (L) | `awesome <field> github`; `awesome <中文词>` |
+| communities (W) | `<中文词> github 开源`; `site:zhihu.com OR site:juejin.cn OR site:bilibili.com <中文词> github`; `<term> github site:reddit.com` |
+| words, without a connector | `site:github.com <terms>`; `site:github.com/topics <topic>` |
 
-If the GitHub connector can search repositories, use it for the word lenses first: that is
-GitHub's own search, and it finds repos a search engine has not indexed yet.
-
-Search the Chinese words too: Chinese projects are found by the words their authors use, on
-GitHub and in Chinese communities.
+Do not spend web searches on repos you already have: read them through the connector.
 
 **3. Follow what you find:**
 
@@ -115,7 +122,8 @@ import fills in stars and dates and drops repos with no push in 12 months.
 
 - **Access:** each tool check above and its answer.
 - **Search log:** one row per search or list you read: number, lens, direction, language, the
-  query word for word, how many results you looked at, and which repos you kept from it. This
+  query word for word, how many results you looked at, and which repos you kept from it. All
+  seven columns: without "kept", nobody can tell which search found what. This
   is how anyone can see what was searched, repeat it, and find the hole when a repo was missed.
 - **Candidates:** one row per repo: URL, kind, direction, language of the project, why it may
   help, last commit, stars, found by (the log number or the list). No verdict column: verdicts

@@ -30,6 +30,11 @@ You are running github-scout in a chat (ChatGPT, Claude on the web, or similar).
 command line here. In every stage below, follow the part titled "Without the command line" and
 skip the commands.
 
+- **No licences.** We look for ideas and reference projects. Do not research, mention or tabulate
+  licences, usage rights, stock-media terms, model-weight terms or prices: no licence column,
+  no licence notes, no licence or rights section. A report that has them has failed this rule.
+- **Keep the report's sections, numbers and order exactly as in the format near the end,**
+  starting with section 1, the directions table: the local agent runs its own searches on it.
 - The user's goal is in their message. If there is none, ask what they want to achieve in which
   project, and wait.
 - If their project is on GitHub and a GitHub connector is connected, or they attached it (a zip
