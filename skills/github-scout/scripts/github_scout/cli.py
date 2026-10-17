@@ -17,7 +17,7 @@ from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated,
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
 from .registry import (
-    adoption_text, find, new_card, new_project, new_question, put_idea, render_find, set_adoption, set_use, show_card,
+    add_watch, adoption_text, find, new_card, new_project, new_question, put_idea, render_find, set_adoption, set_use, show_card,
     show_question, stage_help, write_index,
 )
 from .store import (
@@ -428,7 +428,13 @@ def cmd_note(args):
     if card:
         set_use(store, card.id, use, args.level)
         if args.idea:
-            put_idea(store, card.id, args.idea)
+            put_idea(store, card.id, args.idea, f"{project}/{qid}")
+        if args.watch:
+            add_watch(store, card.id, args.watch)
+        if args.summary:
+            fresh = store.card(card.id)
+            fresh.data["summary"] = args.summary
+            store.save_card(fresh)
         store.append_ledger([_entry(args, card.id, project, qid, "card", args.level or "read", f"{args.take}: {args.note or ''}")])
         print(f"{card.path}: {project}/{qid} -> {args.take}")
         return
@@ -441,7 +447,7 @@ def cmd_note(args):
     meta = peek(client, slug, 0)
     kind = args.kind or meta["kind"]
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
-                   args.level or "read", args.summary)
+                   args.level or "read", args.summary, args.idea)
     if args.idea:
         put_idea(store, doc.id, args.idea)
     store.append_ledger([_entry(args, meta["repo"], project, qid, "card", args.level or "read",

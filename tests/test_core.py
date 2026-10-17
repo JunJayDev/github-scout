@@ -841,6 +841,31 @@ class DogfoodFixTests(Base):
         q = self.store.question("ops/browser-ops").data
         self.assertEqual((q["ask"], q["stage"]), ("A sharper question", "prototype"))
 
+    def test_note_from_a_second_question_keeps_the_first_idea_first_and_merges_watch(self):
+        slug = "a/b"
+        self.api.add(repo(slug, pushed=ago(1), desc="A tool"))
+        code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
+                                    "--idea", "First idea.", "--watch", "src/a.py")
+        self.assertEqual(code, 0, out)
+        registry.new_question(self.store, "ops/other", "Another question", "idea")
+        code, out, _ = self.run_cli("note", slug, "--q", "ops/other", "--take", "adapt", "--idea", "Second idea.",
+                                    "--watch", "src/b.py", "src/a.py", "--summary", "A sharper summary")
+        self.assertEqual(code, 0, out)
+        card = self.store.card(slug)
+        self.assertLess(card.body.index("First idea."), card.body.index("Second idea."))
+        self.assertIn("**ops/other:** Second idea.", card.body)
+        self.assertEqual(card.data["watch"], ["src/a.py", "src/b.py"])
+        self.assertEqual(card.data["summary"], "A sharper summary")
+
+    def test_a_repo_without_a_description_still_gets_a_summary(self):
+        slug = "c/d"
+        self.api.add(repo(slug, pushed=ago(1), desc=""))
+        code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
+                                    "--idea", "Writes letters in the order schools teach them. It also does more.")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.store.card(slug).data["summary"], "Writes letters in the order schools teach them.")
+        self.assertFalse([e for e in self.store.check()[0] if "summary" in e])
+
 
 BILINGUAL = {
     "entities": ["reddit|红迪", "xiaohongshu|小红书|xhs|红书", "bilibili|B站|哔哩哔哩", "zhihu|知乎", "douyin|抖音",

@@ -187,8 +187,18 @@ def stage_help(store: Store, stage: str) -> str:
     return STAGE_HELP[store.lang].get(stage, "")
 
 
+def first_sentence(text: str | None, limit: int = 160) -> str:
+    """The first sentence of a note or idea, for a card whose repo has no description on GitHub."""
+    t = " ".join(str(text or "").split())
+    for stop in (". ", "。", "; ", "；"):
+        if stop in t:
+            t = t[:t.index(stop) + (1 if stop.strip() in ".。" else 0)]
+            break
+    return t[:limit].rstrip()
+
+
 def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[dict], watch: list[str], level: str,
-             summary: str | None = None) -> Doc:
+             summary: str | None = None, idea: str | None = None) -> Doc:
     slug = meta["repo"]
     path = store.card_path(slug)
     if path.exists():
@@ -197,7 +207,8 @@ def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[d
         raise StoreError(f"kind must be one of {', '.join(KINDS)}")
     data = {
         "id": slug, "repo": f"https://github.com/{slug}", "kind": kind, "form": form,
-        "summary": summary or meta.get("desc") or "",
+        # a repo without a description on GitHub would leave the card without one (check refuses that)
+        "summary": summary or meta.get("desc") or first_sentence(idea) or f"{slug} (no description on GitHub)",
         "stars": meta.get("stars"), "created": meta.get("created") or None, "pushed": meta.get("pushed") or None,
         "branch": meta.get("branch"), "commit": meta.get("commit"), "reviewed": today(), "level": level,
         "watch": watch, "uses": uses,
@@ -270,8 +281,9 @@ def adoption_text(a: dict, short: bool = False) -> str:
         + (f" (dropped {a['dropped']})" if a.get("dropped") else "") + (f": {a['note']}" if a.get("note") else "")
 
 
-def put_idea(store: Store, slug: str, idea: str) -> None:
-    """Write the idea into the card's first section, replacing the template hint if it is still there."""
+def put_idea(store: Store, slug: str, idea: str, ref: str | None = None) -> None:
+    """Write the idea into the card's first section: in place of the template hint while it is still there, otherwise
+    at the end of that section, marked with the question it came from, so what other questions wrote stays first."""
     card = store.card(slug)
     lines = card.body.split("\n")
     first = next((i for i, ln in enumerate(lines) if ln.startswith("## ")), None)
@@ -283,10 +295,27 @@ def put_idea(store: Store, slug: str, idea: str) -> None:
             j += 1
         if j < len(lines) and lines[j].startswith(("(", "（")):
             lines[j] = idea
-        else:
+        elif j >= len(lines) or lines[j].startswith("## "):        # an empty first section: the idea goes first
             lines.insert(first + 1, idea)
+        else:
+            end = next((i for i in range(first + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+            while end > first + 1 and not lines[end - 1].strip():
+                end -= 1
+            lines[end:end] = ["", (f"**{ref}:** " if ref else "") + idea]
         card.body = "\n".join(lines)
     store.save_card(card)
+
+
+def add_watch(store: Store, slug: str, paths: list[str]) -> list[str]:
+    """Add upstream paths we depend on to an existing card's watch list (no duplicates)."""
+    card = store.card(slug)
+    watch = [str(w) for w in as_list(card.data.get("watch"))]
+    for p in paths:
+        if p not in watch:
+            watch.append(p)
+    card.data["watch"] = watch
+    store.save_card(card)
+    return watch
 
 
 def new_project(store: Store, pid: str, name: str, summary: str, code: str = "") -> Path:

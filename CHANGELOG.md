@@ -4,6 +4,11 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- `note` on a card that another question already wrote: the idea goes at the end of the first section,
+  marked with the question, instead of above what was there; `--watch` adds to the card's list and
+  `--summary` replaces its summary. A repo with no description on GitHub gets the first sentence of the
+  idea as its summary, so `check` does not stop on an empty one (found on the first real run of all six
+  stages, 2026-10-18).
 - Seven skills instead of one: `github-scout` runs the search; `github-scout-plan`, `-search`,
   `-triage`, `-dig` and `-brief` run alone, and `github-scout-adopt` carries a brief into the
   project. Every stage says what to do with the command line and without it, so the same skills
