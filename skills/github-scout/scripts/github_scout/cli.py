@@ -15,7 +15,7 @@ from .discover import (
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
-from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal
+from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
 from .registry import (
     find, new_card, new_project, new_question, put_idea, render_find, set_use, show_card, show_question, stage_help,
     write_index,
@@ -119,6 +119,9 @@ def cmd_import(args):
         print(f"question {project}/{qid} created from the report (stage {stage or 'idea'}: check it, and fill in where we stand)")
     doc = store.question(f"{project}/{qid}")
     words = parse_directions(text)
+    searches = parse_search_log(text)
+    if not (words["entities"] or words["mechanisms"]) and searches:
+        words["entities"] = words_from_log(searches)          # no directions table: the words it searched with
     if words["entities"] or words["mechanisms"]:
         fresh = {k: v for k, v in words.items() if v and not doc.data.get(k)}   # never overwrite a local plan
         if fresh:
@@ -148,7 +151,6 @@ def cmd_import(args):
         if key in sc.cands and r.get("reason"):
             sc.cands[key]["said"] = r["reason"]
     where = args.note or Path(args.file).name
-    searches = parse_search_log(text)
     for s in searches:                            # what the report says it searched, kept for the next scan
         sc.log.append({"lens": "W", "kind": "cloud " + (s["lens"] or "search")[:20],
                        "query": " · ".join(x for x in (s["direction"], s["lang"], s["query"]) if x)[:200],

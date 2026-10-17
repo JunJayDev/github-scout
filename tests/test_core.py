@@ -497,6 +497,20 @@ class FlowTests(Base):
         self.run_cli("import", str(report), "--q", "ops/videos")
         self.assertEqual(self.store.question("ops/videos").data["entities"], ["product video|宣传片"])
 
+    def test_import_without_directions_uses_the_logged_queries(self):
+        self.seed()
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("| # | lens | lang | query |\n|---|---|---|---|\n"
+                          "| 1 | connector search | en | Claude Code video |\n"
+                          "| 2 | web | en | site:github.com/heygen-com/hyperframes agent video HTML |\n"
+                          "| 3 | connector search | zh | 视频字幕 翻译 配音 开源 |\n"
+                          "| 4 | connector search | en | claude code video |\n\n"
+                          "https://github.com/xpzouying/xiaohongshu-mcp\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/v2")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.store.question("ops/v2").data["entities"],
+                         ["Claude Code video", "agent video HTML", "视频字幕 翻译 配音 开源"])
+
     def test_show_names_the_rows_the_report_missed(self):
         base = {"desc": "Video skill", "created": ago(1)[:10], "pushed": ago(0.1)[:10], "topics": [], "fit": 1, "score": 5,
                 "stars": 900}

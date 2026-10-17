@@ -159,6 +159,18 @@ def parse_directions(text: str, cap: int = 24) -> dict[str, list[str]]:
     return {k: v[:cap] for k, v in out.items()}
 
 
+def words_from_log(searches: list[dict], cap: int = 24) -> list[str]:
+    """Search phrases from a log, for a report that has no directions table: the words it used."""
+    out: list[str] = []
+    for s in searches:
+        q = re.sub(r"\b(site|pushed|created|stars|topic|in|language):\S*", " ", s["query"])
+        q = re.sub(r"https?://\S+|[\"'`]", " ", q)
+        q = re.sub(r"\s+", " ", q).strip()
+        if q and len(q.split()) <= 4 and q.lower() not in {x.lower() for x in out}:
+            out.append(q)
+    return out[:cap]
+
+
 def parse_search_log(text: str) -> list[dict]:
     """The searches a report says it ran: lens, direction, language, query, results looked at, repos kept."""
     out = []
