@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build cloud/github-scout.md: the six skills as one file for chats without a command line.
+"""Build cloud/github-scout.md: every skill but adopt, as one file for chats without a command line.
 
 The skills are the source; this file is generated from them, so the two never disagree.
 `--check` exits 1 when the committed file is out of date (CI runs it).
@@ -59,13 +59,54 @@ skip the commands.
 Generated from the skills in this repository by tools/build-cloud.py; edit the skills, not this file.
 """
 
+# Stage 6 (github-scout-adopt) changes the project, so only the project's own coding agent runs it,
+# never a chat. Blocks that name it (a paragraph, a list item, a table row) are left out of this
+# file; the brief stage says in one plain sentence who adopts.
+LOCAL_ONLY = re.compile(r"github-scout[- ]adopt|`adopt ")
+BLOCK_START = re.compile(r"#|\||\s*(?:[-*+]|\d+\.)\s")
+
+
+def drop_local_only(lines: list[str]) -> list[str]:
+    out: list[str] = []
+    block: list[str] = []
+    fenced = dropped = False
+
+    def flush():
+        nonlocal dropped
+        if block:
+            dropped = bool(LOCAL_ONLY.search("\n".join(block)))
+            if not dropped:
+                out.extend(block)
+            block.clear()
+
+    for line in lines:
+        if line.startswith("```") or fenced:
+            flush()
+            fenced ^= line.startswith("```")
+            out.append(line)
+            dropped = False
+        elif not line.strip():
+            flush()
+            if not (dropped and out and not out[-1].strip()):    # no double blank line where a block went
+                out.append(line)
+            dropped = False
+        elif BLOCK_START.match(line) or not block:
+            flush()
+            block.append(line)
+        else:
+            block.append(line)                                   # continues a paragraph or a list item
+    flush()
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
 
 def body(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)   # drop frontmatter
     text = text.replace("../github-scout/references/", "").replace("references/", "")
     out, fenced = [], False
-    for line in text.strip().splitlines():                       # nest headings one level down,
+    for line in drop_local_only(text.strip().splitlines()):     # nest headings one level down,
         if line.startswith("```"):                               # but never inside code blocks:
             fenced = not fenced                                  # the report template must stay as written
         out.append("#" + line if line.startswith("#") and not fenced else line)

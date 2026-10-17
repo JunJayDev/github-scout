@@ -12,8 +12,9 @@ SKILLS = sorted((ROOT / "skills").glob("*/SKILL.md"))
 
 class SkillFormatTests(unittest.TestCase):
     def test_every_skill_has_name_description_and_licence(self):
-        self.assertEqual([p.parent.name for p in SKILLS], ["github-scout", "github-scout-brief", "github-scout-dig",
-                                                          "github-scout-plan", "github-scout-search", "github-scout-triage"])
+        self.assertEqual([p.parent.name for p in SKILLS], ["github-scout", "github-scout-adopt", "github-scout-brief",
+                                                          "github-scout-dig", "github-scout-plan", "github-scout-search",
+                                                          "github-scout-triage"])
         for path in SKILLS:
             text = path.read_text(encoding="utf-8")
             m = re.match(r"---\n(.*?)\n---\n", text, re.S)
@@ -35,6 +36,21 @@ class SkillFormatTests(unittest.TestCase):
     def test_cloud_file_is_up_to_date(self):
         r = subprocess.run([sys.executable, str(ROOT / "tools" / "build-cloud.py"), "--check"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_cloud_file_leaves_adopting_to_the_local_agent(self):
+        text = (ROOT / "cloud" / "github-scout.md").read_text(encoding="utf-8")
+        self.assertNotIn("github-scout-adopt", text)                 # stage 6 changes the project: never a chat's
+        self.assertNotIn("github-scout adopt", text)
+        self.assertEqual(text.count("coding agent adopts the brief"), 1)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("build_cloud", ROOT / "tools" / "build-cloud.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        lines = ["Intro.", "", "Run `github-scout-adopt` later,", "in the project.", "", "| a |", "|---|", "| `adopt x` |",
+                 "| b |", "", "- keep", "- drop: github-scout adopt x", "  more", "- keep too", "", "```", "github-scout adopt x",
+                 "```", "", "End."]
+        self.assertEqual(build.drop_local_only(lines), ["Intro.", "", "| a |", "|---|", "| b |", "", "- keep", "- keep too", "",
+                                                        "```", "github-scout adopt x", "```", "", "End."])
 
     def test_evals_name_real_repositories(self):
         import json

@@ -50,6 +50,9 @@ github-scout brief <q>        # writes the hand-off from the answer and the card
 
 Give the user the brief's path, to hand to the coding agent. The project is not touched.
 
+The brief ends with one `github-scout adopt` line per picked repo, which the coding agent fills in
+as it brings the brief into the project (`github-scout-adopt`, stage 6).
+
 ## Without the command line (cloud chat)
 
 Write sections 5 and 6 of the report: the answer, then the brief for the coding agent. Offer the
@@ -58,5 +61,7 @@ whole report as one file to download. To take it over locally:
 ```bash
 github-scout import report.md --q <project>/<question>
 ```
+
+Back home, the project's own coding agent adopts the brief; a chat never changes the project.
 
 A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

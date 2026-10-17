@@ -44,15 +44,21 @@ It reads your project, proposes search directions, and **stops for you to confir
 it searches, picks, reads the code of the few that matter, and writes a brief for your coding
 agent. It does not change your project.
 
+When you want it in your code, tell your coding agent to adopt the brief. It works in your
+repository by your project's rules, one commit per repo, and records each one with
+`github-scout adopt`: which of your files came from which repo, at which commits. From then on
+`github-scout updates` tells you when upstream changes the files you took.
+
 **No local setup?** In ChatGPT or Claude on the web, upload
 [`cloud/github-scout.md`](cloud/github-scout.md) and write your goal (add a zip of your project
 if you can). It runs on web search alone, does not stop unless you ask, and ends with one report
 file. Back home, `github-scout import report.md --q <project>/<question>` takes it over and
 checks every link against GitHub.
 
-## Five stages
+## Six stages
 
-Each stage is a skill and runs on its own; `github-scout` runs them in order.
+Each stage is a skill and runs on its own. `github-scout` runs the first five in order; the sixth
+changes your project, so your coding agent runs it there, when you ask.
 
 | skill | does |
 |---|---|
@@ -61,6 +67,7 @@ Each stage is a skill and runs on its own; `github-scout` runs them in order.
 | `github-scout-triage` | registers and tags each repo, decides how to read it (a skill, a CLI and a list are read differently) |
 | `github-scout-dig` | reads the code, pulls out the ideas with file paths |
 | `github-scout-brief` | compares with your code, writes the answer and the hand-off for your coding agent |
+| `github-scout-adopt` | brings what the brief picked into your project, by its rules (depend, vendor, port, skill, tool, data), and records it with `github-scout adopt` |
 
 ## What it believes
 
@@ -76,6 +83,8 @@ Each stage is a skill and runs on its own; `github-scout` runs them in order.
   and they describe themselves in Chinese.
 - **Never read the same repo twice.** Every verdict goes into the registry with its reason; later
   searches start from it, and `updates` shows only what changed in the files you depend on.
+- **Know what came from where.** Each adoption records your files, their files and both commits,
+  so an upstream fix to code you copied reaches you instead of going unnoticed.
 
 ## The registry
 
@@ -84,7 +93,7 @@ A folder of Markdown and JSON, best kept in git:
 ```
 projects/<project>/questions/<q>.md      the goal, its stage, the directions, the answer
 projects/<project>/briefs/<q>.md         the hand-off for the coding agent
-repos/<owner>__<repo>.md                 one card per repo read closely: the idea first
+repos/<owner>__<repo>.md                 one card per repo read closely: the idea first, then where we adopted it
 ledger.jsonl                             every verdict, append-only
 scans/<project>/<q>/<stamp>.json         what each search ran and found
 ```
@@ -109,7 +118,8 @@ github-scout adds what comes before and after that decision:
 - the stage-based question;
 - the registry that remembers every verdict;
 - tracking the repos you depend on;
-- a brief your coding agent can act on.
+- a brief your coding agent can act on;
+- a record of what it adopted, so upstream changes to those files reach you.
 
 ## Contributing
 

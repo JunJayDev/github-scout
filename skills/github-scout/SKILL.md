@@ -11,6 +11,10 @@ user's project, searches GitHub in English and Chinese, reads the repositories t
 and writes a brief for the coding agent: which ideas to take from whom, where in our project
 they apply, and what is left to build ourselves. It never changes the project.
 
+Stage 6, `github-scout-adopt`, is where the brief reaches the code: when the user asks, the
+project's coding agent brings it in by the project's own rules, and the registry records which
+repo went where, so `updates` can say when upstream changes the files we took.
+
 The ideas count more than the code. A coding agent writes code at will, but it never writes
 an approach it did not think of.
 
@@ -23,9 +27,9 @@ Run it inside the project's repository when there is one: the agent then reads o
 see what we already have. Without a local project it still runs; the user then says in a few
 lines what exists today.
 
-## Five stages
+## Stages
 
-Each stage is its own skill and can run alone. This skill runs them in order.
+Each stage is its own skill and can run alone. This skill runs stages 1 to 5 in order.
 
 | stage | skill | does | output |
 |---|---|---|---|
@@ -34,6 +38,7 @@ Each stage is its own skill and can run alone. This skill runs them in order.
 | 3 triage | `github-scout-triage` | registers and tags each candidate; decides how each one is read | a shortlist with a route per repo |
 | 4 dig | `github-scout-dig` | reads inside the shortlisted repos | the ideas, with file paths |
 | 5 brief | `github-scout-brief` | compares with our project, writes the answer and the hand-off | a brief for the coding agent |
+| 6 adopt | `github-scout-adopt` | brings what the brief picked into our project, by its rules, and records it | the change in our project; an `adopted` entry on each card |
 
 ## Where it runs, and when to stop
 
@@ -44,10 +49,16 @@ Each stage is its own skill and can run alone. This skill runs them in order.
   command line" part and write one report file in the format of `references/report-format.md`.
   **Do not stop** between stages unless the user asked to confirm the directions. The local agent
   can take the report over with `github-scout import <report> --q <project>/<question>`.
+- **Stage 6, `github-scout-adopt`,** runs only when the user asks for the integration or hands
+  over the brief: inside the project's repository, by its coding agent. A search run never
+  includes it, and a cloud chat never runs it.
 
 ## Rules
 
 - Never change the user's project. The deliverable is the brief; the coding agent does the work.
+- That work is stage 6, `github-scout-adopt`: stages 1 to 5 never change the project; the coding
+  agent adopts in the project's own repository, by the project's rules, and records each repo it
+  took from.
 - List only repositories you have seen yourself: their page, the connector, or a search result
   that names them. Never invent names, stars or dates.
 - Search every direction in English and in Chinese, with the words each community uses, and in
@@ -86,6 +97,7 @@ skills sit next to this folder and use the same command.
 | `look --q P/Q a/b [--source]` | 3 / 4 | facts, activity and kind / download one commit and map the code |
 | `note a/b --q P/Q --take T --idea "…"` | 4 | the repo's card: the idea first, what we take |
 | `brief P/Q` | 5 | write the hand-off for the coding agent |
+| `adopt a/b --q P/Q --mode M --into PATHS` | 6 | record what came into the project from where; `updates` then watches it |
 | `import REPORT --q P/Q` | any | take over a report from a cloud chat; every link is checked |
 | `show`, `updates`, `site`, `check` | later | read a question or card; upstream changes; a web page; validate |
 

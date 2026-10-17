@@ -1,8 +1,8 @@
 # github-scout skill: setup
 
-`SKILL.md` is the procedure; the five stage skills (`github-scout-plan`, `-search`, `-triage`,
-`-dig`, `-brief`) sit next to this folder. This file covers setup. Project home and design
-notes are in the repository's top-level README.
+`SKILL.md` is the procedure; the six stage skills (`github-scout-plan`, `-search`, `-triage`,
+`-dig`, `-brief`, `-adopt`) sit next to this folder. This file covers setup. Project home and
+design notes are in the repository's top-level README.
 
 ## Requirements
 
@@ -55,7 +55,8 @@ Installed as a package (`pipx install <repo>`), the same CLI is `github-scout`.
 
 ## Maintenance
 
-- `updates` (with `--diff` and `--done`) keeps cards current. `check` validates the registry and
-  regenerates `INDEX.md`. `site` writes `site/index.html`.
+- `updates` (with `--diff` and `--done`) keeps cards current, adopted repos first: `adopt`
+  records which files came into a project, and `updates` reports the upstream commits on them.
+  `check` validates the registry and regenerates `INDEX.md`. `site` writes `site/index.html`.
 - Record a defect that stays unfixed with `scripts/report-problem.sh "<summary>" [observed] [tried]`.
   It writes to local state, never to the registry.

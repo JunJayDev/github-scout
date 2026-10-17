@@ -35,11 +35,13 @@ Claude Code 也能用插件装：先 `/plugin marketplace add <owner>/github-sco
 
 它先读你的项目，列出检索方向，**停下来等你确认**。确认后它去搜、去挑，读最要紧的几个项目的代码，最后写一份给开发 agent 的简报。它不改你的项目。
 
+想把它用进代码时，让你的开发 agent 落地这份简报。它在你的仓库里按项目自己的规矩改，一个仓库一个提交，再用 `github-scout adopt` 登记：你的哪些文件来自哪个仓库、对应哪两个提交。之后 `github-scout updates` 会告诉你，上游改了你拿来的哪些文件。
+
 **不想在本地装？** 在 ChatGPT 或 Claude 网页版里上传 [`cloud/github-scout.md`](cloud/github-scout.md)，写上你的目标，能附上项目的压缩包更好。它只靠网页搜索就能跑；除非你要求，中途不停；最后给你一个报告文件。回到本地，运行 `github-scout import 报告.md --q <项目>/<问题>` 就能接手，每个链接都会去 GitHub 核实。
 
-## 五个阶段
+## 六个阶段
 
-每个阶段是一个 skill，能单独用；`github-scout` 按顺序全跑。
+每个阶段是一个 skill，能单独用。`github-scout` 按顺序跑前五个；第六个要改你的项目，所以由你的开发 agent 在项目里跑，你说了才跑。
 
 | skill | 做什么 |
 |---|---|
@@ -48,6 +50,7 @@ Claude Code 也能用插件装：先 `/plugin marketplace add <owner>/github-sco
 | `github-scout-triage` | 给每个仓库登记、打标，定怎么读（skill、命令行工具、清单读法不同） |
 | `github-scout-dig` | 读代码，带着文件路径把思路挖出来 |
 | `github-scout-brief` | 和你的代码对照，写答案和给开发 agent 的简报 |
+| `github-scout-adopt` | 把简报选中的东西按项目的规矩落到你的项目里（depend、vendor、port、skill、tool、data），用 `github-scout adopt` 登记 |
 
 ## 核心理念
 
@@ -57,6 +60,7 @@ Claude Code 也能用插件装：先 `/plugin marketplace add <owner>/github-sco
 - **新的、常更新的，比星多的老项目值钱。** 3 个月没更新大幅降权，半年放一边，一年直接丢掉。游戏外挂、破解一类的引流仓库和刷出来的安装量，一律排除。
 - **中英文都搜。** 实测选中的仓库一半是中文项目，它们用中文介绍自己。
 - **看过的不再看第二遍。** 每个结论和理由都记进登记库，下次搜从这里开始；`updates` 只告诉你依赖的那几个文件变了什么。
+- **知道每样东西从哪来。** 每次落地都记下你的文件、上游的文件和两边的提交，上游修了你拷来的代码，你不会错过。
 
 ## 登记库
 
@@ -65,7 +69,7 @@ Claude Code 也能用插件装：先 `/plugin marketplace add <owner>/github-sco
 ```
 projects/<项目>/questions/<问题>.md      目标、阶段、检索方向、答案
 projects/<项目>/briefs/<问题>.md         给开发 agent 的简报
-repos/<owner>__<repo>.md                 每个细看过的仓库一张卡，思路在最前
+repos/<owner>__<repo>.md                 每个细看过的仓库一张卡，思路在最前，再记用到了哪里
 ledger.jsonl                             每个结论，只追加
 scans/<项目>/<问题>/<时间>.json          每次搜了什么、找到什么
 ```
@@ -85,7 +89,8 @@ scans/<项目>/<问题>/<时间>.json          每次搜了什么、找到什么
 - 按阶段提问；
 - 记住每个结论的登记库；
 - 跟踪你依赖的仓库；
-- 一份开发 agent 拿来就能做的简报。
+- 一份开发 agent 拿来就能做的简报；
+- 记下 agent 落地了什么，上游改了这些文件会告诉你。
 
 ## 参与
 

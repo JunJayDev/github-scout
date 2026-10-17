@@ -53,9 +53,9 @@ Run it inside the project's repository when there is one: the agent then reads o
 see what we already have. Without a local project it still runs; the user then says in a few
 lines what exists today.
 
-### Five stages
+### Stages
 
-Each stage is its own skill and can run alone. This skill runs them in order.
+Each stage is its own skill and can run alone. This skill runs stages 1 to 5 in order.
 
 | stage | skill | does | output |
 |---|---|---|---|
@@ -535,6 +535,8 @@ whole report as one file to download. To take it over locally:
 ```bash
 github-scout import report.md --q <project>/<question>
 ```
+
+Back home, the project's own coding agent adopts the brief; a chat never changes the project.
 
 A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 

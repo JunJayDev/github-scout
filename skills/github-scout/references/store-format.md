@@ -91,10 +91,25 @@ uses:
     take: use            # use | adapt | learn | later | skip
     where: tools/opencli
     note: "Reddit reads through its fetch adapters"
+adopted:                 # what came into our projects (github-scout adopt, stage 6)
+  - project: ops
+    question: browser-ops
+    mode: port           # depend | vendor | port | skill | tool | data
+    into: [tools/opencli/plugin/reddit-comments.ts]   # our paths, from the root of our git repository
+    from: [clis/reddit/read.js]                       # their files or folders; updates watches these
+    at: b9213a15d63d     # their commit we took it at
+    ours: 4f0c2e1        # our commit that brought it in
+    date: 2026-10-17
+    note: "comment ids kept"
 ```
 
 The body starts with the idea (the design decision that makes the repo worth knowing), then
 quality, what we take, risks or safety, and what to read first.
+
+`adopted` holds one entry per project, question and set of our paths: recording the same again
+replaces it, and `adopt --drop` adds `dropped: <date>` instead of deleting it. `updates` asks
+GitHub for the commits on the branch that touched each `from` path since the date of `at`; an
+entry without `from` gets only the repo-level report. Cards without `adopted` are valid.
 
 ## Ledger
 
@@ -108,7 +123,8 @@ current verdict.
 ```
 
 Verdicts: `peeked`, `short`, `list`, `later`, `skip`, `card`. A `skip` comes back once the
-repo's stars reach twice the recorded count (and at least 200 more).
+repo's stars reach twice the recorded count (and at least 200 more). An adoption is a `card`
+entry whose reason starts with `adopted:` or `dropped adoption:`.
 
 ## Scan
 

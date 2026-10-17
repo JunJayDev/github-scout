@@ -1,6 +1,7 @@
 # Workflow, with a worked example
 
-Sections 1 to 5 follow the stages: plan (1), search (2, 3), triage and dig (4), brief (5).
+Sections 1 to 6 follow the stages: plan (1), search (2, 3), triage and dig (4), brief (5),
+adopt (6).
 
 The example is a real case. An operations project needed to read and post on Reddit, X and
 Xiaohongshu through a logged-in browser, with no model in the loop. Agents searched for
@@ -123,11 +124,45 @@ Write it in the question file. A good one, for a project at `prototype`:
 
 That tells the next agent what to run, what not to rebuild, and where the gap is. Then
 `github-scout brief ops/browser-ops` packs it, with each source's take and reviewed commit,
-into a file for the coding agent. The project itself is not changed.
+into a file for the coding agent. It ends with one `github-scout adopt` line per picked repo.
+The project itself is not changed.
 
-## 6. Upkeep
+## 6. Adopting
 
+Stages 1 to 5 never touch the project. When the user asks, the project's coding agent brings the
+brief in (`github-scout-adopt`), inside the project's repository and by its rules, one commit
+per repo, each step checked the way the brief says. One mode per repo:
+
+| mode | for | traced by |
+|---|---|---|
+| depend | a package | a pinned version |
+| vendor | files copied at the reviewed commit; edits allowed | repo, commit and source path in each file or a manifest beside them; our edits listed |
+| port | the idea rewritten in our code | one comment at the top of our file naming the upstream file |
+| skill | an agent skill installed as is | its folder unchanged |
+| tool | their CLI or app called as is | a pinned version |
+| data | datasets, fonts, prompts, assets | repo, commit and source path beside them |
+
+The answer above gives two adoptions: run OpenCLI as is for reads, and port its Reddit reader
+into our own comment adapter. After each commit:
+
+```bash
+github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode tool --into tools/opencli/run.sh --note "pinned v1.8.8"
+github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode port \
+  --into tools/opencli/plugin/reddit-comments.ts --from clis/reddit/read.js
+```
+
+Each writes an `adopted` entry on the card: our paths, their paths, their commit (the reviewed
+one unless `--at`) and ours (HEAD unless `--ours`). The same `--q` and `--into` again replace the
+entry; `--drop` marks it dropped and keeps it. A brief item the agent did not take gets
+`github-scout note` with the reason, so the next search knows why.
+
+## 7. Upkeep
+
+- `updates` lists adopted repos first. For each `--from` path it counts the upstream commits that
+  touched it since the commit we took it at, and names the newest:
+  `adopted into ops (port tools/opencli/plugin/reddit-comments.ts): upstream clis/reddit/read.js changed 2 times since b9213a1 — newest …`.
+  Read `updates --diff <repo>`, update our copy, and record it again with `--at <their new commit>`.
 - Before relying on a repo again: `updates --project <p>`.
-- A `review` row means a watched path changed, a release came out, the repo was archived,
+- A `review` row means a watched path or a file we took changed, a release came out, the repo was archived,
   or it stopped being maintained. `updates --diff <repo>`, update the card, `updates --done <repo>`.
 - Rescan a question with `scan`; `scan --show` merges all scans and hides what was decided.
