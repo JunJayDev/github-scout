@@ -63,8 +63,10 @@ Most of the budget goes to finding: at least 40 searches before you read candida
 Use what works. Never write that a lens ran when it did not.
 
 **2. Search with every lens.** The word lenses run for every direction in each language from
-the plan (English and Chinese always, others when the user's audience needs them); the other
-lenses run once or twice for the whole question, with its main terms. Queries of one to three
+the plan (English and Chinese always, others when the user's audience needs them). Each other
+lens runs at least once for the whole question, with its main terms, and the rising lens once
+per topic in its row. A third run of this test searched words 40 times and the rising lens once;
+the repos it missed were the ones only the other lenses find. Queries of one to three
 terms, never a list of tool names you already know: such queries only return those tools, and
 a long query returns little at all. Search the Chinese words too: Chinese projects are found by
 the words their authors use.
@@ -94,14 +96,18 @@ directories.
 | communities (W) | `<中文词> github 开源`; `site:zhihu.com OR site:juejin.cn OR site:bilibili.com <中文词> github`; `<term> github site:reddit.com` |
 | words, without a connector | `site:github.com <terms>`; `site:github.com/topics <topic>` |
 
-Do not spend web searches on repos you already have: read them through the connector.
+Do not spend web searches on repos you already have: read them through the connector. The
+community lens in Chinese still runs even with a connector: posts there name repos whose own
+words never match the goal.
 
 **3. Follow what you find:**
 
 - **Lists (L):** when an awesome list or catalog for the field turns up, read all of it
   (through the connector, or by opening its README) and screen every repo it links. One list
   often holds more than all your searches together; opening a list and not reading it is the
-  most common way to miss the best repos.
+  most common way to miss the best repos. When a list is too long to screen, screen the
+  sections that match the directions and attach every link as a companion file
+  (`| repo | category |`, one URL per row): the local import checks and ranks them all.
 - **Neighbours of the shortlist (G, U):** for each repo you shortlist, search
   `site:github.com <owner>` for the author's other repos (authors often have a sibling project
   that fits better) and `"<repo name>" alternative`, and screen the repos its README links.
