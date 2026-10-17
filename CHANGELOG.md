@@ -25,6 +25,9 @@ Renamed from reuse-first to github-scout, and split by stage.
 - `import` reads the report's search log into the scan record, and its directions into the
   question when the question has no words yet, so `scan` can run GitHub's API on them; `scan --show`
   names the rows that came only from the API (the repos the report missed).
+  Directions take turns (and languages within them) so the cap keeps every direction; generic
+  words a chat lists as entities (Claude Code, Codex, skill, plugin, SKILL.md, 技能) and step
+  chains are left out: a third test run put a 280k-star agent harness first because of them.
 - Licences are out of scope: no licence checks, warnings, columns or ranking penalty.
 - `ask` creates the registry (`~/.github-scout`) and the project on first use; inside a git
   repository the project is named after it and its code path recorded.

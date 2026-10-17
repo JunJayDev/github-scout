@@ -481,15 +481,15 @@ class FlowTests(Base):
         report.write_text("# GitHub scout report: product videos\n\n## 1. Directions\n\n"
                           "| direction | entities (en / zh) | mechanisms (en / zh) | forms |\n|---|---|---|---|\n"
                           "| D1 | remotion / 宣传片, 产品视频 | `video understanding` / 视频理解 | skill, cli, whatever |\n"
-                          "| D2 | Remotion、剪映 | 审片 | mcp |\n\n"
+                          "| D2 | Remotion、剪映, Claude Code, skill, 技能 | 审片, SKILL.md | mcp |\n\n"
                           "See https://github.com/xpzouying/xiaohongshu-mcp.\n")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/videos")
         self.assertEqual(code, 0, out)
         self.assertIn("directions read into the question: 4 entities, 3 mechanisms, 3 forms", out)
         self.assertIn("rows without W are repos the report did not list", out)
         q = self.store.question("ops/videos").data
-        self.assertEqual(q["entities"], ["remotion", "宣传片", "产品视频", "剪映"])
-        self.assertEqual(q["mechanisms"], ["video understanding", "视频理解", "审片"])
+        self.assertEqual(q["entities"], ["remotion", "宣传片", "剪映", "产品视频"])   # directions take turns
+        self.assertEqual(q["mechanisms"], ["video understanding", "审片", "视频理解"])
         self.assertEqual(q["forms"], ["skill", "cli", "mcp"])
         doc = self.store.question("ops/videos")                       # a local plan is never overwritten
         doc.data["entities"] = ["product video|宣传片"]

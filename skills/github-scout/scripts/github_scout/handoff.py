@@ -133,6 +133,18 @@ DIRECTION_COLUMNS = {
 }
 FORM_WORDS = ("skill", "skills", "skill-pack", "plugin", "agent", "rules", "mcp", "cli", "library", "framework",
               "app", "extension", "service", "template", "model", "prompt", "list")
+# Words a chat puts in its directions that match every agent repo: as search words they flood a
+# scan (a third test run ranked a 280k-star agent harness first). Forms go in the forms column.
+GENERIC = re.compile(r"^(claude( code)?|codex|opus( \d[\d.]*)?|chatgpt|cursor|gemini|ai|llm|agents?|agents\.md|"
+                     r"skill\.md|claude\.md|mcp|skills?|plugins?|tools?|apps?|cli|workflows?|templates?|prompts?|"
+                     r"brief|hook|human-in-the-loop|技能|插件|工具|工作流|模板|提示词|钩子|人机协作)$", re.I)
+
+
+def _alternate(terms: list[str]) -> list[str]:
+    """English and Chinese terms in turns, so a cap keeps both languages."""
+    zh = [x for x in terms if re.search(r"[\u4e00-\u9fff]", x)]
+    en = [x for x in terms if x not in zh]
+    return [x for pair in zip(en, zh) for x in pair] + en[len(zh):] + zh[len(en):]
 
 
 def parse_directions(text: str, cap: int = 24) -> dict[str, list[str]]:
@@ -140,23 +152,36 @@ def parse_directions(text: str, cap: int = 24) -> dict[str, list[str]]:
 
     Chat models write "remotion / 宣传片, 产品视频" or "Claude Code / Codex / 宣传片": synonyms
     cannot be paired reliably, so every term becomes its own group and the scan's language split
-    sorts them. Capped so a scan stays within its budget."""
-    out: dict[str, list[str]] = {"entities": [], "mechanisms": [], "forms": []}
+    sorts them. Directions take turns, so the cap keeps words from every direction; generic words
+    and step chains ("调研→脚本→样帧") are left out."""
+    rows: dict[str, list[list[str]]] = {"entities": [], "mechanisms": [], "forms": []}
     for _, header, body in _tables(text):
         cols = {k: _column(header, k, DIRECTION_COLUMNS) for k in DIRECTION_COLUMNS}
         if cols["entities"] is None and cols["mechanisms"] is None:
             continue
         for cells, _ in body:
-            for key in out:
+            for key in rows:
+                terms = []
                 for term in re.split(r"\s*[/,，、;；|]\s*", re.sub(r"[`*]", "", _cell(cells, cols[key]))):
                     term = term.strip().strip("()（）")
                     if key == "forms":
                         term = term.lower()
                         if term not in FORM_WORDS:
                             continue
-                    if term and len(term) <= 40 and term.lower() not in {x.lower() for x in out[key]}:
-                        out[key].append(term)
-    return {k: v[:cap] for k, v in out.items()}
+                    elif GENERIC.match(term) or "→" in term or "->" in term:
+                        continue
+                    if term and len(term) <= 40:
+                        terms.append(term)
+                rows[key].append(_alternate(terms))
+    out: dict[str, list[str]] = {}
+    for key, per_row in rows.items():
+        seen: list[str] = []
+        for i in range(max((len(r) for r in per_row), default=0)):   # first term of each direction, then second ...
+            for r in per_row:
+                if i < len(r) and r[i].lower() not in {x.lower() for x in seen}:
+                    seen.append(r[i])
+        out[key] = seen[:cap]
+    return out
 
 
 def words_from_log(searches: list[dict], cap: int = 24) -> list[str]:
@@ -168,10 +193,7 @@ def words_from_log(searches: list[dict], cap: int = 24) -> list[str]:
         q = re.sub(r"\s+", " ", q).strip()
         if q and len(q.split()) <= 4 and q.lower() not in {x.lower() for x in out}:
             out.append(q)
-    zh = [q for q in out if re.search(r"[\u4e00-\u9fff]", q)]          # take turns, so a cap keeps both languages
-    en = [q for q in out if q not in zh]
-    turns = [q for pair in zip(en, zh) for q in pair] + en[len(zh):] + zh[len(en):]
-    return turns[:cap]
+    return _alternate(out)[:cap]
 
 
 def parse_search_log(text: str) -> list[dict]:
