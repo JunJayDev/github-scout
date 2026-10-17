@@ -168,7 +168,10 @@ def words_from_log(searches: list[dict], cap: int = 24) -> list[str]:
         q = re.sub(r"\s+", " ", q).strip()
         if q and len(q.split()) <= 4 and q.lower() not in {x.lower() for x in out}:
             out.append(q)
-    return out[:cap]
+    zh = [q for q in out if re.search(r"[\u4e00-\u9fff]", q)]          # take turns, so a cap keeps both languages
+    en = [q for q in out if q not in zh]
+    turns = [q for pair in zip(en, zh) for q in pair] + en[len(zh):] + zh[len(en):]
+    return turns[:cap]
 
 
 def parse_search_log(text: str) -> list[dict]:

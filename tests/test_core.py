@@ -509,7 +509,7 @@ class FlowTests(Base):
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/v2")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.store.question("ops/v2").data["entities"],
-                         ["Claude Code video", "agent video HTML", "视频字幕 翻译 配音 开源"])
+                         ["Claude Code video", "视频字幕 翻译 配音 开源", "agent video HTML"])
 
     def test_show_names_the_rows_the_report_missed(self):
         base = {"desc": "Video skill", "created": ago(1)[:10], "pushed": ago(0.1)[:10], "topics": [], "fit": 1, "score": 5,
