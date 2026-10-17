@@ -556,7 +556,11 @@ def cmd_updates(args):
         print(f"{r['repo']}: {r['from']} -> {r['to']} (reviewed today)")
         return
     rows = outdated(store, client, args.repos or None, args.project)
-    _out(args, render_outdated(rows) + "\nnext: github-scout updates --diff <repo>, update the card, then --done <repo>", rows)
+    hint = "\nnext: github-scout updates --diff <repo>, update the card, then --done <repo>"
+    if any(p.get("changes") for r in rows for a in r.get("adopted", []) for p in a.get("paths", [])):
+        hint += ("\n      files we took changed: update our copy, then record it again with github-scout adopt <repo> "
+                 "--q <p/q> --mode <mode> --into <the same paths> --at <their new commit>")
+    _out(args, render_outdated(rows) + hint, rows)
 
 
 def cmd_site(args):

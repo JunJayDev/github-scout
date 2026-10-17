@@ -5,7 +5,8 @@ peek   API only, ~1-1.5k tokens: facts, kind guess with evidence, tree summary,
 fetch  download one commit's source into the cache and print a digest that
        says where the code is and how big each part is, so reading can be targeted.
 outdated / diff  what changed upstream since the commit a card was reviewed at,
-       narrowed to the paths the card watches.
+       narrowed to the paths the card watches; for repos adopted into a project, the
+       commits that touched each upstream file we took since the commit we took it at.
 """
 
 from __future__ import annotations
@@ -16,9 +17,9 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .github import Client
+from .github import Client, GitHubError
 from .discover import DROP, HIDE, SLOW, months_since
-from .store import Store, as_list, today
+from .store import Store, adoptions, as_list, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -275,6 +276,51 @@ def watched(paths: list[str], patterns: list[str]) -> list[str]:
     return out
 
 
+ADOPTION_FIELDS = ("project", "question", "mode", "into", "from", "at", "ours", "date")
+
+
+def upstream_changes(client: Client, slug: str, branch: str, a: dict, dates: dict) -> dict:
+    """What happened upstream to the files an adoption took (`from`) since the commit it took them at (`at`):
+    per path, the commits on the branch that touched it since that commit's date, newest first."""
+    out = {k: a[k] for k in ADOPTION_FIELDS if a.get(k)}
+    at = str(a.get("at") or "")
+    if not as_list(a.get("from")):
+        return out
+    if not at:
+        out["error"] = "no upstream commit recorded (adopt --at)"
+        return out
+    if at not in dates:                      # one lookup per commit: "" not found, None unreachable
+        try:
+            c = client.commit(slug, at)
+            dates[at] = (((c or {}).get("commit") or {}).get("committer") or {}).get("date") or ""
+        except GitHubError as exc:
+            dates[at] = "" if exc.status == 422 else None
+        except OSError:
+            dates[at] = None
+    if not dates[at]:
+        out["error"] = "upstream history unreachable" if dates[at] is None else f"commit {at[:7]} not found upstream"
+        return out
+    out["paths"] = []
+    for path in map(str, as_list(a.get("from"))):
+        try:
+            hist = client.path_commits(slug, path, branch, dates[at])
+        except (GitHubError, OSError):
+            hist = None
+        if hist is None:
+            out["paths"].append({"path": path, "error": "history unreachable"})
+            continue
+        more = len(hist) >= 100
+        hist = [c for c in hist if not str(c.get("sha", "")).startswith(at)]
+        p = {"path": path, "changes": len(hist), "more": more}
+        if hist:
+            c = hist[0].get("commit") or {}
+            p["newest"] = {"sha": str(hist[0].get("sha", ""))[:7],
+                           "date": ((c.get("committer") or c.get("author") or {}).get("date") or "")[:10],
+                           "message": (c.get("message") or "").split("\n", 1)[0][:80]}
+        out["paths"].append(p)
+    return out
+
+
 def outdated(store: Store, client: Client, refs: list[str] | None = None, project: str | None = None) -> list[dict]:
     rows = []
     for card in store.cards():
@@ -283,13 +329,17 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
         d = card.data
         if refs and card.id.lower() not in {x.lower() for x in refs} and not set(map(str.lower, map(str, as_list(d.get("aliases"))))) & {x.lower() for x in refs}:
             continue
-        if project and not any(isinstance(u, dict) and u.get("project") == project for u in as_list(d.get("uses"))):
+        adopted = adoptions(d, project)
+        if project and not adopted and not any(isinstance(u, dict) and u.get("project") == project for u in as_list(d.get("uses"))):
             continue
         slug = card.id
         row = {"repo": slug, "reviewed": d.get("reviewed"), "commit": str(d.get("commit") or "")}
         r = client.repo(slug)
         if not r:
             row["state"] = "gone (404: deleted, renamed or private)"
+            if adopted:
+                row["adopted"] = [{**{k: a[k] for k in ADOPTION_FIELDS if a.get(k)}, "error": "the repo is gone"}
+                                  for a in adopted]
             rows.append(row)
             continue
         row["stars"], row["stars_then"] = r.get("stargazers_count", 0), d.get("stars")
@@ -312,9 +362,14 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
             row["head"] = (cmp.get("commits") or [{}])[-1].get("sha", "")[:12] if cmp.get("commits") else row["commit"]
         rels = [x for x in client.releases(r["full_name"]) if (x.get("published_at") or "")[:10] > str(d.get("reviewed") or "")]
         row["releases"] = [x.get("tag_name") for x in rels][:6]
-        if row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") and not row.get("unmaintained"):
+        if adopted:
+            dates: dict = {}
+            row["adopted"] = [upstream_changes(client, r["full_name"], branch, a, dates) for a in adopted]
+        took_changed = any(p.get("changes") for a in row.get("adopted", []) for p in a.get("paths", []))
+        if cmp is not None and row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") \
+                and not row.get("unmaintained") and not took_changed:
             row["state"] = "up to date"
-        elif row.get("watched_changed") or row.get("archived") or row.get("unmaintained"):
+        elif row.get("watched_changed") or row.get("archived") or row.get("unmaintained") or took_changed:
             row["state"] = "review"
         elif row.get("ahead") or row["releases"]:
             row["state"] = "changed (not in watched paths)" if as_list(d.get("watch")) else "changed (card watches no paths)"
@@ -322,10 +377,38 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
     return rows
 
 
+def adoption_lines(r: dict) -> list[str]:
+    """Under a repo's line, one line per adoption: what happened upstream to the files we took."""
+    out = []
+    for a in r.get("adopted", []):
+        head = f"  adopted into {a.get('project')} ({a.get('mode')} {', '.join(map(str, as_list(a.get('into'))))})"
+        at = str(a.get("at") or "")[:7]
+        if a.get("error"):
+            out.append(f"{head}: {a['error']}")
+            continue
+        if not a.get("from"):
+            out.append(f"{head}: no upstream paths recorded (adopt --from), so only the line above applies")
+            continue
+        quiet = []
+        for p in a.get("paths", []):
+            if p.get("error"):
+                out.append(f"{head}: upstream {p['path']}: {p['error']}")
+            elif p.get("changes"):
+                n, new = p["changes"], p.get("newest") or {}
+                times = "once" if n == 1 else f"{n}{'+' if p.get('more') else ''} times"
+                out.append(f"{head}: upstream {p['path']} changed {times} since {at} — newest {new.get('sha')} "
+                           f"{new.get('date')} \"{new.get('message')}\"")
+            else:
+                quiet.append(p["path"])
+        if quiet:
+            out.append(f"{head}: upstream {', '.join(quiet)} unchanged since {at}")
+    return out
+
+
 def render_outdated(rows: list[dict]) -> str:
     out = []
     order = {"review": 0, "gone (404: deleted, renamed or private)": 0}
-    for r in sorted(rows, key=lambda r: (order.get(r.get("state", ""), 1), r["repo"])):
+    for r in sorted(rows, key=lambda r: (not r.get("adopted"), order.get(r.get("state", ""), 1), r["repo"])):
         bits = [r.get("state", "?")]
         if r.get("ahead"):
             bits.append(f"{r['ahead']} commits, {r.get('files_changed', 0)} files")
@@ -340,6 +423,7 @@ def render_outdated(rows: list[dict]) -> str:
         if r.get("stars") and r.get("stars_then") and r["stars"] != r["stars_then"]:
             bits.append(f"stars {r['stars_then']}->{r['stars']}")
         out.append(f"{r['repo']:<40} reviewed {r.get('reviewed')}: " + " · ".join(bits))
+        out += adoption_lines(r)
     return "\n".join(out) or "no cards matched"
 
 
@@ -357,7 +441,8 @@ def diff(store: Store, client: Client, slug: str, every_file: bool = False, max_
         raise LookupError(f"cannot compare {d.get('commit')}...{branch}")
     files = cmp.get("files", [])
     names = [f["filename"] for f in files]
-    keep = set(names if every_file or not as_list(d.get("watch")) else watched(names, as_list(d.get("watch"))))
+    patterns = as_list(d.get("watch")) + [p for a in adoptions(d) for p in as_list(a.get("from"))]   # and what we took
+    keep = set(names if every_file or not patterns else watched(names, patterns))
     out = [f"{card.id} {str(d.get('commit'))[:12]}...{branch}: {cmp.get('ahead_by', 0)} commits, {len(files)} files; "
            f"showing {len(keep)}" + ("" if every_file else " watched") + " file(s)",
            f"compare: https://github.com/{r['full_name']}/compare/{d.get('commit')}...{branch}"]

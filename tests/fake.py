@@ -24,6 +24,10 @@ def repo(slug, stars=100, desc="", created="2026-01-01T00:00:00Z", pushed="2026-
             "forks_count": 1, "open_issues_count": 2, "homepage": ""}
 
 
+def commit(sha: str, date: str, message: str = "change") -> dict:
+    return {"sha": sha, "commit": {"message": message, "committer": {"date": f"{date}T00:00:00Z"}}}
+
+
 def tarball(files: dict[str, str], prefix="owner-repo-abc1234") -> bytes:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
@@ -46,6 +50,7 @@ class FakeAPI:
         self.skills: dict[str, list] = {}       # text -> list of (owner/repo, installs)
         self.mcp: dict[str, list] = {}          # text -> list of repo urls
         self.paths: dict[str, object] = {}      # api path -> payload (dict/list/str/bytes)
+        self.history: dict[str, object] = {}    # upstream path -> commits touching it (list), or an HTTP status (int)
         self.calls: list[str] = []
 
     def add(self, r: dict):
@@ -90,6 +95,9 @@ class FakeAPI:
             return self._ok({"items": self.search.get(q["q"], [])})
         if path == "search/code":
             return self._ok({"items": [{"repository": {"full_name": s}} for s in self.code.get(q["q"], [])]})
+        if path.endswith("/commits") and "path" in q:
+            v = self.history.get(q["path"], [])
+            return (v, {}, b'{"message":"Forbidden"}') if isinstance(v, int) else self._ok(v)
         if path in self.paths:
             v = self.paths[path]
             if isinstance(v, bytes):

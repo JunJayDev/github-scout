@@ -10,7 +10,7 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
-from fake import FakeAPI, client, repo, tarball
+from fake import FakeAPI, client, commit, repo, tarball
 
 from github_scout import cli, discover, examine, registry, yamlish
 from github_scout.github import github_slug
@@ -706,6 +706,52 @@ class AdoptTests(Base):
         lines = self.run_cli("show", "ops/browser-ops")[1].splitlines()
         i = next(n for n, ln in enumerate(lines) if ln.startswith("picked:"))
         self.assertEqual(lines[i + 1], "adopted: jackwener/OpenCLI (vendor tools/read.ts)")
+
+    def test_updates_reports_upstream_commits_on_the_files_we_took(self):
+        self.api.add(repo(self.slug, 31000, "x", pushed=ago(0.1)))
+        self.api.add(repo("other/tool", 50, "y", pushed=ago(0.1)))
+        registry.new_card(self.store, {"repo": "other/tool", "desc": "y", "stars": 50, "branch": "main", "commit": "bbbbbbbbbbbb"},
+                          "software", "cli", [{"project": "ops", "question": "browser-ops", "take": "learn", "note": "n"}], [],
+                          "read")
+        self.api.paths[f"repos/{self.slug}/compare/aaaaaaaaaaaa...main"] = {
+            "ahead_by": 4, "commits": [{"sha": "c" * 40, "commit": {"message": "m"}}],
+            "files": [{"filename": "clis/reddit/read.js", "status": "modified", "additions": 1, "deletions": 1,
+                       "patch": "@@ -1 +1 @@\n-old\n+new"}, {"filename": "README.md", "status": "modified", "patch": "x"}]}
+        self.api.paths["repos/other/tool/compare/bbbbbbbbbbbb...main"] = {"ahead_by": 0, "commits": [], "files": []}
+        self.api.paths[f"repos/{self.slug}/commits/aaaaaaaaaaaa"] = {
+            "sha": "a" * 40, "commit": {"committer": {"date": "2026-10-01T08:00:00Z"}}}
+        self.api.history["clis/reddit/read.js"] = [commit("9f8e7d6" + "0" * 33, "2026-10-20", "fix reddit comments\n\nbody"),
+                                                   commit("8" * 40, "2026-10-12"), commit("7" * 40, "2026-10-05"),
+                                                   commit("a" * 40, "2026-10-01", "the commit we took")]
+        self.api.history["src/broken.ts"] = 403
+        self.adopt("--mode", "vendor", "--into", "tools/read.ts", "--from", "clis/reddit/read.js,src/daemon.ts", "--ours", "1234abc")
+        self.adopt("--mode", "tool", "--into", "tools/run.sh", "--ours", "1234abc")
+        self.adopt("--mode", "port", "--into", "tools/gone.ts", "--from", "src/broken.ts", "--ours", "1234abc")
+        self.adopt("--mode", "data", "--into", "tools/old.json", "--from", "data/old.json", "--ours", "1234abc")
+        self.adopt("--into", "tools/old.json", "--drop")
+        code, out, err = self.run_cli("updates")
+        self.assertEqual(code, 0, err)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("jackwener/OpenCLI") and "review" in lines[0], out)     # adopted first
+        self.assertIn('  adopted into ops (vendor tools/read.ts): upstream clis/reddit/read.js changed 3 times since '
+                      'aaaaaaa — newest 9f8e7d6 2026-10-20 "fix reddit comments"', lines)
+        self.assertIn("  adopted into ops (vendor tools/read.ts): upstream src/daemon.ts unchanged since aaaaaaa", lines)
+        self.assertIn("  adopted into ops (port tools/gone.ts): upstream src/broken.ts: history unreachable", lines)
+        self.assertIn("  adopted into ops (tool tools/run.sh): no upstream paths recorded (adopt --from), so only the line "
+                      "above applies", lines)
+        self.assertNotIn("old.json", out)                                    # dropped: no longer watched
+        self.assertTrue(lines[5].startswith("other/tool") and "up to date" in lines[5], out)
+        self.assertIn("files we took changed: update our copy", out)
+        asked = [c for c in self.api.calls if "path=clis%2Freddit%2Fread.js" in c]
+        self.assertEqual(len(asked), 1)
+        self.assertIn("sha=main", asked[0])
+        self.assertIn("since=2026-10-01T08%3A00%3A00Z", asked[0])
+        _, out, _ = self.run_cli("updates", "--json", "--project", "ops")
+        row = next(r for r in json.loads(out.split("\nnext:")[0]) if r["repo"] == self.slug)
+        self.assertEqual(row["adopted"][0]["paths"][0]["newest"]["sha"], "9f8e7d6")
+        _, out, _ = self.run_cli("updates", "--diff", self.slug)            # the card watches nothing; we took read.js
+        self.assertIn("--- clis/reddit/read.js (modified, +1 -1)", out)
+        self.assertNotIn("README.md (", out)
 
     def test_check_accepts_cards_with_and_without_adoptions(self):
         self.assertEqual(self.store.check()[0], [])                          # a card from before stage 6

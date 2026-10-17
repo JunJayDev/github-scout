@@ -200,6 +200,14 @@ class Client:
         """Commits on the default branch since a date (capped at 100)."""
         return len(self.get_or_none(f"repos/{slug}/commits", {"since": since_iso, "per_page": 100}) or [])
 
+    def commit(self, slug: str, ref: str) -> dict | None:
+        return self.get_or_none(f"repos/{slug}/commits/{urllib.parse.quote(ref)}")
+
+    def path_commits(self, slug: str, path: str, branch: str, since_iso: str, per_page: int = 100) -> list[dict] | None:
+        """Commits on a branch that touched a file or folder since a date, newest first (capped at per_page)."""
+        return self.get_or_none(f"repos/{slug}/commits", {"path": path, "sha": branch, "since": since_iso,
+                                                          "per_page": per_page})
+
     def contributors(self, slug: str, n: int = 10) -> list[dict]:
         return self.get_or_none(f"repos/{slug}/contributors", {"per_page": n}) or []
 
