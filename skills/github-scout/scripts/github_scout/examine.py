@@ -258,14 +258,14 @@ def digest(root: Path, width: int = 20) -> str:
     entries: list[tuple[str, int]] = []
     for path in root.rglob("*"):
         if path.is_file() and not any(part in SKIP_DIRS for part in path.relative_to(root).parts):
-            entries.append((str(path.relative_to(root)), path.stat().st_size))
+            entries.append((path.relative_to(root).as_posix(), path.stat().st_size))
     total = sum(s for _, s in entries)
     text = [(p, s) for p, s in entries if Path(p).suffix.lower() in TEXT_EXT]
     lines = [f"{root}", f"{len(entries)} files, ~{_tok(total)} total, ~{_tok(sum(s for _, s in text))} in text/code"]
     lines.append("top level: " + " | ".join(tree_summary(entries, 1, width)))
     by_dir = defaultdict(int)
     for p, s in text:
-        by_dir[str(Path(p).parent)] += s
+        by_dir[Path(p).parent.as_posix()] += s
     big = sorted(by_dir.items(), key=lambda kv: -kv[1])[:12]
     lines.append("largest code dirs: " + " | ".join(f"{d} ~{_tok(s)}" for d, s in big))
     entry = [p for p, _ in entries if re.search(r"(^|/)(SKILL\.md|README\.md|main\.\w+|index\.\w+|cli\.\w+|__main__\.py|server\.\w+)$", p)]

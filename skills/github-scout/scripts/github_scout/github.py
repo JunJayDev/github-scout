@@ -140,7 +140,7 @@ class Client:
             return
         self.stamp_dir.mkdir(parents=True, exist_ok=True)
         path = self.stamp_dir / f".throttle-{kind}"
-        with open(path, "a+") as f:
+        with open(path, "a+", encoding="utf-8") as f:
             _lock(f)
             try:
                 f.seek(0)

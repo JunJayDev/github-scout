@@ -528,7 +528,7 @@ class Store:
         warns: list[str] = []
 
         def rel(p: Path) -> str:
-            return str(p.relative_to(self.root))
+            return p.relative_to(self.root).as_posix()
 
         projects = {p.path.parent.name: p for p in self.projects()}
         for pid, doc in projects.items():

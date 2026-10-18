@@ -189,7 +189,7 @@ class Base(unittest.TestCase):
 
 class StoreTests(Base):
     def test_init_and_check_clean(self):
-        self.assertEqual(json.loads((self.root / "github-scout.json").read_text())["format"], 2)
+        self.assertEqual(json.loads((self.root / "github-scout.json").read_text(encoding="utf-8"))["format"], 2)
         self.assertEqual(self.store.check()[0], [])
 
     def test_question_template_carries_the_stage(self):
@@ -202,7 +202,7 @@ class StoreTests(Base):
         self.assertEqual((self.store.question("ops/browser-ops").data["backbone"], self.store.check()[0]), (None, []))
 
     def test_check_reports_bad_cards_and_questions(self):
-        (self.root / "repos" / "a__b.md").write_text("---\nid: a/c\nkind: cli\nuses:\n  - project: ops\n    take: love\n---\n")
+        (self.root / "repos" / "a__b.md").write_text("---\nid: a/c\nkind: cli\nuses:\n  - project: ops\n    take: love\n---\n", encoding="utf-8")
         doc = self.store.question("ops/browser-ops")
         doc.data["stage"] = "someday"
         self.store.save_question(doc)
@@ -402,7 +402,7 @@ class FlowTests(Base):
         self.assertIn("public-apis/public-apis skip", out)
         code, out, _ = self.run_cli("check")
         self.assertEqual(code, 0, out)
-        index = (self.root / "INDEX.md").read_text()
+        index = (self.root / "INDEX.md").read_text(encoding="utf-8")
         self.assertIn("[ops/browser-ops]", index)
         self.assertIn("| [jackwener/OpenCLI](repos/jackwener__opencli.md) | use |", index)
         _, out, _ = self.run_cli("show", "ops/browser-ops")
@@ -456,7 +456,7 @@ class FlowTests(Base):
         self.seed()
         self.run_cli("scan", "ops/browser-ops", "--quiet")
         d = self.root / "scans" / "ops" / "browser-ops"
-        (d / "notes-structure.json").write_text('{"repos": {}}')
+        (d / "notes-structure.json").write_text('{"repos": {}}', encoding="utf-8")
         code, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
         self.assertEqual(code, 0, out)
         self.assertIn("jackwener/OpenCLI", out)
@@ -468,7 +468,7 @@ class FlowTests(Base):
         report.write_text("# report\n\n| 仓库 | 类型 | 结论 | 能借什么 |\n|---|---|---|---|\n"
                           "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | 学思路 | 登录态复用 |\n"
                           "| https://github.com/nobody/invented-repo | cli | 直接用 | 编的 |\n\n"
-                          "Also see github.com/jackwener/OpenCLI.\n")
+                          "Also see github.com/jackwener/OpenCLI.\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops", "--note", "ChatGPT Pro")
         self.assertEqual(code, 0, out)
         self.assertIn("3 repos linked; 2 exist on GitHub", out)
@@ -481,7 +481,7 @@ class FlowTests(Base):
         self.api.add(repo("qwen/voice", 2400, "Multi-lingual voice generation", pushed=ago(1)))
         self.api.paths["repos/oldorg/voice"] = repo("qwen/voice", 2400, "Multi-lingual voice generation", pushed=ago(1))
         report = Path(self.tmp.name) / "r.md"
-        report.write_text("| repo | verdict |\n|---|---|\n| https://github.com/oldorg/voice | learn |\n")
+        report.write_text("| repo | verdict |\n|---|---|\n| https://github.com/oldorg/voice | learn |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         self.assertIn("moved (1), added under the new name: oldorg/voice -> qwen/voice", out)
@@ -497,7 +497,7 @@ class FlowTests(Base):
                           "| https://github.com/jackwener/OpenCLI | cli | learn |\n\n"
                           "### Other sources\n\n| repo | verdict |\n|---|---|\n| https://github.com/jackwener/OpenCLI | use |\n\n"
                           "## 3. Triage\n\n| repo | route | verdict | reason |\n|---|---|---|---|\n"
-                          "| https://github.com/jackwener/OpenCLI | read the adapters | shortlist | one command per site |\n")
+                          "| https://github.com/jackwener/OpenCLI | read the adapters | shortlist | one command per site |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         self.assertIn("1 verdicts from the report's table", out)
@@ -515,11 +515,11 @@ class FlowTests(Base):
                           "| 2 | list | D1 | en | https://github.com/jackwener/OpenCLI | 12 | |\n\n### Candidates\n"
                           "| repo | kind | direction | lang | why it may help | last commit | stars | found by |\n"
                           "|---|---|---|---|---|---|---|---|\n"
-                          "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | D1 | zh | 登录态复用 | unknown | 9k | 1 |\n")
+                          "| https://github.com/xpzouying/xiaohongshu-mcp | mcp | D1 | zh | 登录态复用 | unknown | 9k | 1 |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         self.assertIn("2 searches from its search log", out)
-        scan = json.loads(sorted((self.root / "scans" / "ops" / "browser-ops").glob("*.json"))[-1].read_text())
+        scan = json.loads(sorted((self.root / "scans" / "ops" / "browser-ops").glob("*.json"))[-1].read_text(encoding="utf-8"))
         logged = [s for s in scan["searches"] if s["kind"].startswith("cloud")]
         self.assertEqual([(s["kind"], s["query"], s["hits"]) for s in logged],
                          [("cloud words", "D1 · zh · 小红书 登录态", 1),
@@ -534,7 +534,7 @@ class FlowTests(Base):
                           "| direction | entities (en / zh) | mechanisms (en / zh) | forms |\n|---|---|---|---|\n"
                           "| D1 | remotion / 宣传片, 产品视频 | `video understanding` / 视频理解 | skill, cli, whatever |\n"
                           "| D2 | Remotion、剪映, Claude Code, skill, 技能 | 审片, SKILL.md | mcp |\n\n"
-                          "See https://github.com/xpzouying/xiaohongshu-mcp.\n")
+                          "See https://github.com/xpzouying/xiaohongshu-mcp.\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/videos")
         self.assertEqual(code, 0, out)
         self.assertIn("directions read into the question: 4 entities, 3 mechanisms, 3 forms", out)
@@ -557,7 +557,7 @@ class FlowTests(Base):
                           "| 2 | web | en | site:github.com/heygen-com/hyperframes agent video HTML |\n"
                           "| 3 | connector search | zh | 视频字幕 翻译 配音 开源 |\n"
                           "| 4 | connector search | en | claude code video |\n\n"
-                          "https://github.com/xpzouying/xiaohongshu-mcp\n")
+                          "https://github.com/xpzouying/xiaohongshu-mcp\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/v2")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.store.question("ops/v2").data["entities"],
@@ -576,7 +576,7 @@ class FlowTests(Base):
         self.seed()
         report = Path(self.tmp.name) / "cloud.md"
         report.write_text("# GitHub scout report: Read Xiaohongshu notes from scripts\n\n- Stage: prototype\n\n"
-                          "| repo | verdict |\n|---|---|\n| https://github.com/xpzouying/xiaohongshu-mcp | shortlist |\n")
+                          "| repo | verdict |\n|---|---|\n| https://github.com/xpzouying/xiaohongshu-mcp | shortlist |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/xhs-read")
         self.assertEqual(code, 0, out)
         q = self.store.question("ops/xhs-read").data
@@ -592,7 +592,7 @@ class FlowTests(Base):
         self.store.save_question(doc)
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertEqual(code, 0, out)
-        text = Path(out.splitlines()[0]).read_text()
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
         self.assertIn("# Brief for the coding agent:", text)
         self.assertIn("1. Pin OpenCLI 1.8.", text)
         self.assertIn("Project code: /src/ops", text)
@@ -604,7 +604,7 @@ class FlowTests(Base):
         self.run_cli("pick", "ops/browser-ops", "--skip", "xpzouying/xiaohongshu-mcp=x")
         led = self.store.ledger()
         led[-1]["stars"] = 1000
-        (self.root / "ledger.jsonl").write_text("".join(json.dumps(e) + "\n" for e in led))
+        (self.root / "ledger.jsonl").write_text("".join(json.dumps(e) + "\n" for e in led), encoding="utf-8")
         _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
         self.assertIn("grew, look again", out)
 
@@ -655,7 +655,7 @@ class AdoptTests(Base):
         super().setUp()
         self.proj = Path(self.tmp.name) / "ops"
         (self.proj / "tools").mkdir(parents=True)
-        (self.proj / "tools" / "read.ts").write_text("// port of jackwener/OpenCLI clis/reddit/read.js\n")
+        (self.proj / "tools" / "read.ts").write_text("// port of jackwener/OpenCLI clis/reddit/read.js\n", encoding="utf-8")
         doc = self.store.project("ops")
         write_doc(doc.path, {**doc.data, "code": str(self.proj)}, doc.body, PROJECT_ORDER)
         registry.new_card(self.store, {"repo": self.slug, "desc": "x", "stars": 30000, "branch": "main",
@@ -1110,7 +1110,7 @@ class QualityGateTests(Base):
         report = Path(self.tmp.name) / "cloud.md"
         report.write_text("## 3. Triage\n\n| repo | kind | results | route | verdict | reason |\n|---|---|---|---|---|---|\n"
                           "| https://github.com/a/big | cli | https://example.com/big.mp4 | read cli/ | shortlist | one command |\n"
-                          "| https://github.com/b/tiny | cli | none | read all | shortlist | small |\n")
+                          "| https://github.com/b/tiny | cli | none | read all | shortlist | small |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         self.assertIn("under 50 stars, recorded as later, not shortlisted (1): b/tiny", out)

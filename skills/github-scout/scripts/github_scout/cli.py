@@ -173,7 +173,7 @@ def cmd_import(args):
                 low.append(c["repo"])
             entries.append(_entry(args, c["repo"], project, qid, verdict, "meta", reason[:300], c, scan["id"]))
     store.append_ledger(entries)
-    print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root)}); "
+    print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root).as_posix()}); "
           f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table; "
           f"{len(searches)} searches from its search log")
     if moved:
@@ -220,7 +220,7 @@ def cmd_ask(args):
         args.ref = f"{_git_root(Path.cwd()).name if _git_root(Path.cwd()) else 'scratch'}/{args.ref}"
     project, qid = store.split_ref(args.ref)
     if not args.update and not store.project(project):
-        repo = _git_root(Path.cwd())
+        repo = _git_root(Path.cwd().resolve())
         code = args.code or (str(repo) if repo and repo.name.lower() == project.lower() else "")
         new_project(store, project, project, "", code)
         print(f"project {project} created" + (f" (code: {code})" if code else
@@ -305,7 +305,7 @@ def cmd_scan(args):
             q["scanned"] = today()
             store.save_question(doc)
         path = store.save_scan(scan)
-        print(f"saved {path.relative_to(store.root)} · {client.calls} API calls", file=sys.stderr)
+        print(f"saved {path.relative_to(store.root).as_posix()} · {client.calls} API calls", file=sys.stderr)
     merged = _merged(store, q["project"], q["id"])
     if (args.add or args.expand) and not args.show and not args.json:
         rows = visible(merged)
@@ -814,6 +814,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):              # piped on Windows, the default codepage cannot write Chinese
+        if (getattr(stream, "encoding", "") or "").lower().replace("-", "") != "utf8" and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = build_parser()
     args = ap.parse_args(argv)
     if not getattr(args, "fn", None):

@@ -4,6 +4,10 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Windows (found by the first CI run): output is written as UTF-8, so a piped scan table with
+  Chinese rows no longer crashes on the default codepage; `check` and `look --source` print
+  registry and repo paths with forward slashes; `ask` stores the project's resolved path; tests
+  read and write files as UTF-8.
 - Recall. A test scan on 2026-10-18 (125 searches, 525 repos) missed the two closest
   competitors, skills with 131 and 139 stars that do what github-scout does. Broad words sorted
   by stars returned only giants, the vocabulary said each idea one way, and the star gate hid 16
