@@ -34,6 +34,12 @@ In Claude Code, the plugin works too: `/plugin marketplace add <owner>/github-sc
 The command-line part needs Python 3.9+ and a logged-in `gh` (or `GITHUB_TOKEN`). Nothing else
 to set up: the first question creates its registry in `~/.github-scout`.
 
+**Nothing to install:** in ChatGPT or Claude on the web, upload
+[`cloud/github-scout.md`](cloud/github-scout.md) and write your goal (add a zip of your project
+if you can). It runs on web search alone, does not stop unless you ask, and ends with one report
+file. Back home, `github-scout import report.md --q <project>/<question>` takes it over and
+checks every link against GitHub.
+
 ## Use
 
 Open your agent inside your project and say what you want:
@@ -49,12 +55,6 @@ When you want it in your code, tell your coding agent to adopt the brief. It wor
 repository by your project's rules, one commit per repo, and records each one with
 `github-scout adopt`: which of your files came from which repo, at which commits. From then on
 `github-scout updates` tells you when upstream changes the files you took.
-
-**No local setup?** In ChatGPT or Claude on the web, upload
-[`cloud/github-scout.md`](cloud/github-scout.md) and write your goal (add a zip of your project
-if you can). It runs on web search alone, does not stop unless you ask, and ends with one report
-file. Back home, `github-scout import report.md --q <project>/<question>` takes it over and
-checks every link against GitHub.
 
 ## Six stages
 
@@ -85,6 +85,9 @@ changes your project, so your coding agent runs it there, when you ask.
   it lacks, each with a reason. One run took an idea from each of twelve repos, and the film it
   made was wrong.
 - **A brief, not a list.** Twenty repos with star counts leave all the work to you.
+- **No licence filter.** It looks for references to follow. Licences are left out of the search,
+  the ranking and the report: checking them makes an agent drop projects before anyone has looked
+  at what they made.
 - **New and moving helps you find, not pick.** No push in 3 months ranks far down, 6 months is
   set aside, 12 months is dropped. Fast-rising new repos are searched for; picking goes by
   results, stars, the trial and fit. Lures (game cheats, cracks) and farmed install counts are
@@ -113,7 +116,7 @@ scans/<project>/<q>/<stamp>.json         what each search ran and found
 
 ## Costs and limits
 
-- Each search costs API calls, not tokens. A full search takes about five minutes within
+- Each search costs API calls, not tokens. A full search takes five to ten minutes within
   GitHub's free limits. The table the agent reads is about 2,000 tokens; one repo's facts about 1,300.
 - It sees public GitHub, npm, skills.sh, the MCP registry, and links you add. GitLab, Codeberg
   and closed-source options need the web pass the search stage describes.

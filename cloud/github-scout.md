@@ -472,6 +472,9 @@ a route.
    task from our project. Skills too: install the skill and give it one short task. Note what you
    ran, what came out, and how long it took. Stop at the first wall (an install that fails, a key
    we do not have, output far from the target) and record where: minutes, not a day.
+   Their code runs on the user's machine, so run it apart: a throwaway directory or a container,
+   outside our project, with no tokens or keys in the environment; read install scripts and
+   hooks before running them, and stop if they fetch and run remote code.
 3. **Choose the backbone:** the one whose trial worked and whose output comes closest to the
    target, and at most one alternate. Between equals, more stars and more projects using it win.
 4. **Read the backbone's code to follow it:** how it is run, configured and extended, and what

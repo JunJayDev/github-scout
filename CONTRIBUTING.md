@@ -1,7 +1,7 @@
 # Contributing
 
-Thanks for helping. github-scout stays small on purpose: one skill, one standard-library
-Python package, and a plain-text registry format.
+Thanks for helping. github-scout stays small on purpose: seven skills (the whole flow and one per
+stage), one standard-library Python package, and a plain-text registry format.
 
 ## Ground rules
 

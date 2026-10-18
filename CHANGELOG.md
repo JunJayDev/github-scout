@@ -4,6 +4,12 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Trials run apart: dig tells the agent to try repos in a throwaway directory or container, outside
+  the project, with no tokens or keys in the environment, after reading install scripts and hooks.
+  SECURITY.md said downloaded code never runs; that holds for the command line only, and now says
+  so. README: licences are left out on purpose (a belief, not a gap); the no-install cloud file
+  moves up to Install; a full search takes five to ten minutes (a test run: 125 searches, 156 API
+  calls, 7.6 minutes).
 - Quality gate (user, 2026-10-18). A run that took one idea from each of 12 repos made an
   explainer film the user called completely wrong: nobody had looked at what those repos made,
   run one of them, or said what good looks like. Now a repo is a reference only with results to
