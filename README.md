@@ -24,11 +24,11 @@ those searches for you, in English and Chinese, runs about 140 of them, and read
 ## Install
 
 ```bash
-npx skills add HouseYeung/github-scout -g
+npx skills add JunJayDev/github-scout -g
 ```
 
-Or tell your agent: *"Install the skills from https://github.com/HouseYeung/github-scout"*.
-In Claude Code, the plugin works too: `/plugin marketplace add HouseYeung/github-scout`, then
+Or tell your agent: *"Install the skills from https://github.com/JunJayDev/github-scout"*.
+In Claude Code, the plugin works too: `/plugin marketplace add JunJayDev/github-scout`, then
 `/plugin install github-scout@github-scout`.
 
 The command-line part needs Python 3.9+ and a logged-in `gh` (or `GITHUB_TOKEN`). Nothing else
