@@ -2,9 +2,9 @@
 
 # github-scout
 
-**Before your agent builds something, it finds what GitHub already solved, reads the few
-projects that matter, and hands your coding agent a brief: which ideas to take from whom, and
-where they go in your code.**
+**Before your agent builds something, it finds what GitHub already solved, keeps the projects
+that show what they made, tries the best two or three, and hands your coding agent a brief:
+which one to follow as a whole, what fills its gaps, and where it goes in your code.**
 
 Agents rebuild things that exist because they search like newcomers. One project needed to
 read and post on Reddit, X and Xiaohongshu through a logged-in browser. The right tool had
@@ -40,9 +40,10 @@ Open your agent inside your project and say what you want:
 
 > Use github-scout: make the product videos our agent renders cut and move like an editor's.
 
-It reads your project, proposes search directions, and **stops for you to confirm them**. Then
-it searches, picks, reads the code of the few that matter, and writes a brief for your coding
-agent. It does not change your project.
+It reads your project, proposes what good looks like and the search directions, and **stops for
+you to confirm them**. Then it searches, keeps the repos with results to look at and 50+ stars,
+tries the best two or three, reads the code of the one to follow, and writes a brief for your
+coding agent. It does not change your project.
 
 When you want it in your code, tell your coding agent to adopt the brief. It works in your
 repository by your project's rules, one commit per repo, and records each one with
@@ -62,23 +63,32 @@ changes your project, so your coding agent runs it there, when you ask.
 
 | skill | does |
 |---|---|
-| `github-scout-plan` | reads your project, restates the goal as a result, sets the stage, writes search directions in English and Chinese |
-| `github-scout-search` | searches every direction many ways: names, pairs, mechanisms, topics, SKILL.md files, skills.sh, the MCP registry, npm, fast-rising new repos |
-| `github-scout-triage` | registers and tags each repo, decides how to read it (a skill, a CLI and a list are read differently) |
-| `github-scout-dig` | reads the code, pulls out the ideas with file paths |
-| `github-scout-brief` | compares with your code, writes the answer and the hand-off for your coding agent |
-| `github-scout-adopt` | brings what the brief picked into your project, by its rules (depend, vendor, port, skill, tool, data), and records it with `github-scout adopt` |
+| `github-scout-plan` | reads your project, restates the goal as a result, says what good looks like, sets the stage, writes search directions in English and Chinese |
+| `github-scout-search` | searches every direction many ways: names, pairs, mechanisms, topics, SKILL.md files, skills.sh, the MCP registry, npm, fast-rising new repos; leaves out repos under 50 stars |
+| `github-scout-triage` | keeps the repos with results to look at and 50+ stars, tags them, decides how to read each (a skill, a CLI and a list are read differently) |
+| `github-scout-dig` | tries the best two or three, stops early on dead ends, reads the code of the one to follow |
+| `github-scout-brief` | compares with your code; writes the answer (one backbone, what fills its gaps) and the hand-off for your coding agent |
+| `github-scout-adopt` | brings the backbone in whole (depend, skill, tool) and each gap filler by your rules (port, vendor, data), and records it with `github-scout adopt` |
 
 ## What it believes
 
 - **The goal decides what you find.** "Find a video tool" and "make our videos cut like an
-  editor's" find different projects. The stage of your own work decides what to borrow: the
-  approach early on, parameters and edge cases later.
-- **Ideas over code.** An agent writes code at will; it never writes an approach it did not
-  think of. Cards start with the idea, where it lives, and why it is not obvious.
+  editor's" find different projects. Say what good looks like before you search: two or three
+  finished results to match, or checks anyone can run. The stage of your own work decides what to
+  borrow: a whole approach early on, parameters and edge cases later.
+- **Results before code.** A repo counts only if you can see what it made: films, galleries,
+  sample outputs, benchmarks, projects using it. Under 50 stars it is no reference unless you
+  write why.
+- **Try before you read.** The best two or three get a short run, their own smallest example or
+  one real task, before anyone reads their code. One that does not run is dropped in minutes.
+- **One backbone, then its gaps.** Follow one proven repo as a whole; take from others only what
+  it lacks, each with a reason. One run took an idea from each of twelve repos, and the film it
+  made was wrong.
 - **A brief, not a list.** Twenty repos with star counts leave all the work to you.
-- **New and moving beats old and famous.** No push in 3 months ranks far down, 6 months is set
-  aside, 12 months is dropped. Lures (game cheats, cracks) and farmed install counts are left out.
+- **New and moving helps you find, not pick.** No push in 3 months ranks far down, 6 months is
+  set aside, 12 months is dropped. Fast-rising new repos are searched for; picking goes by
+  results, stars, the trial and fit. Lures (game cheats, cracks) and farmed install counts are
+  left out.
 - **English and Chinese, always.** Chinese projects supplied half the repos picked in real runs,
   and they describe themselves in Chinese.
 - **Never read the same repo twice.** Every verdict goes into the registry with its reason; later
@@ -93,7 +103,7 @@ A folder of Markdown and JSON, best kept in git:
 ```
 projects/<project>/questions/<q>.md      the goal, its stage, the directions, the answer
 projects/<project>/briefs/<q>.md         the hand-off for the coding agent
-repos/<owner>__<repo>.md                 one card per repo read closely: the idea first, then where we adopted it
+repos/<owner>__<repo>.md                 one card per repo read closely: the idea, its results and our trial, where we adopted it
 ledger.jsonl                             every verdict, append-only
 scans/<project>/<q>/<stamp>.json         what each search ran and found
 ```
@@ -115,7 +125,8 @@ Many "search before you build" skills guide one search to one decision, such as 
 `search-first` (the most installed on skills.sh), `reuse-before-build` and `oss-scout`.
 github-scout adds what comes before and after that decision:
 - reading your own project first;
-- the stage-based question;
+- the stage-based question, with what good looks like;
+- a quality gate: results to look at, 50+ stars, a trial run before anyone reads code;
 - the registry that remembers every verdict;
 - tracking the repos you depend on;
 - a brief your coding agent can act on;

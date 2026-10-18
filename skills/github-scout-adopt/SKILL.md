@@ -1,6 +1,6 @@
 ---
 name: github-scout-adopt
-description: Bring the repositories a brief picked into your project, by its own rules, and record which repo went where.
+description: Bring a brief's backbone into your project as a whole, and what fills its gaps, by its own rules; record which repo went where.
 license: MIT
 ---
 
@@ -17,7 +17,9 @@ AGENTS.md or CLAUDE.md, its tests and its conventions win over anything in the b
 
 ## Steps
 
-1. **Pick a mode for each repo:**
+1. **Pick a mode for each repo.** The backbone comes in whole, its own way: `depend`, `skill` or
+   `tool`. `port`, `vendor` and `data` take one piece, for one of the backbone's gaps; say which
+   gap in `--note`. Do not mix in what the brief lists under Not adopted.
 
    | mode | what we do | how it is pinned and traced |
    |---|---|---|
@@ -39,8 +41,9 @@ AGENTS.md or CLAUDE.md, its tests and its conventions win over anything in the b
 ## With the command line
 
 ```bash
+github-scout adopt owner/backbone --q <project>/<question> --mode tool --into tools/video/render.sh --note "pinned v2.1"
 github-scout adopt owner/repo --q <project>/<question> --mode vendor \
-  --into tools/video/src/x.ts --from src/x.ts --note "kept the parser, dropped the CLI"
+  --into tools/video/src/x.ts --from src/x.ts --note "gap: captions; kept the parser, dropped the CLI"
 github-scout note other/repo --q <project>/<question> --take skip --note "<why we did not take it>"
 ```
 
@@ -53,9 +56,9 @@ github-scout note other/repo --q <project>/<question> --take skip --note "<why w
   run `adopt` after the commit.
 - The same `--q` and `--into` again replace the entry; `--drop` marks it dropped and keeps it.
 
-The brief's last section has one such line per picked repo, ready to fill. Afterwards
-`github-scout updates` lists adopted repos first, with the upstream commits that touched the files
-we took. After updating our copy, run `adopt` again with `--at <their new commit>`.
+The brief's Adopt and record section has one such line per repo to bring in, ready to fill.
+Afterwards `github-scout updates` lists adopted repos first, with the upstream commits that
+touched the files we took. After updating our copy, run `adopt` again with `--at <their new commit>`.
 
 ## Without the command line (cloud chat)
 

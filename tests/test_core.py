@@ -299,7 +299,7 @@ class ChineseStoreTests(Base):
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
-        self.assertIn("## 主干：整套照做\n\n照主干的做法从头做到尾。", text)
+        self.assertIn("## 主干：整套照做\n\n照主干的做法从头做到尾；别的仓库只在「补什么」点名的地方进来。", text)
         self.assertIn("d/tool：成片和目标最像", text)
         self.assertIn("## 补什么\n\n| 主干缺什么 | 从哪补 | 为什么 |", text)
         self.assertIn("| [d/tool](https://github.com/d/tool) | 主干 | - | - | - | - | - | - |", text)

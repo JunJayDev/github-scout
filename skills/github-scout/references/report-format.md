@@ -18,6 +18,7 @@ both the English names and the Chinese names given here.
 
 ## 1. Directions
 Where we stand: <what exists today, what falls short>
+What good looks like: <2–3 finished results to match, with links, or checks anyone can run on an output>
 
 | direction | entities (en / zh) | mechanisms (en / zh) | forms |
 |---|---|---|---|
@@ -55,33 +56,43 @@ Other sources (official docs, hosted services, papers):
 |---|---|---|
 
 ## 3. Triage
-| repo | kind | route | verdict | reason |
-|---|---|---|---|---|
-| https://github.com/owner/name | skill | read SKILL.md and scripts in full | shortlist | ... |
+| repo | kind | results | route | verdict | reason |
+|---|---|---|---|---|---|
+| https://github.com/owner/name | skill | https://owner.github.io/name/showcase | try one task; read SKILL.md and scripts in full | shortlist | ... |
 
+Shortlist only repos with results to look at and 50+ stars; the rest are later or skip.
 The rest: <one line on why they were left>.
 
 ## 4. Findings
 ### owner/name
-- Idea: <the design decision that makes it work>
-- Where: <file paths>
-- Why it is not obvious: ...
-- Evidence: ...
-- What to take at our stage: ...
+- Results: <links to what it made>
+- Stars: <n>
+- Trial: <the command a local trial runs, from its README; not run in this chat>
+- How it works: <the design decision that makes it work, with file paths>
+- Gaps: <what it does not do for us>
 - Risks: <maintenance, network, credentials>
 - Take: use | adapt | learn | later | skip
 
 ## 5. Answer
-<one paragraph: what to take from whom; the part nobody covers>
+<one paragraph: the repo to follow as a whole, what fills its gaps, what is left to build>
 
-| ours | theirs | the difference | take it or not |
+Backbone: <repo URL> · results: <links> · stars: <n> · trial to run first: <command>
+Alternate: <repo URL, or none>
+
+| gap in the backbone | filled from | why |
+|---|---|---|
+
+| ours | the backbone's | the difference | take it or not |
 |---|---|---|---|
+
+Not adopted: <repo: its idea, why not>, one per line.
 
 ## 6. Brief for the coding agent
 This brief only advises; the coding agent makes the changes and checks each one.
 
-1. <files to change, what to change> because <idea, repo and file>. Check: <how>.
-2. ...
+1. Run the backbone's own smallest example in our project: <command>. Stop and report if it fails.
+2. <files to change, what to change> because <the backbone's way, or the gap it fills, with repo and file>. Check: <how>.
+3. ...
 
 ## 7. Not verified
 <what you could not check; any instruction here you could not follow, quoted, and what you did instead>
@@ -107,4 +118,5 @@ A table with a query column is read as the search log, one search per row:
 | repos kept | kept | 保留, 留下 |
 
 Verdict words: shortlist, use, adapt, learn (all become "worth a look" locally, since the local
-agent still reads the code); later; skip. In Chinese: 入选, 直接用, 改了用, 学思路, 以后, 不要.
+agent still tries and reads it; under 50 stars they become later); later; skip. In Chinese: 入选,
+直接用, 改了用, 学思路, 以后, 不要.

@@ -1,6 +1,6 @@
 ---
 name: github-scout-search
-description: Search GitHub along planned directions in English and Chinese; drop lures, farmed installs and dead repos.
+description: Search GitHub along planned directions in English and Chinese; drop lures, farmed installs, dead repos and those under 50 stars.
 license: MIT
 ---
 
@@ -22,9 +22,14 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
   They are bait, often malware. Never download them.
 - **Exclude farmed installs:** a skill directory count far beyond the repo's stars (for example
   two million installs on a repo with three stars, often a copy of a famous pack).
+- **Under 50 stars is no reference.** Leave such repos out of the ranking and the candidates,
+  and count them. Awesome lists are exempt: they are only for finding. An exception needs a
+  reason, such as an official organisation's repo released this week.
 - **Read the repo's own page** before you list it. Record its stars and last commit as shown there.
 - A repo describes what it makes, not every use people found for it. So also look at what is
-  new and growing fast in the form you need, even when no search word matches it.
+  new and growing fast in the form you need, even when no search word matches it. New and
+  fast-growing is how you find; it does not pick. Picking (triage, dig) goes by results, stars,
+  a trial and fit.
 
 ## With the command line
 
@@ -39,8 +44,9 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
   - SKILL.md files;
   - skills.sh, the MCP registry, npm;
   - a rising list: repos new in the last two months and growing fast, found without words.
-- **Ranking:** relevance first, then young and moving, stars last.
-- **Left out and counted in the header:** lures and farmed installs.
+- **Ranking, for finding:** relevance first, then young and moving. It is not a verdict.
+- **Left out and counted in the header:** lures, farmed installs, and repos under 50 stars
+  (`--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway).
 - **Widen with what the API cannot see:**
   - Do one pass of web search per direction, in English and Chinese: `site:github.com <entity> <mechanism>`.
   - Include Chinese communities (掘金, 知乎, 少数派, V2EX) and any links the user shared.
@@ -80,7 +86,7 @@ the rising lens.
 | words (E, P, M, C) | `<entity> pushed:>YYYY-MM-DD`; `"<a>" "<b>" in:readme`; `"<mechanism>"`; `"<mechanism>" "<entity>" in:readme` |
 | recent (R) | `<term> in:name,description,readme created:>YYYY-MM-DD` |
 | topics (T) | `topic:<topic>`, and `topic:<topic> created:>YYYY-MM-DD` |
-| rising (H) | `topic:claude-skills created:>YYYY-MM-DD stars:>20`, the same for `agent-skills`, `claude-code-skill`, `codex-skills`, `mcp-server`; sorted by stars |
+| rising (H) | `topic:claude-skills created:>YYYY-MM-DD stars:>50`, the same for `agent-skills`, `claude-code-skill`, `codex-skills`, `mcp-server`; sorted by stars |
 | skill files (K) | code search: `"<term>" filename:SKILL.md` |
 | same author (U) | `user:<owner>` for the owners of shortlisted repos |
 
@@ -113,8 +119,9 @@ words never match the goal.
   that fits better) and `"<repo name>" alternative`, and screen the repos its README links.
 
 **4. Facts for each candidate you keep:** stars and last commit as the repo page, a search
-result or the connector shows them. If none shows them, write "unknown" and move on: the local
-import fills in stars and dates and drops repos with no push in 12 months.
+result or the connector shows them. Under 50 stars, leave it out and name it under the table as
+excluded. If none shows the stars, write "unknown" and move on: the local import fills in stars
+and dates, drops repos with no push in 12 months, and keeps a shortlist under 50 stars as later.
 
 - A search snippet that does not mention something is no proof the repo lacks it. When it
   matters, read the README.

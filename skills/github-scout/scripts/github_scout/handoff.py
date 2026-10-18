@@ -247,8 +247,7 @@ T = {
         "goal": "## Goal and where we stand", "good": "### What good looks like", "code": "Project code: {code}",
         "nocode": "No local project was given; map each step onto the code it would change before starting.",
         "backbone": "## Backbone: follow it as a whole",
-        "follow": "Do it the backbone's way, end to end. Other repos come in only where Gaps to fill names them; "
-                  "Not adopted, at the end, stays out.",
+        "follow": "Do it the backbone's way, end to end; other repos come in only where Gaps to fill names them.",
         "gaps": "## Gaps to fill", "trials": "## Trial runs",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
@@ -276,7 +275,7 @@ T = {
         "goal": "## 目标和现状", "good": "### 好的结果长什么样", "code": "项目代码：{code}",
         "nocode": "没有给本地项目；动手前先把每一步对应到要改的代码。",
         "backbone": "## 主干：整套照做",
-        "follow": "照主干的做法从头做到尾。别的仓库只在「补什么」点名的地方进来；最后「没采用」里的不要加。",
+        "follow": "照主干的做法从头做到尾；别的仓库只在「补什么」点名的地方进来。",
         "gaps": "## 补什么", "trials": "## 试跑记录",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",

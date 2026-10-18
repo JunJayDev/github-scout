@@ -1,6 +1,6 @@
 ---
 name: github-scout-plan
-description: Turn a goal in your project into GitHub search directions in English and Chinese, after reading the project.
+description: Turn a goal in your project into what good looks like and GitHub search directions in English and Chinese, after reading the project.
 license: MIT
 ---
 
@@ -22,7 +22,12 @@ which project?" and wait.
    user says exists today.
 2. **Restate the goal as a result**, not as the tool you imagine. Not "find a video generation
    tool" but "make our product videos cut like an editor's, with an agent doing the work".
-3. **Set the stage.** It decides what is worth borrowing. Split the question if parts sit at
+3. **Say what good looks like:** two or three finished results we want to match (a film, a page,
+   an output, with links), or checks anyone can run on an output ("renders in under a minute",
+   "every cut lands on a beat"). Triage and dig judge each candidate's results against these;
+   without them, any repo looks good on paper. Ask the user for examples they like; propose your
+   own when they have none.
+4. **Set the stage.** It decides what is worth borrowing. Split the question if parts sit at
    different stages.
 
    | stage | our work | borrow mostly |
@@ -32,7 +37,7 @@ which project?" and wait.
    | `working` | it works | techniques, parameters, prompts, edge cases, evaluation |
    | `polishing` | refining | details, benchmarks, parts to drop in |
 
-4. **Write 3 to 8 directions.** Each direction is one sub-problem, with:
+5. **Write 3 to 8 directions.** Each direction is one sub-problem, with:
    - **entities**: the concrete things a solution touches: sites, file formats, APIs, products;
    - **mechanisms**: how a solution would work, in the words its README would use
      ("logged-in browser", "remotion", "MCP server");
@@ -57,22 +62,23 @@ github-scout ask <project>/<question> "<the result we want>" --stage working
 Run `ask` inside the project's repository; it creates the registry and the project when
 missing. Fill the question file it prints:
 - "Where we are": what we have, what falls short.
+- "What good looks like": the finished results to match, as links, or the checks.
 - The vocabulary in the frontmatter: `entities` and `mechanisms` are lists of groups,
   synonyms joined with `|`; then `forms` and `problems`.
 
 Then `github-scout scan <project>/<question> --plan` prints the searches and warns about groups
 missing a language.
 
-**Stop here.** Show the user the directions and the search plan, and wait for them to confirm or
-change them, unless they said not to stop.
+**Stop here.** Show the user what good looks like, the directions and the search plan, and wait
+for them to confirm or change them, unless they said not to stop.
 
 ## Without the command line (cloud chat)
 
 Read our project first: through the GitHub connector when the user's repo is connected, else
 the files they attached, else what they say exists today. Then write section 1 of the report
-(`../github-scout/references/report-format.md`): the goal as a result, where we stand, the stage, and the directions in a table: direction, entities and
-mechanisms in each language, and forms. Then go straight to the search, unless the user asked to confirm the
-directions first.
+(`../github-scout/references/report-format.md`): the goal as a result, where we stand, what good looks like, the stage,
+and the directions in a table: direction, entities and mechanisms in each language, and forms. Then go straight to the
+search, unless the user asked to confirm the directions first.
 
 ## Next
 

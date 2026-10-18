@@ -4,6 +4,29 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Quality gate (user, 2026-10-18). A run that took one idea from each of 12 repos made an
+  explainer film the user called completely wrong: nobody had looked at what those repos made,
+  run one of them, or said what good looks like. Now a repo is a reference only with results to
+  look at and 50+ stars (`GITHUB_SCOUT_MIN_STARS`); the best two or three are tried before one is
+  chosen; the answer follows one backbone as a whole (at most one alternate) and fills only its
+  named gaps; other repos' ideas go to a Not adopted appendix. New and fast-growing repos are
+  still searched for, but no longer pick.
+  - `pick` refuses a shortlist under the threshold without `--low-stars "<why>"`, recorded in the
+    ledger; lists are exempt and unknown stars warn. Such rows leave the scan table and are
+    counted in its header; `import` keeps a shortlist under the threshold as `later`.
+  - `note --take use|adapt|learn` needs results on the card (`--results <links>`, or
+    `--no-results "<why>"`) and the same `--low-stars`; both reasons go on the take and into the
+    ledger. `note --trial` writes a dated line into the card's new Results and trial section and
+    sets `level: trial`. `look` shows the homepage and the README links that look like results;
+    `show` and the site show a card's results.
+  - Questions: What good looks like; an answer of one paragraph, Backbone, Gaps to fill, Trial
+    runs, Against what we have, Next steps, Not adopted; `backbone:` and `alternate:` in the
+    frontmatter. `check` warns when a named backbone was not tried or a repo the answer relies
+    on lacks results or stars without a reason. `brief` follows the new layout, lists each
+    source's role, stars, results and level, and ends with the appendix. Questions and cards
+    written before still read, brief and check as they did.
+  - All eight recall cases in `evals/evals.json` have 50+ stars (the smallest,
+    alchaincyf/tramstop-skill, has 53), so the threshold hides none of them.
 - `note` on a card that another question already wrote: the idea goes at the end of the first section,
   marked with the question, instead of above what was there; `--watch` adds to the card's list and
   `--summary` replaces its summary. A repo with no description on GitHub gets the first sentence of the

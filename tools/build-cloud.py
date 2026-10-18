@@ -30,7 +30,7 @@ You are running github-scout in a chat (ChatGPT, Claude on the web, or similar).
 command line here. In every stage below, follow the part titled "Without the command line" and
 skip the commands.
 
-- **No licences.** We look for ideas and reference projects. Do not research, mention or tabulate
+- **No licences.** We look for reference projects to follow. Do not research, mention or tabulate
   licences, usage rights, stock-media terms, model-weight terms or prices: no licence column,
   no licence notes, no licence or rights section. A report that has them has failed this rule.
 - **Keep the report's sections, numbers and order exactly as in the format near the end,**
@@ -50,6 +50,10 @@ skip the commands.
   and offer it for download.
 - List only repositories you have seen (their page, the connector, or a search result naming
   them). Never invent a repository, a star count or a date.
+- **Trials run locally.** You cannot install or run code here. Where a stage says to try a repo,
+  look at what it made instead (videos, galleries, sample outputs) and write the command a local
+  trial should run. Choose the backbone by its results and stars; the local agent tries it before
+  anyone follows it.
 - Without a project, the stage is "idea".
 - If the user attaches a candidate table from a local `github-scout scan`, those are the
   candidates: skip the search and start at triage (stage 3).
