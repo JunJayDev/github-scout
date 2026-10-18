@@ -52,7 +52,7 @@ python3 scripts/github-scout.py --help
 python3 scripts/github-scout.py <command> --help
 ```
 
-Installed as a package (`pipx install <repo>`), the same CLI is `github-scout`.
+Installed as a package (`pipx install git+https://github.com/HouseYeung/github-scout`), the same CLI is `github-scout`.
 
 ## Maintenance
 

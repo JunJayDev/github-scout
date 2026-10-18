@@ -18,12 +18,12 @@ agent 爱重复造轮子，因为它像新手一样搜。有个项目要用登�
 ## 安装
 
 ```bash
-npx skills add <owner>/github-scout -g
+npx skills add HouseYeung/github-scout -g
 ```
 
-或者直接对你的 agent 说：「帮我安装这个仓库里的 skill：https://github.com/<owner>/github-scout」。
+或者直接对你的 agent 说：「帮我安装这个仓库里的 skill：https://github.com/HouseYeung/github-scout」。
 
-Claude Code 也能用插件装：先 `/plugin marketplace add <owner>/github-scout`，再 `/plugin install github-scout@github-scout`。
+Claude Code 也能用插件装：先 `/plugin marketplace add HouseYeung/github-scout`，再 `/plugin install github-scout@github-scout`。
 
 命令行部分要 Python 3.9+ 和登录过的 `gh`（或者 `GITHUB_TOKEN`）。别的不用配：第一次提问会在 `~/.github-scout` 建好登记库。
 

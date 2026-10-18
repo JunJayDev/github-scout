@@ -3,6 +3,8 @@
   "version": "0.2.0",
   "description": "Find what GitHub already solved for a goal in your project, and hand concrete suggestions to your coding agent.",
   "license": "MIT",
+  "homepage": "https://github.com/HouseYeung/github-scout",
+  "repository": "https://github.com/HouseYeung/github-scout",
   "keywords": ["github", "open-source", "search", "prior-art", "reuse", "registry", "skills"],
   "author": {"name": "github-scout contributors"}
 }

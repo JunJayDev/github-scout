@@ -23,6 +23,11 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/HouseYeung/github-scout"
+Issues = "https://github.com/HouseYeung/github-scout/issues"
+Changelog = "https://github.com/HouseYeung/github-scout/blob/main/CHANGELOG.md"
+
 [project.scripts]
 github-scout = "github_scout.cli:main"
 
