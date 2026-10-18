@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 
 from .discover import slugs_in_text
-from .store import BACKBONE_TITLES, Store, StoreError, as_list, section, today
+from .store import BACKBONE_TITLES, SLUG, Store, StoreError, as_list, section, today
 
 # Column names a report may use, in English and Chinese.
 COLUMNS = {
@@ -330,7 +330,7 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
         for key in ("practice", "compare"):
             if parts[key]:
                 lines += [t[key], "", parts[key], ""]
-    backbone, alternate = (str(q.get(k) or "") for k in ("backbone", "alternate"))
+    backbone, alternate = (q[k] if isinstance(q.get(k), str) and SLUG.match(q[k]) else "" for k in ("backbone", "alternate"))
     picked = [str(x) for x in as_list(q.get("picked"))]
     adopt = list(dict.fromkeys([backbone] * bool(backbone) + picked))          # the alternate only if it is picked
     sources = list(dict.fromkeys(adopt[:1] + [alternate] * bool(alternate) + adopt[1:]))

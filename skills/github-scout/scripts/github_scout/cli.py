@@ -450,7 +450,7 @@ def pack(path: Path, include: list[str] | None) -> str:
     return f"packed: {out}" + (f" ({total})" if total else "")
 
 
-def _gate(args, slug: str, stars, results: list) -> None:
+def _gate(args, slug: str, stars, results: list, carded: bool = False) -> None:
     """use, adapt and learn make a repo a reference: it needs results to look at and enough stars, or a written
     reason for each (user, 2026-10-18). Refused before anything is written."""
     if args.take not in REFERENCE_TAKES:
@@ -459,8 +459,9 @@ def _gate(args, slug: str, stars, results: list) -> None:
     if stars is None:
         print(f"warn  {slug}: stars unknown. A reference needs {limit}+")
     elif stars < limit and not args.low_stars:
-        problems.append(f"{slug} has {stars} stars, under {limit}: no reference. Say why it is an exception with "
-                        f"--low-stars \"<why>\" (an official organisation's new repo, say), or note it as later or skip")
+        problems.append(f"{slug} has {stars} stars" + (" on its card (updates --done refreshes the count)" if carded else "")
+                        + f", under {limit}: no reference. Say why it is an exception with --low-stars \"<why>\" (an "
+                        "official organisation's new repo, say), or note it as later or skip")
     if not results and not args.no_results:
         problems.append(f"{slug} has no results to look at on its card. Give --results <links to what it made: films, "
                         "galleries, sample outputs, benchmarks, projects using it>, or --no-results \"<why it still "
@@ -486,7 +487,7 @@ def cmd_note(args):
            "low_stars": args.low_stars, "no_results": args.no_results}
     extra = {k: v for k, v in (("low_stars", args.low_stars), ("no_results", args.no_results)) if v}
     if card:
-        _gate(args, card.id, card.data.get("stars"), [*map(str, as_list(card.data.get("results"))), *results])
+        _gate(args, card.id, card.data.get("stars"), [*map(str, as_list(card.data.get("results"))), *results], True)
         set_use(store, card.id, use, level)
         if results:
             add_results(store, card.id, results)

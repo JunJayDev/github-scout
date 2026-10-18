@@ -993,6 +993,8 @@ class QualityGateTests(Base):
         self.assertEqual(code, 0, err)
         self.assertEqual(self.store.card("c/plain").data["uses"][0]["no_results"], "a library: its tests are the result")
         registry.new_question(self.store, "ops/other", "Another question", "idea")
+        code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/other", "--take", "use")
+        self.assertIn("b/tiny has 12 stars on its card (updates --done refreshes the count), under 50", err)
         code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/other", "--take", "use", "--low-stars", "same org")
         self.assertEqual(code, 0, err)                                    # the card has results already
         self.assertEqual(self.store.check()[0], [])
