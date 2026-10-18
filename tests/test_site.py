@@ -74,6 +74,7 @@ def build(tmp: str, lang: str) -> tuple[Path, str, dict]:
                              [{"project": "shop", "question": "mail", "take": "use", "note": "the mailer"}],
                              [], "read", summary=EVIL)
     card.body = CARD_BODY.format(idea="思路" if zh else "The idea", read="先读" if zh else "Read first")
+    card.data["results"] = ["https://example.com/demo.mp4", "javascript:alert(1)"]
     card.data["adopted"] = [{"project": "shop", "question": "mail", "mode": "vendor", "into": ["src/mail/pool.py"],
                              "from": ["src/send.py"], "at": "abcdef1234567", "date": "2026-10-02"},
                             {"project": "shop", "question": "mail", "mode": "port", "into": ["src/old.py"],
@@ -107,6 +108,12 @@ class SiteTests(unittest.TestCase):
             self.assertNotIn("url(", site.CSS)
             for call in ("fetch(", "XMLHttpRequest", "import("):
                 self.assertNotIn(call, site.JS)
+
+    def test_cards_carry_their_result_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, _, data = build(tmp, "en")
+            self.assertEqual([c["results"] for c in data["cards"]], [["https://example.com/demo.mp4"], []])
+            self.assertEqual(data["ui"]["results"], "Results")
 
     def test_registry_text_cannot_inject_html(self):
         with tempfile.TemporaryDirectory() as tmp:

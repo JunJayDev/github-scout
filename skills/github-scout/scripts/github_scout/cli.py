@@ -11,28 +11,29 @@ from pathlib import Path
 from . import __version__
 from .discover import (
     DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, is_open, is_stale, plan, render, rescore, rising, row,
-    slugs_in_text, visible,
+    slugs_in_text, visible, why_hidden,
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
 from .registry import (
-    add_watch, adoption_text, find, new_card, new_project, new_question, put_idea, render_find, set_adoption, set_use, show_card,
-    show_question, stage_help, write_index,
+    add_results, add_watch, adoption_text, find, new_card, new_project, new_question, put_idea, put_trial, render_find,
+    set_adoption, set_use, show_card, show_question, stage_help, write_index,
 )
 from .store import (
-    KINDS, LEVELS, MODES, SHA, STAGES, TAKES, Store, StoreError, env, lang_gaps, locate, parse_langs, question_langs,
-    read_config, today,
+    KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, env, lang_gaps, locate,
+    min_stars, parse_langs, question_langs, read_config, stars_of, today,
 )
 
 EPILOG = """stages (one skill each; github-scout runs 1 to 5, which never change the project):
-  plan    find, ask, scan --plan       the goal, where we stand, search directions
-  search  scan, scan --add/--expand     every lens, merged and ranked; lures and farmed installs left out
-  triage  pick, look                    register and tag each repo, decide how to read it
-  dig     look --source, note --idea    read the code, take the ideas
-  brief   write the answer, brief       a hand-off for the coding agent; the project is not changed
+  plan    find, ask, scan --plan       the goal, what good looks like, search directions
+  search  scan, scan --add/--expand     every lens, merged and ranked; lures, farmed installs and repos under 50 stars left out
+  triage  pick, look                    keep repos with results to look at and 50+ stars; decide how to read each
+  dig     note --trial, look --source   try the top 2-3, then read the code of the one to follow
+  brief   write the answer, brief       one backbone and what fills its gaps; the project is not changed
   adopt   adopt                         the coding agent brings it into the project; updates then watches it
   also: import (a report from a cloud chat), updates, show, site, check
+star threshold: 50, or $GITHUB_SCOUT_MIN_STARS
 
 store: --store DIR, else $GITHUB_SCOUT_STORE, else the config file, else the nearest
 parent directory that contains github-scout.json, else ~/.github-scout (created by the first `ask`)."""
@@ -159,12 +160,18 @@ def cmd_import(args):
     sc.log.append({"lens": "W", "kind": "import", "query": f"import {where}"[:200], "hits": n})
     scan = sc.finish("W")
     path = store.save_scan(scan)
-    entries = []
+    entries, low = [], []
+    limit = min_stars()
     for key, r in rows.items():
         if r.get("take") and key in sc.cands:
+            c = sc.cands[key]
+            verdict = VERDICT_OF_TAKE[r["take"]]
             reason = f"{where}: {r['take']}" + (f": {r['reason']}" if r.get("reason") else "")
-            entries.append(_entry(args, sc.cands[key]["repo"], project, qid, VERDICT_OF_TAKE[r["take"]], "meta",
-                                  reason[:300], sc.cands[key], scan["id"]))
+            stars = stars_of(c.get("stars"))
+            if verdict == "short" and stars is not None and stars < limit:     # no reference: kept for later
+                verdict, reason = "later", f"under {limit} stars; {reason}"
+                low.append(c["repo"])
+            entries.append(_entry(args, c["repo"], project, qid, verdict, "meta", reason[:300], c, scan["id"]))
     store.append_ledger(entries)
     print(f"{len(slugs)} repos linked; {n} exist on GitHub and were added ({path.relative_to(store.root)}); "
           f"{len(sc.dropped)} dropped (no push in 12 months); {len(entries)} verdicts from the report's table; "
@@ -173,6 +180,9 @@ def cmd_import(args):
         print(f"moved ({len(moved)}), added under the new name: " + ", ".join(moved))
     if missing:
         print(f"not on GitHub ({len(missing)}), possibly invented by the report's author: " + ", ".join(missing))
+    if low:
+        print(f"under {limit} stars, recorded as later, not shortlisted ({len(low)}): {', '.join(low)} "
+              f"(pick <q> owner/repo --low-stars \"why\" to shortlist one anyway)")
     if q.get("entities") or q.get("mechanisms"):
         print(f"next: github-scout scan {project}/{qid}   (GitHub's API on the same directions, no model needed; "
               f"rows without W are repos the report did not list)")
@@ -234,7 +244,8 @@ def cmd_ask(args):
           f"stage {args.stage}: {stage_help(store, args.stage)}\n"
           "before searching, edit the file:\n"
           "  1. Where we are: what we already have (paths) and what is not good enough.\n"
-          "  2. Vocabulary: entities (platforms, formats, products) and mechanisms (how a solution would work,\n"
+          "  2. What good looks like: 2-3 finished results to match (links), or checks anyone can run on an output.\n"
+          "  3. Vocabulary: entities (platforms, formats, products) and mechanisms (how a solution would work,\n"
           f"     in README words), each group with a term in every language of langs ({', '.join(langs)}), synonyms\n"
           "     with |, in the words those users write, not translations: \"xiaohongshu|小红书|xhs|红书\".\n"
           "     Then forms, and 2-4 short problem phrases, one per language.\n"
@@ -302,12 +313,13 @@ def cmd_scan(args):
         added = [c["repo"] for c in scan["candidates"]]
         print(f"added {len(added)} repos ({scan.get('dropped', 0)} dropped: no push in 12 months). Where they rank now:")
         by = {c["repo"].lower(): c for c in merged["candidates"]}
+        limit = min_stars()
         for slug in added:
             c = by.get(slug.lower())
             if c is None:
                 continue
             i = index.get(slug.lower())
-            print(row(i, c) if i else f"  -  {slug}  ({'decided' if c.get('card') or c.get('seen') else 'stale or a list'})")
+            print(row(i, c) if i else f"  -  {slug}  ({why_hidden(c, limit)})")
         print(f"full table: github-scout scan {ref} --show")
         return
     _out(args, render(merged, args.top, args.all)
@@ -339,13 +351,27 @@ def cmd_pick(args):
         slug = _slug(ref)
         return by_repo.get(slug.lower(), {"repo": slug}), reason or None
 
-    entries, decided = [], set()
+    entries, decided, low, unknown = [], set(), [], []
+    limit = min_stars()
     for verdict, items in (("short", args.items), ("list", args.list), ("later", args.later), ("skip", args.skip)):
         for item in items or []:
             c, reason = resolve(item)
             decided.add(c["repo"].lower())
-            entries.append(_entry(args, c["repo"], project, qid, verdict, "meta",
-                                  reason or (args.why if verdict == "skip" else None), c, scan.get("id")))
+            e = _entry(args, c["repo"], project, qid, verdict, "meta", reason or (args.why if verdict == "skip" else None),
+                       c, scan.get("id"))
+            stars = stars_of(c.get("stars"))
+            if verdict == "short" and stars is None:
+                unknown.append(c["repo"])
+            elif verdict == "short" and stars < limit:            # no reference without a written reason
+                if args.low_stars:
+                    e["low_stars"] = args.low_stars
+                else:
+                    low.append(f"{c['repo']} ({stars})")
+            entries.append(e)
+    if low:
+        raise StoreError(f"under {limit} stars, no references: {', '.join(low)}. Shortlist one only with "
+                         f"--low-stars \"<why it is an exception>\" (an official organisation's new repo, say); "
+                         "otherwise --later or --skip it")
     if args.rest:
         lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c)][:8]
         for c in rows[: args.top] + lists + rise[:RISE_SHOW]:
@@ -363,6 +389,9 @@ def cmd_pick(args):
     explicit = [e["repo"] for e in entries if e["verdict"] == "skip" and e.get("reason") != args.rest]
     if explicit:
         print("  skip: " + ", ".join(explicit))
+    if unknown:
+        print(f"warn  stars unknown (not in a scan): {', '.join(unknown)}. A reference needs {limit}+ stars: "
+              "check before you read it")
     short = [e["repo"] for e in entries if e["verdict"] == "short"]
     if short:
         print(f"next: github-scout look --q {project}/{qid} " + " ".join(short))
@@ -397,8 +426,9 @@ def cmd_look(args):
             project, qid = store.split_ref(args.q)
             entries.append(_entry(args, p["repo"], project, qid, "peeked", "read" if args.source else "look", None, p))
     store.append_ledger(entries)
-    _out(args, "\n\n".join(texts) + ("\n\nnext: github-scout note <repo> --q <question> --take use|adapt|learn|later|skip"
-                                     " --note \"...\"" if results else ""), results)
+    _out(args, "\n\n".join(texts) + ("\n\nnext: look at its results, then github-scout note <repo> --q <question> "
+                                     "--take use|adapt|learn|later|skip --results <links> --note \"...\"" if results else ""),
+         results)
 
 
 def pack(path: Path, include: list[str] | None) -> str:
@@ -420,40 +450,80 @@ def pack(path: Path, include: list[str] | None) -> str:
     return f"packed: {out}" + (f" ({total})" if total else "")
 
 
+def _gate(args, slug: str, stars, results: list) -> None:
+    """use, adapt and learn make a repo a reference: it needs results to look at and enough stars, or a written
+    reason for each (user, 2026-10-18). Refused before anything is written."""
+    if args.take not in REFERENCE_TAKES:
+        return
+    limit, stars, problems = min_stars(), stars_of(stars), []
+    if stars is None:
+        print(f"warn  {slug}: stars unknown. A reference needs {limit}+")
+    elif stars < limit and not args.low_stars:
+        problems.append(f"{slug} has {stars} stars, under {limit}: no reference. Say why it is an exception with "
+                        f"--low-stars \"<why>\" (an official organisation's new repo, say), or note it as later or skip")
+    if not results and not args.no_results:
+        problems.append(f"{slug} has no results to look at on its card. Give --results <links to what it made: films, "
+                        "galleries, sample outputs, benchmarks, projects using it>, or --no-results \"<why it still "
+                        "counts>\"; without results it is later or skip")
+    if problems:
+        raise StoreError("\n".join(problems))
+
+
+def _links(items: list[str] | None) -> list[str]:
+    bad = [x for x in items or [] if not URL.match(x)]
+    if bad:
+        raise StoreError(f"--results takes links (http or https) to what it made: {', '.join(bad)}")
+    return list(dict.fromkeys(items or []))
+
+
 def cmd_note(args):
     store = _store(args)
     project, qid = store.split_ref(args.q)
+    results = _links(args.results)
+    level = args.level or ("trial" if args.trial else None)
     card = store.card(args.repo)
-    use = {"project": project, "question": qid, "take": args.take, "where": args.where, "note": args.note}
+    use = {"project": project, "question": qid, "take": args.take, "where": args.where, "note": args.note,
+           "low_stars": args.low_stars, "no_results": args.no_results}
+    extra = {k: v for k, v in (("low_stars", args.low_stars), ("no_results", args.no_results)) if v}
     if card:
-        set_use(store, card.id, use, args.level)
+        _gate(args, card.id, card.data.get("stars"), [*map(str, as_list(card.data.get("results"))), *results])
+        set_use(store, card.id, use, level)
+        if results:
+            add_results(store, card.id, results)
         if args.idea:
             put_idea(store, card.id, args.idea, f"{project}/{qid}")
+        if args.trial:
+            put_trial(store, card.id, args.trial, f"{project}/{qid}")
         if args.watch:
             add_watch(store, card.id, args.watch)
         if args.summary:
             fresh = store.card(card.id)
             fresh.data["summary"] = args.summary
             store.save_card(fresh)
-        store.append_ledger([_entry(args, card.id, project, qid, "card", args.level or "read", f"{args.take}: {args.note or ''}")])
+        store.append_ledger([{**_entry(args, card.id, project, qid, "card", level or "read",
+                                       f"{args.take}: {args.note or ''}"), **extra}])
         print(f"{card.path}: {project}/{qid} -> {args.take}")
         return
     slug = _slug(args.repo)
     if args.take == "skip" and not args.card:
-        store.append_ledger([_entry(args, slug, project, qid, "skip", args.level or "look", args.note)])
+        reason = "; ".join(x for x in (args.note, f"trial: {args.trial}" if args.trial else None) if x)
+        store.append_ledger([_entry(args, slug, project, qid, "skip", level or "look", reason or None)])
         print(f"recorded skip for {slug} under {project}/{qid} (no card; --card makes one)")
         return
     client = make_client(args, store)
     meta = peek(client, slug, 0)
+    _gate(args, meta["repo"], meta.get("stars"), results)
     kind = args.kind or meta["kind"]
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
-                   args.level or "read", args.summary, args.idea)
+                   level or "read", args.summary, args.idea, results)
     if args.idea:
         put_idea(store, doc.id, args.idea)
-    store.append_ledger([_entry(args, meta["repo"], project, qid, "card", args.level or "read",
-                                f"{args.take}: {args.note or ''}", meta)])
+    if args.trial:
+        put_trial(store, doc.id, args.trial, f"{project}/{qid}")
+    store.append_ledger([{**_entry(args, meta["repo"], project, qid, "card", level or "read",
+                                   f"{args.take}: {args.note or ''}", meta), **extra}])
     print(f"{doc.path}\nkind {kind} ({meta['form']}; {'; '.join(meta['evidence'])})\n"
-          "fill the card (the idea first), list upstream paths we depend on under watch:, "
+          "fill the card (the idea, then results and trial), list upstream paths we depend on under watch:, "
           "then write the answer in the question file and run github-scout check")
 
 
@@ -654,8 +724,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("pick", cmd_pick, "record verdicts on scan rows: numbers from the table, or owner/repo")
     p.add_argument("ref")
-    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look")
-    p.add_argument("--list", nargs="+", metavar="ITEM", help="awesome lists to expand")
+    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look: results to look at and 50+ stars")
+    p.add_argument("--low-stars", metavar="REASON", help="shortlist items under the star threshold anyway, with this "
+                   "reason (an official organisation's new repo, say); it goes into the ledger")
+    p.add_argument("--list", nargs="+", metavar="ITEM", help="awesome lists to expand (no star threshold)")
     p.add_argument("--later", nargs="+", metavar="ITEM", help="maybe later")
     p.add_argument("--skip", nargs="+", metavar="ITEM[=reason]", help="no help for this question")
     p.add_argument("--why", help="reason for --skip items without their own")
@@ -672,10 +744,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pack", action="store_true", help="with --source: also write a repomix digest if installed")
     p.add_argument("--include", nargs="+", metavar="GLOB", help="with --pack: only these paths")
 
-    p = add("note", cmd_note, "record what we take from a repo; creates or updates its card")
+    p = add("note", cmd_note, "record what we take from a repo; creates or updates its card. use, adapt and learn need "
+            "results to look at and 50+ stars, or a written reason")
     p.add_argument("repo")
     p.add_argument("--q", required=True, help="<project>/<question>")
     p.add_argument("--take", required=True, choices=TAKES)
+    p.add_argument("--results", nargs="+", metavar="URL", help="links to what it made: films, galleries, sample outputs, "
+                   "benchmarks, projects using it; added to the card")
+    p.add_argument("--no-results", metavar="REASON", help="why it is a reference with no results to look at")
+    p.add_argument("--low-stars", metavar="REASON", help="why it is a reference under the star threshold")
+    p.add_argument("--trial", metavar="TEXT", help="what we ran and what came out; written into the card, level trial")
     p.add_argument("--note", help="one line: what we take, or why not")
     p.add_argument("--where", help="where it lands in our project")
     p.add_argument("--kind", choices=KINDS, help="default: guessed")

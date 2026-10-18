@@ -6,10 +6,13 @@ do not exist are listed, since a chat model may invent them. Table columns it re
 verdict, reason) ride along as notes.
 
 `brief`: an answered question becomes a hand-off for the agent that will change the code. It
-copies the answer's own sections and adds the facts from the cards (take, reviewed commit),
-so the coding agent gets what to change, why, and from where, without reading the registry.
-It ends with one `github-scout adopt` line per picked repo, for the coding agent to fill in as it
-adopts (stage 6), so the registry learns which repo went where. The brief itself changes nothing.
+copies the answer's own sections (the backbone to follow, the gaps and where they are filled
+from, the trials) and adds the facts from the cards (role, take, stars, results, level,
+reviewed commit), so the coding agent gets what to change, why, and from where, without
+reading the registry. Answers written before the backbone are still read.
+It ends with one `github-scout adopt` line per repo to bring in, for the coding agent to fill in
+as it adopts (stage 6), so the registry learns which repo went where, and an appendix of what
+was left out. The brief itself changes nothing.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ import re
 from pathlib import Path
 
 from .discover import slugs_in_text
-from .store import Store, StoreError, as_list, today
+from .store import BACKBONE_TITLES, Store, StoreError, as_list, section, today
 
 # Column names a report may use, in English and Chinese.
 COLUMNS = {
@@ -220,38 +223,19 @@ def parse_search_log(text: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _section(body: str, titles: tuple[str, ...]) -> str:
-    """The text under the first heading whose title starts with one of `titles`, up to the next heading
-    of the same or a higher level."""
-    lines = body.splitlines()
-    for i, ln in enumerate(lines):
-        m = re.match(r"^(#{2,4})\s+(.*)$", ln)
-        if m and any(m.group(2).strip().lower().startswith(t.lower()) for t in titles):
-            level = len(m.group(1))
-            out = []
-            for nxt in lines[i + 1:]:
-                h = re.match(r"^(#{1,4})\s", nxt)
-                if h and len(h.group(1)) <= level:
-                    break
-                out.append(nxt)
-            text = "\n".join(out).strip()
-            return "" if _placeholder(text) else text
-    return ""
-
-
-def _placeholder(text: str) -> bool:
-    """Template hints are one parenthesised paragraph: "(Who to take what from ...)"."""
-    t = text.strip()
-    return not t or (t[0] in "(（" and t[-1] in ")）" and "\n\n" not in t)
-
-
 SECTIONS = {
     "where": ("Where we are", "我们现在"),
+    "good": ("What good looks like", "好的结果长什么样"),
     "summary": ("In one paragraph", "一段话结论"),
-    "ideas": ("Ideas worth taking", "值得借的思路"),
-    "practice": ("Practices and components", "做法和组件"),
+    "backbone": BACKBONE_TITLES,
+    "gaps": ("Gaps to fill", "补什么"),
+    "trials": ("Trial runs", "试跑记录"),
     "compare": ("Against what we have", "和我们已有的对照"),
     "next": ("Next steps", "我们接下来改什么"),
+    "skipped": ("Not adopted", "没采用"),
+    # answers written before the backbone (2026-10-18) are still read
+    "ideas": ("Ideas worth taking", "值得借的思路"),
+    "practice": ("Practices and components", "做法和组件"),
 }
 
 T = {
@@ -259,94 +243,138 @@ T = {
         "title": "Brief for the coding agent: {ask}", "from": "From github-scout question `{ref}` ({path}), {date}.",
         "rule": "This brief only advises; by itself it changes nothing. Adopt it with the github-scout-adopt skill: "
                 "make the changes in the project by the project's own rules, check each one, keep what the user "
-                "decided before, and record each repo you took from (last section).",
-        "goal": "## Goal and where we stand", "code": "Project code: {code}", "nocode": "No local project was given; "
-                "map each step onto the code it would change before starting.",
+                "decided before, and record each repo you took from (Adopt and record, below).",
+        "goal": "## Goal and where we stand", "good": "### What good looks like", "code": "Project code: {code}",
+        "nocode": "No local project was given; map each step onto the code it would change before starting.",
+        "backbone": "## Backbone: follow it as a whole",
+        "follow": "Do it the backbone's way, end to end. Other repos come in only where Gaps to fill names them; "
+                  "Not adopted, at the end, stays out.",
+        "gaps": "## Gaps to fill", "trials": "## Trial runs",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
-        "repos": "## Sources", "head": "| repo | take | reviewed at | what we take |",
+        "repos": "## Sources", "head": "| repo | role | take | stars | results | level | reviewed at | what we take |",
+        "roles": {"backbone": "backbone", "alternate": "alternate", "gap": "fills a gap"}, "none": "none",
+        "skipped": "## Not adopted (leave these out)",
         "empty": "(the answer has no such section yet)", "noanswer": "{ref} has no answer yet: write its answer section first",
         "adopt": "## Adopt and record",
-        "adopt_how": "Use the github-scout-adopt skill. For each repo pick a mode: `depend` (package manager, pinned "
-                     "version), `vendor` (copy files at the reviewed commit, with a provenance line), `port` (rewrite "
-                     "the idea in our code, naming the upstream file at the top), `skill` (install an agent skill as "
-                     "is), `tool` (call their CLI or app as is, pinned), `data` (datasets, fonts, prompts, assets, with "
-                     "provenance). Once a repo's change is committed and checked, fill in its line below and run it; "
-                     "`--from` names the upstream files we took, so `github-scout updates` can watch them. For a repo "
-                     "you did not take, run `github-scout note` with the reason instead.",
-        "mode": "<mode>", "into": "<our paths>", "src": "<their files>", "repo": "<owner/repo>",
+        "adopt_how": "Use the github-scout-adopt skill. The backbone comes in whole: `depend` (package manager, pinned "
+                     "version), `skill` (an agent skill as is) or `tool` (their CLI or app as is, pinned). A repo that "
+                     "fills one of its gaps may come as `port` (the idea rewritten in our code, naming the upstream file "
+                     "at the top), `vendor` (files copied at the reviewed commit, with a provenance line) or `data` "
+                     "(datasets, fonts, prompts, assets, with provenance), its `--note` naming the gap. Once a repo's "
+                     "change is committed and checked, fill in its line below and run it; `--from` names the upstream "
+                     "files we took, so `github-scout updates` can watch them. For a repo you did not take, run "
+                     "`github-scout note` with the reason instead.",
+        "mode": "<mode>", "whole": "<depend|skill|tool>", "gap": "<the gap in the backbone it fills>",
+        "into": "<our paths>", "src": "<their files>", "repo": "<owner/repo>",
         "nocard": "# no card yet: github-scout note {repo} --q {ref} first",
     },
     "zh": {
         "title": "给开发 agent 的简报：{ask}", "from": "来自 github-scout 问题 `{ref}`（{path}），{date}。",
         "rule": "这份简报只给建议，本身不改任何东西。用 github-scout-adopt skill 落地：按项目自己的规矩在项目里改，"
-                "每一步做完要验证，用户以前定过的规矩照旧，最后一节记下从哪些仓库拿了东西。",
-        "goal": "## 目标和现状", "code": "项目代码：{code}", "nocode": "没有给本地项目；动手前先把每一步对应到要改的代码。",
+                "每一步做完要验证，用户以前定过的规矩照旧，在下面「落地和登记」一节记下从哪些仓库拿了东西。",
+        "goal": "## 目标和现状", "good": "### 好的结果长什么样", "code": "项目代码：{code}",
+        "nocode": "没有给本地项目；动手前先把每一步对应到要改的代码。",
+        "backbone": "## 主干：整套照做",
+        "follow": "照主干的做法从头做到尾。别的仓库只在「补什么」点名的地方进来；最后「没采用」里的不要加。",
+        "gaps": "## 补什么", "trials": "## 试跑记录",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",
-        "repos": "## 参考仓库", "head": "| 仓库 | 取舍 | 审查时的版本 | 我们拿什么 |",
+        "repos": "## 参考仓库", "head": "| 仓库 | 角色 | 取舍 | 星数 | 结果 | 看到哪一步 | 审查时的版本 | 我们拿什么 |",
+        "roles": {"backbone": "主干", "alternate": "备选", "gap": "补缺口"}, "none": "没有",
+        "skipped": "## 没采用（不要加进来）",
         "empty": "（答案里还没有这一节）", "noanswer": "{ref} 还没有答案：先写问题文件里的答案",
         "adopt": "## 落地和登记",
-        "adopt_how": "用 github-scout-adopt skill。每个仓库选一种方式：`depend`（用包管理器装，锁定版本）、`vendor`"
-                     "（按审查时的提交复制文件，注明出处）、`port`（用我们的代码重写思路，文件开头写明上游文件）、`skill`"
-                     "（原样安装 agent skill）、`tool`（原样调用它的命令行或应用，锁定版本）、`data`（数据集、字体、"
-                     "提示词、素材，注明出处）。一个仓库的改动提交并验证之后，填好下面它那一行再运行；`--from` 写我们拿了"
-                     "上游的哪些文件，`github-scout updates` 才能盯住它们。没采用的仓库改用 `github-scout note` 记下原因。",
-        "mode": "<方式>", "into": "<我们的路径>", "src": "<他们的文件>", "repo": "<owner/repo>",
+        "adopt_how": "用 github-scout-adopt skill。主干整套进来：`depend`（用包管理器装，锁定版本）、`skill`（原样安装 "
+                     "agent skill）或 `tool`（原样调用它的命令行或应用，锁定版本）。补主干缺口的仓库也可以用 `port`"
+                     "（用我们的代码重写思路，文件开头写明上游文件）、`vendor`（按审查时的提交复制文件，注明出处）或 "
+                     "`data`（数据集、字体、提示词、素材，注明出处），`--note` 写清补的是哪个缺口。一个仓库的改动提交并"
+                     "验证之后，填好下面它那一行再运行；`--from` 写我们拿了上游的哪些文件，`github-scout updates` 才能"
+                     "盯住它们。没采用的仓库改用 `github-scout note` 记下原因。",
+        "mode": "<方式>", "whole": "<depend|skill|tool>", "gap": "<补主干的哪个缺口>",
+        "into": "<我们的路径>", "src": "<他们的文件>", "repo": "<owner/repo>",
         "nocard": "# 还没有卡片：先运行 github-scout note {repo} --q {ref}",
     },
 }
+
+
+def _flat(v, limit: int = 220) -> str:
+    """Text fit for one table cell."""
+    return str(v or "").replace("|", "/").replace("\n", " ")[:limit]
 
 
 def brief(store: Store, ref: str, out: Path | None = None) -> Path:
     doc = store.question(ref)
     q = doc.data
     t = T[store.lang]
-    parts = {k: _section(doc.body, v) for k, v in SECTIONS.items()}
-    if not (parts["summary"] or parts["ideas"] or parts["next"]):
+    raw = {k: section(doc.body, v) for k, v in SECTIONS.items()}
+    parts = {k: v or "" for k, v in raw.items()}
+    if not (parts["summary"] or parts["backbone"] or parts["ideas"] or parts["next"]):
         raise StoreError(t["noanswer"].format(ref=ref))
     project = store.project(q["project"])
     code = (project.data.get("code") if project else "") or ""
     lines = [f"# {t['title'].format(ask=q.get('ask', ''))}", "",
              t["from"].format(ref=f"{q['project']}/{q['id']}", path=doc.path, date=today()), "", t["rule"], "",
              t["goal"], "", t["code"].format(code=code) if code else t["nocode"], "", parts["where"] or t["empty"], ""]
+    if parts["good"]:
+        lines += [t["good"], "", parts["good"], ""]
     if parts["summary"]:
         lines += [parts["summary"], ""]
-    lines += [t["steps"], "", parts["next"] or t["empty"], "", t["why"], "", parts["ideas"] or t["empty"], ""]
-    if parts["practice"]:
-        lines += [t["practice"], "", parts["practice"], ""]
-    if parts["compare"]:
-        lines += [t["compare"], "", parts["compare"], ""]
+    if raw["backbone"] is not None:          # one backbone, its gaps, the trials, then the steps
+        lines += [t["backbone"], "", t["follow"], "", parts["backbone"] or t["empty"], ""]
+        for key in ("gaps", "trials", "compare"):
+            if parts[key]:
+                lines += [t[key], "", parts[key], ""]
+        lines += [t["steps"], "", parts["next"] or t["empty"], ""]
+    else:                                    # an answer from before the backbone: as it was
+        lines += [t["steps"], "", parts["next"] or t["empty"], "", t["why"], "", parts["ideas"] or t["empty"], ""]
+        for key in ("practice", "compare"):
+            if parts[key]:
+                lines += [t[key], "", parts[key], ""]
+    backbone, alternate = (str(q.get(k) or "") for k in ("backbone", "alternate"))
     picked = [str(x) for x in as_list(q.get("picked"))]
-    cards = {slug: store.card(slug) for slug in picked}
+    adopt = list(dict.fromkeys([backbone] * bool(backbone) + picked))          # the alternate only if it is picked
+    sources = list(dict.fromkeys(adopt[:1] + [alternate] * bool(alternate) + adopt[1:]))
+    cards = {slug: store.card(slug) for slug in sources}
 
     def use_of(card) -> dict:
         return next((u for u in as_list(card.data.get("uses")) if isinstance(u, dict) and u.get("question") == q["id"]), {})
 
-    if picked:
-        lines += [t["repos"], "", t["head"], "|---|---|---|---|"]
-        for slug in picked:
+    def role(slug: str) -> str:
+        return t["roles"]["backbone"] if slug == backbone else t["roles"]["alternate"] if slug == alternate \
+            else t["roles"]["gap"] if backbone else "-"
+
+    if sources:
+        lines += [t["repos"], "", t["head"], "|---|---|---|---|---|---|---|---|"]
+        for slug in sources:
             card = cards[slug]
             if not card:
-                lines.append(f"| [{slug}](https://github.com/{slug}) | - | - | - |")
+                lines.append(f"| [{slug}](https://github.com/{slug}) | {role(slug)} | - | - | - | - | - | - |")
                 continue
-            d = card.data
-            use = use_of(card)
-            note = str(use.get("note") or d.get("summary") or "").replace("|", "/").replace("\n", " ")[:220]
-            lines.append(f"| [{card.id}](https://github.com/{card.id}) | {use.get('take', '-')} | "
-                         f"{d.get('commit', '-')} | {note} |")
+            d, use = card.data, use_of(card)
+            stars = "-" if d.get("stars") is None else str(d["stars"]) + (f" ({_flat(use['low_stars'], 80)})"
+                                                                         if use.get("low_stars") else "")
+            res = [str(x).replace("|", "%7C") for x in as_list(d.get("results"))]
+            shown = " ".join(f"[{i}]({u})" for i, u in enumerate(res[:4], 1)) + (f" +{len(res) - 4}" if len(res) > 4 else "")
+            if not res:
+                shown = f"{t['none']}: {_flat(use['no_results'], 80)}" if use.get("no_results") else "-"
+            lines.append(f"| [{card.id}](https://github.com/{card.id}) | {role(slug)} | {use.get('take', '-')} | {stars} | "
+                         f"{shown} | {d.get('level', '-')} | {d.get('commit', '-')} | {_flat(use.get('note') or d.get('summary'))} |")
         lines.append("")
-    # Stage 6 happens in the project: one line per picked repo for the coding agent to fill in and run.
+    # Stage 6 happens in the project: one line per repo to bring in, for the coding agent to fill in and run.
     ref = f"{q['project']}/{q['id']}"
     lines += [t["adopt"], "", t["adopt_how"], "", "```bash"]
-    for slug in picked or [""]:
+    for slug in adopt or [""]:
         card = cards.get(slug)
         where = str(use_of(card).get("where") or "") if card else ""
         into = where if re.fullmatch(r"[\w./@+,-]+", where) else t["into"]       # where it lands, when it is a path
-        line = (f"github-scout adopt {(card.id if card else '') or slug or t['repo']} --q {ref} --mode {t['mode']} "
-                f"--into {into} --from {t['src']}")
+        mode = t["whole"] if backbone and slug == backbone else t["mode"]
+        line = (f"github-scout adopt {(card.id if card else '') or slug or t['repo']} --q {ref} --mode {mode} "
+                f"--into {into} --from {t['src']}" + (f" --note \"{t['gap']}\"" if backbone and slug != backbone else ""))
         lines.append(line + (f"   {t['nocard'].format(repo=slug, ref=ref)}" if slug and not card else ""))
     lines += ["```", ""]
+    if parts["skipped"]:                     # the appendix: what was weighed and left out
+        lines += [t["skipped"], "", parts["skipped"], ""]
     path = out or store.root / "projects" / q["project"] / "briefs" / f"{q['id']}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

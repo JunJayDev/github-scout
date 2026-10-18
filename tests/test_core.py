@@ -3,6 +3,7 @@ import datetime as dt
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -171,7 +172,8 @@ class Base(unittest.TestCase):
         self.api = FakeAPI()
         self.old_factory = cli.make_client
         cli.make_client = lambda args, store=None: client(self.api)
-        self.env = {k: os.environ.pop(k) for k in ["GITHUB_SCOUT_STORE", "REUSE_FIRST_STORE"] if k in os.environ}
+        self.env = {k: os.environ.pop(k) for k in ["GITHUB_SCOUT_STORE", "REUSE_FIRST_STORE", "GITHUB_SCOUT_MIN_STARS",
+                                                   "REUSE_FIRST_MIN_STARS"] if k in os.environ}
 
     def tearDown(self):
         cli.make_client = self.old_factory
@@ -193,7 +195,11 @@ class StoreTests(Base):
     def test_question_template_carries_the_stage(self):
         body = self.store.question("ops/browser-ops").body
         self.assertIn("Stage: working (it works: borrow techniques", body)
-        self.assertIn("### Ideas worth taking", body)
+        for heading in ("## What good looks like", "### Backbone", "### Gaps to fill", "### Trial runs", "### Not adopted"):
+            self.assertIn(heading, body)
+        self.assertNotIn("### Ideas worth taking", body)
+        self.assertIn("50+ stars", body)
+        self.assertEqual((self.store.question("ops/browser-ops").data["backbone"], self.store.check()[0]), (None, []))
 
     def test_check_reports_bad_cards_and_questions(self):
         (self.root / "repos" / "a__b.md").write_text("---\nid: a/c\nkind: cli\nuses:\n  - project: ops\n    take: love\n---\n")
@@ -267,7 +273,9 @@ class ChineseStoreTests(Base):
     def test_chinese_templates(self):
         body = self.store.question("ops/browser-ops").body
         self.assertIn("阶段：working（已经能用：借技巧", body)
-        self.assertIn("### 值得借的思路", body)
+        for heading in ("## 好的结果长什么样", "### 主干", "### 补什么", "### 试跑记录", "### 没采用"):
+            self.assertIn(heading, body)
+        self.assertIn("50 星以上", body)
 
     def test_chinese_brief_ends_with_the_adopt_section(self):
         doc = self.store.question("ops/browser-ops")
@@ -280,6 +288,23 @@ class ChineseStoreTests(Base):
         self.assertIn("本身不改任何东西。用 github-scout-adopt skill 落地", text)
         self.assertIn("\n## 落地和登记\n", text)
         self.assertIn("github-scout adopt z/no-card --q ops/browser-ops --mode <方式> --into <我们的路径> --from <他们的文件>", text)
+
+    def test_chinese_brief_follows_the_backbone(self):
+        doc = self.store.question("ops/browser-ops")
+        doc.body = doc.body.replace("### 主干\n", "### 主干\nd/tool：成片和目标最像，试跑 40 秒出片。\n")
+        doc.body = doc.body.replace("### 补什么\n| 主干缺什么 | 从哪补 | 为什么 |\n|---|---|---|\n",
+                                    "### 补什么\n| 主干缺什么 | 从哪补 | 为什么 |\n|---|---|---|\n| 字幕 | e/gap | 主干没有 |\n")
+        doc.data.update(backbone="d/tool", picked=["d/tool", "e/gap"])
+        self.store.save_question(doc)
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
+        self.assertIn("## 主干：整套照做\n\n照主干的做法从头做到尾。", text)
+        self.assertIn("d/tool：成片和目标最像", text)
+        self.assertIn("## 补什么\n\n| 主干缺什么 | 从哪补 | 为什么 |", text)
+        self.assertIn("| [d/tool](https://github.com/d/tool) | 主干 | - | - | - | - | - | - |", text)
+        self.assertIn("--mode <depend|skill|tool>", text)
+        self.assertIn('--note "<补主干的哪个缺口>"', text)
 
 
 class FlowTests(Base):
@@ -346,10 +371,13 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("(software: cli?)", out)
         self.assertIn("maintenance: active · 37 commits in 30 days", out)
+        self.assertIn("results to check: none linked in the README", out)
+        self.assertIn("--results <links>", out)
         self.assertIn("top one 80% of commits", out)
 
         code, out, _ = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
-                                    "--where", "tools/opencli", "--watch", "clis/reddit/**")
+                                    "--where", "tools/opencli", "--watch", "clis/reddit/**",
+                                    "--results", "https://github.com/jackwener/OpenCLI#demo")
         self.assertEqual(code, 0, out)
         card = self.store.card("jackwener/opencli")
         self.assertEqual(card.path.name, card_filename("jackwener/OpenCLI"))
@@ -830,7 +858,8 @@ class DogfoodFixTests(Base):
         self.api.paths[f"repos/{slug}/git/trees/{sha}"] = {"tree": [{"path": "LICENSE", "type": "blob", "size": 10}]}
         self.api.paths[f"repos/{slug}/contents/LICENSE"] = "PolyForm Noncommercial License 1.0.0"
         code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
-                                    "--idea", "Judge pairs, not scores.", "--note", "judge design")
+                                    "--idea", "Judge pairs, not scores.", "--note", "judge design",
+                                    "--results", "https://example.com/a-b/samples")
         self.assertEqual(code, 0, out)
         self.assertNotIn("LICENSE", out)                     # licences are not part of the research
         card = self.store.card(slug)
@@ -845,7 +874,7 @@ class DogfoodFixTests(Base):
         slug = "a/b"
         self.api.add(repo(slug, pushed=ago(1), desc="A tool"))
         code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
-                                    "--idea", "First idea.", "--watch", "src/a.py")
+                                    "--idea", "First idea.", "--watch", "src/a.py", "--results", "https://example.com/demo")
         self.assertEqual(code, 0, out)
         registry.new_question(self.store, "ops/other", "Another question", "idea")
         code, out, _ = self.run_cli("note", slug, "--q", "ops/other", "--take", "adapt", "--idea", "Second idea.",
@@ -861,10 +890,231 @@ class DogfoodFixTests(Base):
         slug = "c/d"
         self.api.add(repo(slug, pushed=ago(1), desc=""))
         code, out, _ = self.run_cli("note", slug, "--q", "ops/browser-ops", "--take", "learn",
-                                    "--idea", "Writes letters in the order schools teach them. It also does more.")
+                                    "--idea", "Writes letters in the order schools teach them. It also does more.",
+                                    "--no-results", "a teaching method; its output is the order itself")
         self.assertEqual(code, 0, out)
         self.assertEqual(self.store.card(slug).data["summary"], "Writes letters in the order schools teach them.")
         self.assertFalse([e for e in self.store.check()[0] if "summary" in e])
+
+
+class QualityGateTests(Base):
+    """User, 2026-10-18: a reference shows results and has 50+ stars; the top 2-3 are tried; one backbone is followed
+    as a whole and only its gaps are filled from elsewhere."""
+
+    def scan_with_a_tiny_repo(self):
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        big = self.api.add(repo("a/reddit-cli", 900, "Reddit CLI", created=ago(3), pushed=ago(0.2)))
+        tiny = self.api.add(repo("b/reddit-tiny", 12, "Reddit CLI for agents", created=ago(1), pushed=ago(0.1)))
+        lst = self.api.add(repo("c/awesome-reddit", 8, "A curated list of Reddit tools", pushed=ago(0.5)))
+        self.api.search["reddit" + alive] = [big, tiny, lst]
+        return self.run_cli("scan", "ops/browser-ops", "--quiet")
+
+    def answered(self, body: dict, **data):
+        doc = self.store.question("ops/browser-ops")
+        for heading, text in body.items():
+            doc.body = re.sub(rf"(\n#+ {re.escape(heading)}\n)(?:\(.*\)\n|\|.*\|\n\|[-|]+\|\n)?",
+                              lambda m, text=text: m.group(1) + text + "\n", doc.body, count=1)
+        doc.data.update(status="answered", **data)
+        self.store.save_question(doc)
+
+    def card(self, slug, stars, take="use", level="read", results=(), **use):
+        registry.new_card(self.store, {"repo": slug, "desc": f"{slug} tool", "stars": stars, "branch": "main",
+                                       "commit": "abcdef123456"}, "software", "cli",
+                          [{"project": "ops", "question": "browser-ops", "take": take, "note": "n", **use}], [], level,
+                          results=list(results))
+
+    def test_rows_under_50_stars_leave_the_table_and_need_a_reason_to_shortlist(self):
+        code, out, _ = self.scan_with_a_tiny_repo()
+        self.assertEqual(code, 0, out)
+        self.assertIn("a/reddit-cli", out)
+        self.assertNotIn("b/reddit-tiny", out)
+        self.assertIn("under 50 stars: 1 hidden, no references", out)
+        self.assertIn("lists (scan --expand <list>): c/awesome-reddit (8)", out)            # lists are only for finding
+        _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show", "--all")
+        self.assertIn("under 50 stars", next(ln for ln in out.splitlines() if "b/reddit-tiny" in ln))
+        code, _, err = self.run_cli("pick", "ops/browser-ops", "1", "b/reddit-tiny")
+        self.assertEqual(code, 1)
+        self.assertIn("under 50 stars, no references: b/reddit-tiny (12). Shortlist one only with --low-stars", err)
+        self.assertEqual(self.store.ledger(), [])                                          # nothing half-written
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "--later", "b/reddit-tiny", "--list", "c/awesome-reddit")
+        self.assertEqual(code, 0, out)
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "b/reddit-tiny", "--low-stars", "official org, out this week")
+        self.assertEqual(code, 0, out)
+        e = self.store.ledger()[-1]
+        self.assertEqual((e["repo"], e["verdict"], e["low_stars"]), ("b/reddit-tiny", "short", "official org, out this week"))
+        self.assertIn("· low stars: official org, out this week", self.run_cli("show", "b/reddit-tiny")[1])
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "z/never-scanned")
+        self.assertEqual(code, 0, out)
+        self.assertIn("warn  stars unknown (not in a scan): z/never-scanned. A reference needs 50+ stars", out)
+
+    def test_the_threshold_comes_from_the_environment(self):
+        self.scan_with_a_tiny_repo()
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_SCOUT_MIN_STARS": "10"}):
+            _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
+            self.assertIn("b/reddit-tiny", out)
+            code, out, _ = self.run_cli("pick", "ops/browser-ops", "b/reddit-tiny")
+            self.assertEqual(code, 0, out)
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_SCOUT_MIN_STARS": "lots"}):
+            code, _, err = self.run_cli("pick", "ops/browser-ops", "b/reddit-tiny")
+            self.assertEqual(code, 1)
+            self.assertIn("GITHUB_SCOUT_MIN_STARS must be a whole number", err)
+
+    def test_note_needs_results_and_stars_for_a_reference(self):
+        self.api.add(repo("b/tiny", 12, "Tiny tool", pushed=ago(0.1)))
+        code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--note", "x")
+        self.assertEqual(code, 1)
+        self.assertIn("b/tiny has 12 stars, under 50: no reference. Say why it is an exception with --low-stars", err)
+        self.assertIn("b/tiny has no results to look at on its card. Give --results", err)
+        self.assertIsNone(self.store.card("b/tiny"))
+        self.assertEqual(self.store.ledger(), [])
+        code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--results", "demo.mp4",
+                                    "--low-stars", "x")
+        self.assertIn("--results takes links (http or https) to what it made: demo.mp4", err)
+        code, out, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn",
+                                      "--results", "https://example.com/tiny/demo.mp4", "--low-stars", "official org")
+        self.assertEqual(code, 0, err)
+        card = self.store.card("b/tiny")
+        self.assertEqual(card.data["results"], ["https://example.com/tiny/demo.mp4"])
+        self.assertEqual(card.data["uses"][0]["low_stars"], "official org")
+        self.assertEqual(self.store.ledger()[-1]["low_stars"], "official org")
+        self.assertIn("results:\n  https://example.com/tiny/demo.mp4", self.run_cli("show", "b/tiny")[1])
+
+        self.api.add(repo("c/plain", 400, "Plain tool", pushed=ago(0.1)))
+        code, out, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "later", "--note", "no results yet")
+        self.assertEqual(code, 0, err)                                    # later and skip need neither
+        self.assertEqual(self.store.card("c/plain").data["results"], [])
+        self.assertIn("results: none recorded", self.run_cli("show", "c/plain")[1])
+        code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt")
+        self.assertEqual(code, 1)
+        self.assertIn("no results to look at", err)
+        self.assertNotIn("stars", err)
+        code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt",
+                                    "--no-results", "a library: its tests are the result")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.store.card("c/plain").data["uses"][0]["no_results"], "a library: its tests are the result")
+        registry.new_question(self.store, "ops/other", "Another question", "idea")
+        code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/other", "--take", "use", "--low-stars", "same org")
+        self.assertEqual(code, 0, err)                                    # the card has results already
+        self.assertEqual(self.store.check()[0], [])
+
+    def test_a_trial_goes_into_the_card(self):
+        self.api.add(repo("d/tool", 300, "Video tool", pushed=ago(0.1)))
+        code, out, err = self.run_cli("note", "d/tool", "--q", "ops/browser-ops", "--take", "use", "--kind", "software",
+                                      "--results", "https://example.com/d/gallery", "--trial", "ran examples/basic:\n 40 s")
+        self.assertEqual(code, 0, err)
+        card = self.store.card("d/tool")
+        self.assertEqual(card.data["level"], "trial")
+        self.assertIn(f"## Results and trial\n\n- {today()}, ops/browser-ops: ran examples/basic: 40 s\n\n## Quality", card.body)
+        registry.new_question(self.store, "ops/other", "Another question", "idea")
+        self.run_cli("note", "d/tool", "--q", "ops/other", "--take", "learn", "--trial", "second run")
+        body = self.store.card("d/tool").body
+        self.assertIn(f"40 s\n- {today()}, ops/other: second run\n\n## Quality", body)
+        old = self.store.card("d/tool")                                   # a card from before the section
+        old.body = "\n# d/tool\n\n## The idea\nRenders frames.\n\n## Read first\n"
+        self.store.save_card(old)
+        self.run_cli("note", "d/tool", "--q", "ops/other", "--take", "skip", "--trial", "fails on arm64")
+        self.assertIn(f"Renders frames.\n\n## Results and trial\n\n- {today()}, ops/other: fails on arm64\n\n## Read first",
+                      self.store.card("d/tool").body)
+        code, out, _ = self.run_cli("note", "z/gone", "--q", "ops/other", "--take", "skip", "--trial", "no install")
+        self.assertEqual(self.store.ledger()[-1]["reason"], "trial: no install")   # no card: the trial goes in the ledger
+
+    def test_check_holds_the_backbone_to_the_gates(self):
+        self.card("d/tool", 300)                                          # read, no results
+        self.card("e/gap", 12, take="learn", results=["https://example.com/e"])
+        self.card("f/alt", 900, level="trial", results=["https://example.com/f"])
+        self.answered({"Backbone": "d/tool, because its films match."}, backbone="d/tool", alternate="f/alt",
+                      picked=["d/tool", "e/gap"])
+        errors, warns = self.store.check()
+        self.assertEqual(errors, [])
+        mine = [w.split(": ", 1)[1] for w in warns if "questions/browser-ops.md" in w and "vocabulary" not in w]
+        self.assertEqual(mine, ["backbone d/tool was not tried (level read): run its own example, then note --trial",
+                                "backbone d/tool has no results to look at (note --results <links>)",
+                                "picked e/gap has 12 stars, under 50, and no reason (note --low-stars)"])
+        doc = self.store.question("ops/browser-ops")
+        doc.data.update(backbone="not a repo", alternate=["a/b"])
+        self.store.save_question(doc)
+        errors = self.store.check()[0]
+        self.assertIn("projects/ops/questions/browser-ops.md: backbone must be one repository, owner/repo", errors)
+        self.assertIn("projects/ops/questions/browser-ops.md: alternate must be one repository, owner/repo", errors)
+        registry.new_question(self.store, "ops/empty", "Answered with nothing under Backbone", "idea")
+        doc = self.store.question("ops/empty")
+        doc.data["status"] = "answered"
+        self.store.save_question(doc)
+        self.assertIn("projects/ops/questions/empty.md: answered without a backbone: name the repo the answer follows "
+                      "(backbone:), or say under Backbone why none qualifies", self.store.check()[1])
+        card = self.store.card("f/alt")
+        card.data["results"] = ["javascript:alert(1)"]
+        self.store.save_card(card)
+        self.assertIn("repos/f__alt.md: results are links (http or https): javascript:alert(1)", self.store.check()[0])
+
+    def test_brief_follows_the_backbone_and_leaves_the_rest_in_an_appendix(self):
+        self.card("d/tool", 300, level="trial", results=["https://example.com/d/gallery"], where="tools/video")
+        self.card("e/gap", 12, take="learn", results=["https://example.com/e"], low_stars="official org")
+        self.answered({"What good looks like": "The three films at https://example.com/target.",
+                       "In one paragraph": "Follow d/tool; fill captions from e/gap.",
+                       "Backbone": "d/tool: its gallery matches the target; 300 stars; the trial rendered in 40 s.",
+                       "Gaps to fill": "| what the backbone lacks | filled from | why |\n|---|---|---|\n"
+                                       "| captions | e/gap `src/caption.ts` | d/tool has none |",
+                       "Trial runs": "- d/tool: examples/basic rendered in 40 s.",
+                       "Next steps in our project": "1. Install d/tool 2.1.",
+                       "Not adopted": "- x/y: shot lists by hand; d/tool plans its own."},
+                      backbone="d/tool", alternate="f/alt", picked=["d/tool", "e/gap"])
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
+        order = ["## Goal and where we stand", "### What good looks like", "Follow d/tool; fill captions",
+                 "## Backbone: follow it as a whole", "Do it the backbone's way, end to end", "## Gaps to fill",
+                 "## Trial runs", "## What to change, in order", "## Sources", "## Adopt and record",
+                 "## Not adopted (leave these out)", "- x/y: shot lists by hand"]
+        self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
+        self.assertNotIn("## Why: the ideas behind it", text)
+        self.assertNotIn("## Against what we have", text)                  # left empty: no section
+        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | [1](https://example.com/d/gallery) | "
+                      "trial | abcdef123456 | n |", text)
+        self.assertIn("| [f/alt](https://github.com/f/alt) | alternate | - | - | - | - | - | - |", text)
+        self.assertIn("| [e/gap](https://github.com/e/gap) | fills a gap | learn | 12 (official org) |", text)
+        adopt = [ln for ln in text.splitlines() if ln.startswith("github-scout adopt ")]
+        self.assertEqual(adopt, [
+            "github-scout adopt d/tool --q ops/browser-ops --mode <depend|skill|tool> --into tools/video --from <their files>",
+            "github-scout adopt e/gap --q ops/browser-ops --mode <mode> --into <our paths> --from <their files> "
+            "--note \"<the gap in the backbone it fills>\""])                 # no line for the alternate
+
+    def test_answers_written_before_the_backbone_still_brief_and_check(self):
+        old = ("\n# Drive our logged-in sites\n\n## Where we are\nStage: working (it works)\n- What we have: tools/reddit\n\n"
+               "## Answer\n(The deliverable. Ideas first: code is cheap for an agent, an idea it never had is not.)\n\n"
+               "### In one paragraph\nUse OpenCLI for reads.\n\n### Ideas worth taking\n(One per line: the idea ...)\n\n"
+               "1. Exit codes as a contract.\n\n### Practices and components\n(Only what our stage needs.)\n\n"
+               "### Against what we have\n| we have | they do | difference | take it? |\n|---|---|---|---|\n\n"
+               "### Next steps in our project\n1. Pin OpenCLI 1.8.\n\n## Searched\n(Scans are in scans/ops/browser-ops/.)\n")
+        doc = self.store.question("ops/browser-ops")
+        data = {k: v for k, v in doc.data.items() if k not in ("backbone", "alternate")}
+        write_doc(doc.path, {**data, "status": "answered", "picked": []}, old, list(data))
+        self.assertNotIn("backbone", doc.path.read_text(encoding="utf-8"))
+        errors, warns = self.store.check()
+        self.assertEqual(errors, [])
+        self.assertFalse([w for w in warns if "backbone" in w], warns)
+        code, out, _ = self.run_cli("brief", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
+        self.assertIn("## Why: the ideas behind it\n\n1. Exit codes as a contract.", text)
+        self.assertIn("## What to change, in order\n\n1. Pin OpenCLI 1.8.", text)
+        self.assertNotIn("(One per line", text)
+        self.assertNotIn("## Backbone", text)
+        self.assertNotIn("| we have | they do |", text)                    # a header-only table is no content
+
+    def test_import_keeps_a_shortlist_under_50_stars_for_later(self):
+        self.api.add(repo("a/big", 900, "Reddit CLI", pushed=ago(0.2)))
+        self.api.add(repo("b/tiny", 12, "Reddit CLI", pushed=ago(0.2)))
+        report = Path(self.tmp.name) / "cloud.md"
+        report.write_text("## 3. Triage\n\n| repo | kind | results | route | verdict | reason |\n|---|---|---|---|---|---|\n"
+                          "| https://github.com/a/big | cli | https://example.com/big.mp4 | read cli/ | shortlist | one command |\n"
+                          "| https://github.com/b/tiny | cli | none | read all | shortlist | small |\n")
+        code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
+        self.assertEqual(code, 0, out)
+        self.assertIn("under 50 stars, recorded as later, not shortlisted (1): b/tiny", out)
+        verdicts = {e["repo"]: (e["verdict"], e["reason"]) for e in self.store.ledger()}
+        self.assertEqual(verdicts["a/big"], ("short", "cloud.md: shortlist: one command"))
+        self.assertEqual(verdicts["b/tiny"], ("later", "under 50 stars; cloud.md: shortlist: small"))
 
 
 BILINGUAL = {
@@ -1011,6 +1261,17 @@ class ExamineTests(unittest.TestCase):
         files = ["clis/reddit/read.js", "src/daemon.ts", "docs/a.md", "skills/x/SKILL.md"]
         self.assertEqual(examine.watched(files, ["clis/reddit/**", "src/daemon.ts", "skills/"]),
                          ["clis/reddit/read.js", "src/daemon.ts", "skills/x/SKILL.md"])
+
+    def test_result_links_point_at_what_a_repo_made(self):
+        readme = ("[![CI](https://github.com/a/b/actions/workflows/ci.yml/badge.svg)](https://github.com/a/b/actions)\n"
+                  "# b\n\n![logo](docs/logo.png)\n\nhttps://github.com/user-attachments/assets/1234-abcd\n\n"
+                  "See the [gallery](https://b.dev/gallery) and [examples](./examples/basic). [Docs](https://b.dev/docs)\n"
+                  '<video src="https://cdn.b.dev/demo.mp4"></video>\n[演示视频](https://www.bilibili.com/video/BV1xx)\n'
+                  "[License](LICENSE)\n")
+        self.assertEqual(examine.result_links(readme, "a/b", "main"), [
+            "https://b.dev/gallery", "https://github.com/a/b/blob/main/examples/basic", "https://www.bilibili.com/video/BV1xx",
+            "https://cdn.b.dev/demo.mp4", "https://github.com/user-attachments/assets/1234-abcd"])
+        self.assertEqual(examine.result_links("# x\n[Docs](https://x.dev/docs)\n", "a/b", "main"), [])
 
     def test_clean_readme_drops_badges_and_html(self):
         out = examine.clean_readme('<p align="center"><img src="x"></p>\n# T\n[![b](u)](v)\n\n\n\nBody\n```\n<keep>\n```\n', 1000)

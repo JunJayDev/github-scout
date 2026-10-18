@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .registry import STAGE_HELP, T
-from .store import KINDS, SHA, SLUG, TAKES, Doc, Store, adoptions, as_list, card_takes, strongest
+from .store import KINDS, SHA, SLUG, TAKES, URL, Doc, Store, adoptions, as_list, card_takes, strongest
 
 # ---------------------------------------------------------------------------
 # Markdown: the subset agents write. Blocks are parsed into tuples first so unfilled template
@@ -494,6 +494,7 @@ def _card(c: Doc, link, day: _dt.date, root: Path) -> dict:
         "stars": _int(d.get("stars")), "created": _s(d.get("created")),
         "pushed": _s(d.get("pushed")), "age": age, "stale": age is not None and age >= 3,
         "reviewed": _s(d.get("reviewed")), "level": _s(d.get("level")),
+        "results": [_s(u) for u in as_list(d.get("results")) if URL.match(_s(u))],
         "commit": _s(d.get("commit")) if SHA.match(_s(d.get("commit"))) else "", "branch": _s(d.get("branch")),
         "uses": _uses(c), "adopted": _adopted(c), "take": strongest(card_takes(d)) or "",
         "idea": idea if len(idea) <= 300 else idea[:299].rstrip() + "…",
@@ -596,7 +597,7 @@ UI = {
         "allQuestions": "All questions", "count": "{n} of {total}", "clear": "Clear",
         "noRepos": "No repos match these filters.",
         "created": "created", "pushed": "pushed", "reviewed": "reviewed", "stale": "no push for {n} months",
-        "level": "Review depth", "commit": "Reviewed commit", "file": "File",
+        "level": "Review depth", "commit": "Reviewed commit", "file": "File", "results": "Results",
         "uses": "Taken by", "github": "GitHub", "stars": "stars",
         "adopted": "Adopted in", "adoptedIn": "adopted in {project} ({mode})",
         "labels": {
@@ -617,7 +618,7 @@ UI = {
         "allQuestions": "全部问题", "count": "{n} / {total}", "clear": "清除",
         "noRepos": "没有符合筛选的仓库。",
         "created": "创建", "pushed": "推送", "reviewed": "审阅", "stale": "{n} 个月没有推送",
-        "level": "看到哪一步", "commit": "审阅的提交", "file": "文件",
+        "level": "看到哪一步", "commit": "审阅的提交", "file": "文件", "results": "结果",
         "uses": "用在哪", "github": "GitHub", "stars": "星",
         "adopted": "引入到", "adoptedIn": "已引入 {project}（{mode}）",
         "labels": {
@@ -870,6 +871,8 @@ function fill(row) {
   row.body.append(
     h("dl", {class: "facts"},
       c.level ? fact(U.level, lab("level", c.level)) : null,
+      c.results.length ? fact(U.results, h("ul", {class: "uselist"}, c.results.map((u) => h("li", null,
+        h("a", {href: u, target: "_blank", rel: "noopener noreferrer"}, u))))) : null,
       c.commit ? fact(U.commit, link ? h("a", {href: link.replace(/\/+$/, "") + "/tree/" + c.commit, target: "_blank",
         rel: "noopener noreferrer"}, h("code", null, c.commit.slice(0, 7))) : c.commit.slice(0, 7), c.branch ? " (" + c.branch + ")" : "") : null,
       c.uses.length ? fact(U.uses, h("ul", {class: "uselist"}, c.uses.map((u) => h("li", null,

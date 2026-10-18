@@ -46,6 +46,11 @@ FORMAT = 2
 KINDS = ["skill", "software", "list", "other"]
 # What we take from it, strongest first. A card's status is its strongest take.
 TAKES = ["use", "adapt", "learn", "later", "skip"]
+# Takes that make a repo a reference: they need results to look at and MIN_STARS, or a written reason.
+REFERENCE_TAKES = ("use", "adapt", "learn")
+# Under this many stars a repo is no reference: not shortlisted, used, adapted or learned from unless a reason is
+# written (user, 2026-10-18). GITHUB_SCOUT_MIN_STARS changes it. Lists are exempt: they are only for finding.
+MIN_STARS = 50
 # Where our own work stands. It decides what is worth borrowing.
 STAGES = ["idea", "prototype", "working", "polishing"]
 QUESTION_STATUS = ["open", "answered"]
@@ -60,15 +65,18 @@ DEFAULT_LANGS = ["en", "zh"]
 
 CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars",  # license: old cards only, no longer written
               "created", "pushed", "branch", "commit",
-              "reviewed", "level", "watch", "aliases", "uses", "adopted"]
+              "reviewed", "level", "results", "watch", "aliases", "uses", "adopted"]
 QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "langs", "entities", "mechanisms", "forms", "problems",
-                  "topics", "picked", "scanned"]
+                  "topics", "backbone", "alternate", "picked", "scanned"]
+# Answer sections a check or a brief looks for, in both template languages.
+BACKBONE_TITLES = ("Backbone", "主干")
 PROJECT_ORDER = ["id", "name", "summary", "code", "stack", "constraints", "languages"]
 
 SLUG = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9_.-]+$")
 ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
+URL = re.compile(r"^https?://[^\s<>\"']+$")
 KANA = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]")
 HANGUL = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]")
 HAN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
@@ -80,6 +88,39 @@ class StoreError(RuntimeError):
 
 def today() -> str:
     return _dt.date.today().isoformat()
+
+
+def min_stars() -> int:
+    """The star threshold for a reference: MIN_STARS, or GITHUB_SCOUT_MIN_STARS."""
+    raw = (env("MIN_STARS") or "").strip()
+    if not raw:
+        return MIN_STARS
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        raise StoreError(f"GITHUB_SCOUT_MIN_STARS must be a whole number (got {raw!r})") from None
+
+
+def stars_of(v) -> int | None:
+    """A star count as recorded (an int, or digits in a hand-edited file); None when unknown."""
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def reference_gaps(card: dict, use: dict, limit: int, trial: bool = False) -> list[str]:
+    """Why a repo falls short of a reference: no results to look at, under the star threshold, and (for a
+    backbone) never tried. A reason written on the take (`no_results`, `low_stars`) lifts its gate."""
+    out = []
+    stars = stars_of(card.get("stars"))
+    if trial and card.get("level") != "trial":
+        out.append(f"was not tried (level {card.get('level') or '-'}): run its own example, then note --trial")
+    if not as_list(card.get("results")) and not use.get("no_results"):
+        out.append("has no results to look at (note --results <links>)")
+    if stars is not None and stars < limit and not use.get("low_stars"):
+        out.append(f"has {stars} stars, under {limit}, and no reason (note --low-stars)")
+    return out
 
 
 def now_stamp() -> str:
@@ -183,6 +224,35 @@ def read_doc(path: Path) -> Doc:
 def write_doc(path: Path, data: dict, body: str, order: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(join_frontmatter(data, body, order), encoding="utf-8")
+
+
+def _scaffold(par: str) -> bool:
+    """A template hint (one parenthesised paragraph) or a table with a header and no rows."""
+    t = par.strip()
+    if t[:1] in "(（" and t[-1:] in ")）":
+        return True
+    rows = [ln for ln in t.splitlines() if ln.strip()]
+    return all(ln.lstrip().startswith("|") for ln in rows) and len(rows) <= 2 and \
+        (len(rows) < 2 or bool(re.match(r"^\s*\|?\s*:?-{2,}", rows[1])))
+
+
+def section(body: str, titles: tuple[str, ...]) -> str | None:
+    """The text under the first heading (levels 2-4) whose title starts with one of `titles`, up to the next heading
+    of the same or a higher level, without unfilled template scaffolding. None when there is no such heading: an
+    answer written before that section existed."""
+    lines = body.splitlines()
+    for i, ln in enumerate(lines):
+        m = re.match(r"^(#{2,4})\s+(.*)$", ln)
+        if m and any(m.group(2).strip().lower().startswith(t.lower()) for t in titles):
+            out = []
+            for nxt in lines[i + 1:]:
+                h = re.match(r"^(#{1,4})\s", nxt)
+                if h and len(h.group(1)) <= len(m.group(1)):
+                    break
+                out.append(nxt)
+            pars = re.split(r"\n\s*\n", "\n".join(out).strip())
+            return "\n\n".join(p for p in pars if p.strip() and not _scaffold(p))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +499,30 @@ class Store:
         return sorted(d.glob(f"{owner}__{name}@*")) if d.is_dir() else []
 
     # -- validation ------------------------------------------------------
+    def _reference_warnings(self, r: str, d: dict, pid: str, qid: str) -> list[str]:
+        """For an answer that names a backbone: the backbone and the alternate were tried, and every repo it relies on
+        has results to look at and enough stars, or a written reason. Answers without `backbone:` are left alone."""
+        def slug(key: str) -> str | None:
+            v = d.get(key)
+            return v if isinstance(v, str) and SLUG.match(v) else None
+
+        backbone, alternate = slug("backbone"), slug("alternate")
+        if not backbone:
+            return []
+        limit = min_stars()
+        out = []
+        for s in dict.fromkeys([backbone, *([alternate] if alternate else []), *map(str, as_list(d.get("picked")))]):
+            role = "backbone" if s == backbone else "alternate" if s == alternate else "picked"
+            card = self.card(s)
+            if not card or card.error:
+                if role != "picked":                         # a picked repo without a card is reported already
+                    out.append(f"{r}: {role} {s} has no card")
+                continue
+            use = next((u for u in as_list(card.data.get("uses")) if isinstance(u, dict)
+                        and u.get("project") == pid and u.get("question") == qid), {})
+            out += [f"{r}: {role} {s} {w}" for w in reference_gaps(card.data, use, limit, trial=role != "picked")]
+        return out
+
     def check(self) -> tuple[list[str], list[str]]:
         errors: list[str] = []
         warns: list[str] = []
@@ -478,6 +572,12 @@ class Store:
                     warns.append(f"{r}: picked {slug} has no card")
             if d.get("scanned") and not DATE.match(str(d.get("scanned"))):
                 errors.append(f"{r}: scanned must be YYYY-MM-DD")
+            errors += [f"{r}: {key} must be one repository, owner/repo" for key in ("backbone", "alternate")
+                       if d.get(key) is not None and not (isinstance(d[key], str) and SLUG.match(d[key]))]
+            if d.get("status") == "answered" and not d.get("backbone") and section(doc.body, BACKBONE_TITLES) == "":
+                warns.append(f"{r}: answered without a backbone: name the repo the answer follows (backbone:), "
+                             "or say under Backbone why none qualifies")
+            warns += self._reference_warnings(r, d, pid, qid)
         seen_ids: dict[str, Path] = {}
         for doc in self.cards():
             r = rel(doc.path)
@@ -505,6 +605,10 @@ class Store:
                     errors.append(f"{r}: {key} must be YYYY-MM-DD")
             if d.get("level") and d["level"] not in LEVELS:
                 errors.append(f"{r}: level must be one of {', '.join(LEVELS)}")
+            if d.get("results") is not None and not isinstance(d.get("results"), list):
+                errors.append(f"{r}: results must be a list of links")
+            errors += [f"{r}: results are links (http or https): {x}" for x in as_list(d.get("results"))
+                       if isinstance(d.get("results"), list) and not URL.match(str(x))]
             uses = d.get("uses")
             if uses is not None and not isinstance(uses, list):
                 errors.append(f"{r}: uses must be a list")

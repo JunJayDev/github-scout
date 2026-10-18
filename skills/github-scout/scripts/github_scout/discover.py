@@ -41,13 +41,17 @@ Lenses (one letter each, kept with every candidate):
     W web / add     links found elsewhere (web search, X, chat), fed in with `scan --add`
     L list          links expanded from an awesome list with `scan --expand`
 
-Ranking favours what is relevant and alive over what is famous: in the agent era, a repo
-created this year and pushed this week usually beats an older one with ten times the stars.
+The ranking is for finding, so it favours what is relevant and alive over what is famous: a
+repo created this year and pushed this week usually beats an older one with ten times the
+stars. Picking is done on results, stars, a trial and fit (triage and dig), not on this order.
 Maintenance is a hard rule, by the last push:
 
     over 3 months   ranked far down
     over 6 months   hidden by default (`--all` shows them); GitHub searches ask only for newer ones
     over 12 months  dropped: not saved, not shown, no verdict needed
+
+Rows under the star threshold (50, GITHUB_SCOUT_MIN_STARS) are no references and are hidden too,
+counted in the header; awesome lists are exempt, being only for finding.
 """
 
 from __future__ import annotations
@@ -59,7 +63,7 @@ import re
 import sys
 
 from .github import Client, GitHubError, github_slug
-from .store import HAN, Store, as_list, groups, lang_of, now_stamp, question_langs, today
+from .store import HAN, MIN_STARS, Store, as_list, groups, lang_of, min_stars, now_stamp, question_langs, stars_of, today
 
 LENSES = "EPMCQTRHKSDNUGWL"
 LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "problem", "T": "topic",
@@ -70,7 +74,7 @@ KEEP = 400  # candidates saved per scan (best first); the search log is always k
 SKILL_FORMS = ("skill", "skills", "skill-pack", "rules", "plugin", "agent")
 RISE_TOPICS = {"skill": ("agent-skill", "agent-skills", "claude-skills", "claude-skill", "claude-code-skill", "skills"),
                "mcp": ("mcp-server", "mcp")}
-RISE_MONTHS, RISE_STARS = 2, 50          # H: created in the last 2 months, past 50 stars, in the form's topics
+RISE_MONTHS, RISE_STARS = 2, MIN_STARS   # H: created in the last 2 months, past 50 stars, in the form's topics
 BREAKOUT_MONTHS, BREAKOUT_STARS = 1, 500  # H for other forms: any repo past 500 stars within a month
 RISE_KEEP, RISE_SHOW = 300, 30           # rising repos kept beyond KEEP; rows shown apart
 RISE_TOPIC_SET = {t for ts in RISE_TOPICS.values() for t in ts}
@@ -553,6 +557,27 @@ def is_stale(c: dict) -> bool:
     return months_since(c.get("pushed")) > HIDE
 
 
+def is_low(c: dict, limit: int) -> bool:
+    """Under the star threshold: no reference. Lists are exempt: they are only for finding."""
+    stars = stars_of(c.get("stars"))
+    return stars is not None and stars < limit and not c.get("list")
+
+
+def why_hidden(c: dict, limit: int) -> str:
+    """Why a candidate is not a numbered row of the table."""
+    if c.get("card") or not is_open(c):
+        return "decided"
+    if c.get("list"):
+        return "a list: scan --expand it"
+    if excluded(c):
+        return "left out: a lure or farmed installs"
+    if is_stale(c):
+        return f"stale: no push in {HIDE} months"
+    if is_low(c, limit):
+        return f"under {limit} stars: no reference without pick --low-stars \"why\""
+    return "hidden"
+
+
 def is_rising(c: dict) -> bool:
     """Found only because it is new and growing fast: none of the vocabulary is in its own words."""
     return "H" in c.get("lenses", []) and not c.get("fit") and not c.get("list") and not excluded(c)
@@ -564,15 +589,19 @@ def momentum(c: dict) -> float:
 
 def visible(scan: dict, show_all: bool = False) -> list[dict]:
     """Rows `render` numbers; `pick` resolves numbers against the same list."""
+    limit = min_stars()
     return [c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_rising(c)
-            and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c) and not excluded(c)))]
+            and months_since(c.get("pushed")) <= DROP
+            and (show_all or (is_open(c) and not is_stale(c) and not excluded(c) and not is_low(c, limit)))]
 
 
 def rising(scan: dict, show_all: bool = False) -> list[dict]:
     """Rows `render` lists apart as h1, h2...: fastest-growing first, those in the form's topics
     (skills, MCP servers) ahead of breakouts from anywhere, which keep a third of the shown rows."""
+    limit = min_stars()
     rows = sorted((c for c in scan["candidates"] if is_rising(c) and not c.get("card") and not excluded(c)
-                   and months_since(c.get("pushed")) <= DROP and (show_all or (is_open(c) and not is_stale(c)))),
+                   and months_since(c.get("pushed")) <= DROP
+                   and (show_all or (is_open(c) and not is_stale(c) and not is_low(c, limit)))),
                   key=lambda c: -momentum(c))
     form = [c for c in rows if RISE_TOPIC_SET & set(c.get("topics") or [])]
     other = [c for c in rows if not RISE_TOPIC_SET & set(c.get("topics") or [])]
@@ -593,6 +622,8 @@ def row(i, c: dict) -> str:
         flags.append("ARCHIVED")
     if c.get("fork"):
         flags.append("fork")
+    if is_low(c, min_stars()):
+        flags.append(f"under {min_stars()} stars")
     seen = c.get("seen")
     if seen and not seen.get("here"):
         flags.append(f"seen:{seen['verdict']}@{seen.get('question')}")
@@ -634,6 +665,12 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     if lures or farmed:
         out.append(f"excluded: {len(lures)} look like lures (game cheats, cracks; do not download), "
                    f"{len(farmed)} have install counts far beyond their stars (--all shows them)")
+    limit = min_stars()
+    low = [c for c in scan["candidates"] if is_low(c, limit) and not c.get("card") and is_open(c) and not is_stale(c)
+           and not excluded(c)]
+    if low:
+        out.append(f"under {limit} stars: {len(low)} hidden, no references (--all shows them; to shortlist one anyway: "
+                   f"pick <q> owner/repo --low-stars \"why\")")
     lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c) and not excluded(c)]
     if lists:
         out.append("lists (scan --expand <list>): " + ", ".join(f"{c['repo']} ({human(c['stars'])})" for c in lists[:8]))
@@ -642,7 +679,7 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
         out.append(f"not in the report or web links: {len(api_only)} of {len(rows)} rows came only from GitHub's API "
                    f"(no W): {', '.join(c['repo'] for c in api_only[:6])}" + (" ..." if len(api_only) > 6 else ""))
     hidden = len([c for c in scan["candidates"] if not c.get("list") and not c.get("card") and not is_stale(c)
-                  and not excluded(c) and not is_rising(c)]) - len(rows)
+                  and not excluded(c) and not is_rising(c) and not is_open(c)])
     out.append("  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics"
                + (f"  ({hidden} already decided, hidden; --all shows them)" if hidden > 0 and not show_all else ""))
     out += [row(i, c) for i, c in enumerate(rows[:top], 1)]

@@ -40,6 +40,7 @@ Registries, variables and config files from before the rename (`reuse-first.json
 | `GITHUB_SCOUT_PROJECT` | project used when a question is written without `<project>/` |
 | `GITHUB_SCOUT_CONFIG` | alternative config file |
 | `GITHUB_SCOUT_AGENT` | name recorded as `by` in the ledger (default `agent`) |
+| `GITHUB_SCOUT_MIN_STARS` | stars a repo needs to be a reference (default 50); under it, `pick` and `note` ask for a reason |
 | `GITHUB_TOKEN`, `GH_TOKEN` | GitHub token |
 | `GITHUB_SCOUT_GITHUB_API`, `GITHUB_SCOUT_NPM_API`, `GITHUB_SCOUT_SKILLS_API`, `GITHUB_SCOUT_MCP_API` | API base URLs (GitHub Enterprise, mirrors, tests) |
 | `AGENT_SKILLS_STATE_DIR` | where `scripts/report-problem.sh` records known defects |

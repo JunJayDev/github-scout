@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .store import (
     DEFAULT_LANGS, KINDS, MODES, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, adoptions, as_list,
-    card_takes, strongest, today, write_doc,
+    card_takes, min_stars, strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -36,23 +36,33 @@ Stage: {stage} ({stage_help})
 - What we have: (paths in our code, docs, what already works)
 - What is not good enough: (the reason we are asking)
 
+## What good looks like
+(2-3 finished results we want to match, as links, or checks anyone can run on an output. Every candidate is judged against these.)
+
 ## Answer
-(The deliverable. Ideas first: code is cheap for an agent, an idea it never had is not.)
+(The deliverable: one repo to follow as a whole, and what fills its gaps. A repo qualifies with results to look at, {stars}+ stars and a trial that ran.)
 
 ### In one paragraph
-(What to take from whom, or "build it ourselves, because ...".)
+(Which repo to follow and why; what fills its gaps; what is left to build. Or "nothing qualifies, so we build it, because ...".)
 
-### Ideas worth taking
-(One per line: the idea, where it is (repo + file), why it is not obvious, how it applies to us.)
+### Backbone
+(The repo we follow as a whole, and at most one alternate. Why it passed: its results (links), its stars, our trial.)
 
-### Practices and components
-(Only what our stage needs: workflows, parameters, prompts, modules.)
+### Gaps to fill
+| what the backbone lacks | filled from | why |
+|---|---|---|
+
+### Trial runs
+(Each repo tried: what we ran, what came out, how long; where we stopped.)
 
 ### Against what we have
-| we have | they do | difference | take it? |
+| we have | the backbone does | difference | take it? |
 |---|---|---|---|
 
 ### Next steps in our project
+
+### Not adopted
+(Ideas from other repos we did not take, one line each, with the reason. The coding agent leaves them out.)
 
 ## Searched
 (Scans are in scans/{project}/{id}/. Note the web and X pass here.
@@ -64,13 +74,16 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 # {id}
 
 ## The idea
-(What it does that an agent would not think of. Where, by file.)
+(How it does the job, in a few lines. Where, by file.)
+
+## Results and trial
+(What it has made that we can look at: links under results:. Our trial: what we ran, what came out, how long.)
 
 ## Method quality
-(Concrete steps or vague advice? Evidence it works? What it costs to load?)
+(Concrete steps or vague advice? What it costs to load?)
 
 ## What we take
-(By our stage: idea, practice, parameter or component, with file paths.)
+(The whole of it as our backbone, or the gap in the backbone it fills, with file paths.)
 
 ## Safety
 (Network calls, credential reads, self-update, broad permissions. "None found in <files>" is an answer.)
@@ -83,11 +96,14 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## The idea
 (The key design decision, and how it differs from what we would have built. Where, by file.)
 
+## Results and trial
+(What it has made that we can look at: links under results:. Our trial: what we ran, what came out, how long.)
+
 ## Quality
 (New and moving? Who uses it? Do maintainers answer issues?)
 
 ## What we take
-(By our stage: idea, practice, parameter or component, with file paths; or how we run or adapt it.)
+(The whole of it as our backbone, or the gap in the backbone it fills: how we run or adapt it, with file paths.)
 
 ## Risks
 (Permissions, data it can reach, lock-in.)
@@ -98,6 +114,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 # {id}
 
 ## The idea
+
+## Results and trial
 
 ## What we take
 
@@ -113,23 +131,33 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 - 已经有的：（我们的代码路径、文档、已经能用的部分）
 - 不满意的：（为什么要问这个问题）
 
+## 好的结果长什么样
+（2–3 个想做到的成品（给链接），或者任何人都能拿产出去核对的标准。每个候选都拿这个比。）
+
 ## 答案
-（交付物。思路优先：代码 agent 随手能写，没想到的思路不会去做。）
+（交付物：整套照做的一个仓库，加上补它缺口的东西。有能看的结果、{stars} 星以上、试跑跑通的仓库才算数。）
 
 ### 一段话结论
-（向谁借什么；或者「只能自己做，因为……」。）
+（照哪个仓库做、为什么；缺口从哪补；还剩什么要自己做。或者「没有过关的，只能自己做，因为……」。）
 
-### 值得借的思路
-（一行一条：思路是什么、在哪（仓库 + 文件）、为什么不是显而易见的、用到我们这里会怎样。）
+### 主干
+（整套照做的那个仓库，最多再加一个备选。为什么过关：它的结果（链接）、星数、我们的试跑。）
 
-### 做法和组件
-（只写我们这个阶段用得上的：流程、参数、提示词、模块。）
+### 补什么
+| 主干缺什么 | 从哪补 | 为什么 |
+|---|---|---|
+
+### 试跑记录
+（每个试过的仓库：跑了什么、出来什么、花了多久；在哪一步停下。）
 
 ### 和我们已有的对照
-| 我们已有 | 别人的做法 | 差在哪 | 拿不拿 |
+| 我们已有 | 主干的做法 | 差在哪 | 拿不拿 |
 |---|---|---|---|
 
 ### 我们接下来改什么
+
+### 没采用
+（别家的思路，一行一条，写清为什么没用。开发 agent 不把这些加进来。）
 
 ## 搜过哪些
 （扫描记录在 scans/{project}/{id}/；网页和 X 那一轮写在这里。
@@ -140,13 +168,16 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 # {id}
 
 ## 思路
-（它做了什么 agent 自己想不到的事。写在哪个文件。）
+（它怎么把事做成，几行说清。写在哪个文件。）
+
+## 结果和试跑
+（它做出过什么、我们能看到的：链接写进 results:。我们的试跑：跑了什么、出来什么、花了多久。）
 
 ## 方法质量
-（是具体步骤还是空泛建议？有没有真实效果？加载要多少 token？）
+（是具体步骤还是空泛建议？加载要多少 token？）
 
 ## 我们拿什么
-（按我们的阶段：思路、做法、参数还是组件，写到文件。）
+（整套当主干，还是补主干的哪个缺口；写到文件。）
 
 ## 安全
 （联网、读凭证、自动更新、要宽权限。没有就写「在哪些文件里没看到」。）
@@ -159,11 +190,14 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## 思路
 （关键的设计决定，和我们自己会怎么做有什么不同。写在哪个文件。）
 
+## 结果和试跑
+（它做出过什么、我们能看到的：链接写进 results:。我们的试跑：跑了什么、出来什么、花了多久。）
+
 ## 质量
 （新不新、更新勤不勤、谁在用、维护者回不回 issue。）
 
 ## 我们拿什么
-（按我们的阶段：思路、做法、参数还是组件，写到文件；或者怎么直接用、怎么改了用。）
+（整套当主干，还是补主干的哪个缺口：怎么直接用、怎么改了用，写到文件。）
 
 ## 风险
 （权限、能碰到的数据、锁定。）
@@ -175,12 +209,17 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 
 ## 思路
 
+## 结果和试跑
+
 ## 我们拿什么
 
 ## 先读
 """,
     },
 }
+
+# The card section a trial goes into; cards from before it get one after their first section.
+TRIAL_TITLES = {"en": "Results and trial", "zh": "结果和试跑"}
 
 
 def stage_help(store: Store, stage: str) -> str:
@@ -198,7 +237,7 @@ def first_sentence(text: str | None, limit: int = 160) -> str:
 
 
 def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[dict], watch: list[str], level: str,
-             summary: str | None = None, idea: str | None = None) -> Doc:
+             summary: str | None = None, idea: str | None = None, results: list[str] | None = None) -> Doc:
     slug = meta["repo"]
     path = store.card_path(slug)
     if path.exists():
@@ -211,7 +250,7 @@ def new_card(store: Store, meta: dict, kind: str, form: str | None, uses: list[d
         "summary": summary or meta.get("desc") or first_sentence(idea) or f"{slug} (no description on GitHub)",
         "stars": meta.get("stars"), "created": meta.get("created") or None, "pushed": meta.get("pushed") or None,
         "branch": meta.get("branch"), "commit": meta.get("commit"), "reviewed": today(), "level": level,
-        "watch": watch, "uses": uses,
+        "results": list(dict.fromkeys(results or [])), "watch": watch, "uses": uses,
     }
     data = {k: v for k, v in data.items() if v is not None}
     doc = Doc(path, data, T[store.lang].get(kind, T[store.lang]["other"]).format(id=slug))
@@ -306,6 +345,39 @@ def put_idea(store: Store, slug: str, idea: str, ref: str | None = None) -> None
     store.save_card(card)
 
 
+def put_trial(store: Store, slug: str, text: str, ref: str) -> None:
+    """Add a dated trial line to the card's Results and trial section, in place of its template hint. A card from
+    before that section existed gets it after its first section."""
+    card = store.card(slug)
+    lines = card.body.split("\n")
+    entry = f"- {today()}, {ref}: {' '.join(text.split())}"
+    heads = [i for i, ln in enumerate(lines) if ln.startswith("## ")]
+    at = next((i for i in heads if lines[i][3:].strip().lower() in {t.lower() for t in TRIAL_TITLES.values()}), None)
+    if at is None:
+        pos = heads[1] if len(heads) > 1 else len(lines)
+        lines[pos:pos] = ([""] if pos and lines[pos - 1].strip() else []) + [f"## {TRIAL_TITLES[store.lang]}", "", entry, ""]
+    else:
+        end = next((i for i in heads if i > at), len(lines))
+        kept = [ln for ln in lines[at + 1:end] if not re.fullmatch(r"\s*[(（].*[)）]\s*", ln)]   # the hint goes
+        while kept and not kept[-1].strip():
+            kept.pop()
+        while kept and not kept[0].strip():
+            kept.pop(0)
+        lines[at + 1:end] = [""] + kept + ([""] if kept and not kept[-1].startswith("- ") else []) + [entry, ""]
+    card.body = "\n".join(lines)
+    store.save_card(card)
+
+
+def add_results(store: Store, slug: str, links: list[str]) -> list[str]:
+    """Add links to what a repo made to its card's results (no duplicates)."""
+    card = store.card(slug)
+    results = [str(x) for x in as_list(card.data.get("results"))]
+    results += [x for x in links if x not in results]
+    card.data["results"] = results
+    store.save_card(card)
+    return results
+
+
 def add_watch(store: Store, slug: str, paths: list[str]) -> list[str]:
     """Add upstream paths we depend on to an existing card's watch list (no duplicates)."""
     card = store.card(slug)
@@ -343,9 +415,9 @@ def new_question(store: Store, ref: str, ask: str, stage: str, langs: list[str] 
         raise StoreError(f"question exists: {path}")
     data = {"id": qid, "project": project, "ask": ask, "stage": stage, "status": "open",
             "langs": list(langs or DEFAULT_LANGS), "entities": [], "mechanisms": [], "forms": [], "problems": [],
-            "topics": [], "picked": [], "scanned": None}
+            "topics": [], "backbone": None, "alternate": None, "picked": [], "scanned": None}
     body = T[store.lang]["question"].format(ask=ask, stage=stage, stage_help=stage_help(store, stage),
-                                            project=project, id=qid)
+                                            project=project, id=qid, stars=min_stars())
     write_doc(path, data, body, QUESTION_ORDER)
     return path
 
@@ -354,9 +426,11 @@ def card_line(c: Doc) -> str:
     d = c.data
     uses = [u for u in as_list(d.get("uses")) if isinstance(u, dict)]
     takes = [f"{u.get('project')}/{u.get('question') or '-'}:{u.get('take')}" for u in uses]
+    facts = [", ".join(takes) or "no uses", f"{d['stars']} stars" if d.get("stars") is not None else "stars unknown",
+             f"{len(as_list(d.get('results')))} results" if as_list(d.get("results")) else "no results",
+             f"level {d.get('level') or '-'}", f"reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]}"]
     return (f"{c.id} [{d.get('kind')}{'/' + str(d['form']) if d.get('form') else ''}] {strongest(card_takes(d)) or 'unrelated'}"
-            f" — {str(d.get('summary') or '')[:100]} ({', '.join(takes) or 'no uses'}; "
-            f"reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]})")
+            f" — {str(d.get('summary') or '')[:100]} ({'; '.join(facts)})")
 
 
 def _text(doc: Doc) -> str:
@@ -440,6 +514,8 @@ def show_question(store: Store, ref: str) -> str:
            f"file: {doc.path}",
            f"picked: {', '.join(map(str, as_list(d.get('picked')))) or '-'} · scanned {d.get('scanned') or 'never'}"
            f" · scans {len(cov['scans'])}"]
+    if d.get("backbone"):
+        out.append(f"backbone: {d['backbone']}" + (f" · alternate: {d['alternate']}" if d.get("alternate") else ""))
     adopted = [(c.id, a) for c in store.cards() if not c.error for a in adoptions(c.data, d["project"], dropped=True)
                if a.get("question") == d["id"]]
     if adopted:
@@ -465,6 +541,9 @@ def show_card(store: Store, ref: str) -> str:
     out = []
     if card:
         out += [f"card: {card.path}", card.path.read_text(encoding="utf-8").strip()]
+        results = [str(x) for x in as_list(card.data.get("results"))]
+        out += ["results:"] + [f"  {x}" for x in results] if results else \
+            ["results: none recorded (note --results <links to what it made>)"]
         adopted = adoptions(card.data, dropped=True)
         if adopted:
             out.append("adopted:")
@@ -475,7 +554,9 @@ def show_card(store: Store, ref: str) -> str:
     if hist:
         out.append("ledger:")
         out += [f"  {e.get('date')} {e.get('verdict')} ({e.get('level')}) {e.get('project')}/{e.get('question')}"
-                + (f": {e.get('reason')}" if e.get("reason") else "") for e in hist]
+                + (f": {e.get('reason')}" if e.get("reason") else "")
+                + (f" · low stars: {e['low_stars']}" if e.get("low_stars") else "")
+                + (f" · no results: {e['no_results']}" if e.get("no_results") else "") for e in hist]
     return "\n".join(out) or f"{ref}: never seen. Look at it: github-scout look {ref}"
 
 

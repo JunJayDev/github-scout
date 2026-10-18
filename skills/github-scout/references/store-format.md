@@ -50,7 +50,9 @@ mechanisms: ["programmatic video|代码做视频", "html to video"]
 forms: [skill, library]
 problems: ["agent video editing", "AI 视频 剪辑"]
 topics: []
-picked: [heygen-com/hyperframes]   # repos the answer relies on
+backbone: heygen-com/hyperframes   # the one repo the answer follows as a whole
+alternate: null                    # at most one fallback, tried as well
+picked: [heygen-com/hyperframes]   # repos the answer relies on: the backbone, then what fills its gaps
 scanned: 2026-10-15
 ```
 
@@ -65,8 +67,15 @@ take turns between languages; pairs and recent searches serve the first language
 and give the others what is left. Topics and the MCP registry take Latin-script terms only (both are ASCII names).
 
 Body sections (template in the registry's language): where we are (what we have, what is not
-good enough), the answer (one paragraph; ideas worth taking; practices and components; a
-table against what we have; next steps), and what was searched.
+good enough), what good looks like (2–3 finished results to match, or checks anyone can run),
+the answer (one paragraph; backbone; gaps to fill; trial runs; a table against what we have;
+next steps; not adopted), and what was searched. `brief` still reads answers written before
+2026-10-18 (ideas worth taking; practices and components), and `check` leaves them alone.
+
+`check` holds an answer that names a `backbone` to the gates: the backbone and the alternate
+were tried (`level: trial`), and each of them and every picked repo has `results` or a
+`no_results` reason, and the star threshold or a `low_stars` reason. An answered question
+with an empty Backbone section and no `backbone` gets a warning.
 
 ## Card
 
@@ -83,6 +92,7 @@ branch: main
 commit: b9213a15d63d     # the commit that was reviewed
 reviewed: 2026-10-14
 level: trial             # meta | look | read | trial
+results: ["https://opencli.info/"]   # what it made, to look at: films, galleries, sample outputs, benchmarks, users
 watch: [src/daemon.ts, "clis/reddit/**"]
 aliases: [opencli]
 uses:
@@ -91,6 +101,8 @@ uses:
     take: use            # use | adapt | learn | later | skip
     where: tools/opencli
     note: "Reddit reads through its fetch adapters"
+    low_stars: "..."     # only under the star threshold: why it is a reference anyway
+    no_results: "..."    # only without results: why it counts anyway
 adopted:                 # what came into our projects (github-scout adopt, stage 6)
   - project: ops
     question: browser-ops
@@ -103,8 +115,15 @@ adopted:                 # what came into our projects (github-scout adopt, stag
     note: "comment ids kept"
 ```
 
-The body starts with the idea (the design decision that makes the repo worth knowing), then
-quality, what we take, risks or safety, and what to read first.
+The body starts with the idea (how it does the job), then results and trial (what it made, and
+one dated line per trial run: what we ran, what came out), quality, what we take, risks or
+safety, and what to read first. `note --trial` writes the trial line; a card from before that
+section gets it after its first section.
+
+`results` holds links, http or https. `note` refuses `use`, `adapt` and `learn` for a repo
+without `results` (unless `--no-results` gives a reason) or under the star threshold, 50 or
+`GITHUB_SCOUT_MIN_STARS` (unless `--low-stars` does); the reason goes on the take and into the
+ledger. Cards without `results` stay valid.
 
 `adopted` holds one entry per project, question and set of our paths: recording the same again
 replaces it, and `adopt --drop` adds `dropped: <date>` instead of deleting it. `updates` asks
@@ -124,7 +143,10 @@ current verdict.
 
 Verdicts: `peeked`, `short`, `list`, `later`, `skip`, `card`. A `skip` comes back once the
 repo's stars reach twice the recorded count (and at least 200 more). An adoption is a `card`
-entry whose reason starts with `adopted:` or `dropped adoption:`.
+entry whose reason starts with `adopted:` or `dropped adoption:`. A `short` under the star
+threshold, and a `card` that takes such a repo as a reference, carry `low_stars` (the reason);
+a reference without results carries `no_results`. `import` records a shortlist under the
+threshold as `later`.
 
 ## Scan
 

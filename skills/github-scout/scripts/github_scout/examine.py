@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .github import Client, GitHubError
 from .discover import DROP, HIDE, SLOW, months_since
-from .store import Store, adoptions, as_list, today
+from .store import Store, adoptions, as_list, min_stars, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -85,6 +85,35 @@ def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str, 
     if len(code) < 5:
         return "example", [f"{len(code)} code files"]
     return "library", ["code without a manifest the tool recognises"]
+
+
+# README links that may show what a repo made: demo videos, galleries, examples, benchmarks.
+RESULT_WORDS = re.compile(r"demo|gallery|showcase|examples?\b|samples?\b|benchmark|playground|preview|case.?stud|"
+                          r"演示|示例|案例|效果|作品|样例|展示|评测", re.I)
+RESULT_MEDIA = re.compile(r"\.(mp4|webm|mov|gif)(?:[?#]|$)|github\.com/user-attachments/assets/|youtube\.com/watch|youtu\.be/|"
+                          r"bilibili\.com/video|vimeo\.com/\d|loom\.com/share", re.I)
+NOT_RESULT = re.compile(r"shields\.io|badge|/actions/workflows/|codecov|star-history|contrib\.rocks|/blob/[^/]+/LICENSE", re.I)
+
+
+def result_links(readme: str, slug: str, branch: str, limit: int = 5) -> list[str]:
+    """Links in a README that look like results, for the agent to open before reading code: media, and links whose
+    text or address says demo, gallery, examples and the like. Relative links point into the repo."""
+    found: list[tuple[str, str]] = re.findall(r"\[([^\]]*)\]\(\s*<?([^)\s>]+)>?[^)]*\)", readme)
+    found += [("", u) for u in re.findall(r"(?:src|href)=[\"']([^\"']+)[\"']", readme)]
+    found += [("", u) for u in re.findall(r"(?m)^\s*(https?://\S+)\s*$", readme)]
+    out: list[str] = []
+    for text, url in found:
+        target = url.split("?")[0].split("#")[0].lower()
+        if url.startswith(("#", "mailto:")) or NOT_RESULT.search(url) or target.endswith((".svg", ".png", ".jpg", ".jpeg", ".webp")):
+            continue
+        if not (RESULT_MEDIA.search(url) or RESULT_WORDS.search(text) or RESULT_WORDS.search(target)):
+            continue
+        if not url.startswith(("http://", "https://")):
+            path = re.sub(r"^(?:\./)+", "", url).lstrip("/")
+            url = f"https://github.com/{slug}/blob/{branch}/{path}"
+        if url not in out:
+            out.append(url)
+    return out[:limit]
 
 
 def _json(text: str | None) -> dict:
@@ -179,6 +208,7 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
         "tree": tree_summary(entries), "skills": skills[:15],
         "manifests": [m for m in MANIFESTS if m in paths],
         "package": {k: pkg[k] for k in ("name", "version", "bin") if k in pkg} if pkg else None,
+        "result_links": result_links(readme, slug, branch),     # to open before any code: not checked, not on the card
         "readme": clean_readme(readme, readme_chars),
     }
 
@@ -195,15 +225,21 @@ def maintenance(idle: float) -> str:
 
 def render_peek(p: dict) -> str:
     a = p["activity"]
+    limit = min_stars()
     lines = [f"## {p['repo']}  ({p['kind']}: {p['form']}?)  {p['url']}",
              f"{p['desc']}",
-             f"stars {p['stars']} · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
+             f"stars {p['stars']}" + (f" (UNDER {limit}: no reference without a written reason)" if p["stars"] < limit else "")
+             + f" · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
              f" · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else ""),
              f"head {p['branch']}@{p['commit']}" + (f" · release {p['release']['tag']} {p['release']['date']}" if p["release"] else " · no releases"),
              f"maintenance: {maintenance(a['idle_months'])} · {a['commits_30d']}{'+' if a['commits_30d'] >= 100 else ''} commits in 30 days"
              f" · {a['releases_90d']} releases in 90 days · {a['contributors']}{'+' if a['contributors'] >= 10 else ''} contributors"
              + (f", top one {a['top_contributor_pct']}% of commits" if a['top_contributor_pct'] is not None else ""),
              f"kind evidence: {'; '.join(p['evidence'])}"]
+    if p.get("homepage"):
+        lines.append(f"homepage: {p['homepage']}")
+    lines.append("results to check: " + (" · ".join(p["result_links"]) if p.get("result_links") else
+                                         "none linked in the README (look for a gallery, demo or examples)"))
     if p["topics"]:
         lines.append("topics: " + ", ".join(p["topics"][:10]))
     if p["package"]:
