@@ -10,8 +10,8 @@ from pathlib import Path
 
 from . import __version__
 from .discover import (
-    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, is_open, is_stale, plan, render, rescore, rising, row,
-    slugs_in_text, visible, why_hidden,
+    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, is_open, is_stale, plan, plan_warnings, render, rescore,
+    rising, row, slugs_in_text, visible, why_hidden,
 )
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
@@ -274,7 +274,8 @@ def cmd_scan(args):
     doc = store.question(args.ref)
     q = doc.data
     ref = f"{q['project']}/{q['id']}"
-    gaps = [f"warn  {w}" for w in lang_gaps(q)]
+    earlier = [s for p in store.scans(q["project"], q["id"]) for s in json.loads(p.read_text(encoding="utf-8"))["searches"]]
+    gaps = [f"warn  {w}" for w in lang_gaps(q) + plan_warnings(q, earlier)]
     if args.plan:
         rows = plan(q, args.lenses)
         for r in rows:

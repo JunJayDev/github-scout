@@ -116,7 +116,7 @@ scans/<project>/<q>/<stamp>.json         what each search ran and found
 
 ## Costs and limits
 
-- Each search costs API calls, not tokens. A full search takes five to ten minutes within
+- Each search costs API calls, not tokens. A full search takes five to fifteen minutes within
   GitHub's free limits. The table the agent reads is about 2,000 tokens; one repo's facts about 1,300.
 - It sees public GitHub, npm, skills.sh, the MCP registry, and links you add. GitLab, Codeberg
   and closed-source options need the web pass the search stage describes.

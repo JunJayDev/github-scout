@@ -1,33 +1,242 @@
 {
-  "about": "Recall cases: repositories a person found that github-scout must find. Each gives the goal as a user would say it and the repos the report or the scan must contain. Add one whenever someone finds a good repo the tool missed.",
+  "about": "Recall cases: repositories a person found that github-scout must find. Each gives the goal as a user would say it, the vocabulary a scan uses (fixed, so runs compare), and the repos the scan must keep. `python evals/run.py` scans every case for real and reports which came back. Add a case whenever someone finds a good repo the tool missed.",
   "evals": [
     {
       "id": "logged-in-browser",
       "prompt": "Use github-scout: our operations scripts must read and post on Reddit, X and Xiaohongshu through the Chrome profile we are already logged into, without a model clicking pages.",
       "stage": "working",
-      "must_find": ["jackwener/OpenCLI"],
-      "note": "Agents searched 'social media automation' and missed it; a person found it on X. Entity pairs and 'logged-in browser' put it first."
+      "must_find": [
+        "jackwener/OpenCLI"
+      ],
+      "note": "Agents searched 'social media automation' and missed it; a person found it on X. Entity pairs and 'logged-in browser' put it first.",
+      "vocabulary": {
+        "langs": [
+          "en",
+          "zh"
+        ],
+        "entities": [
+          "reddit",
+          "xiaohongshu|小红书|rednote",
+          "twitter|x.com",
+          "note.com",
+          "bilibili",
+          "zhihu|知乎"
+        ],
+        "mechanisms": [
+          "logged-in browser",
+          "chrome extension",
+          "browser cookies",
+          "CDP",
+          "browser automation"
+        ],
+        "forms": [
+          "cli",
+          "mcp",
+          "skill"
+        ],
+        "problems": [
+          "social media automation",
+          "自媒体 自动化",
+          "website to cli"
+        ],
+        "topics": []
+      },
+      "vocabulary_from": "the browser-ops question, 2026-10-15"
     },
     {
       "id": "explainer-figures",
       "prompt": "Use github-scout: let an agent (Opus 5.5) make short explainer videos that show how a machine or a system works.",
       "stage": "idea",
-      "must_find": ["wheresryan22/anatomy"],
-      "note": "Its own words never say video; people make explainer videos with its interactive figures. Found only by the rising lens."
+      "must_find": [
+        "wheresryan22/anatomy"
+      ],
+      "note": "Its own words never say video; people make explainer videos with its interactive figures. Found only by the rising lens.",
+      "vocabulary": {
+        "langs": [
+          "en",
+          "zh"
+        ],
+        "entities": [
+          "remotion",
+          "screen recording|screen studio|录屏",
+          "product launch video|product video|app promo|宣传片|产品视频",
+          "hyperframes",
+          "motion graphics|motion design|动效|动态图形",
+          "short video|shorts|reels|短视频",
+          "after effects",
+          "claude code"
+        ],
+        "mechanisms": [
+          "programmatic video|video as code|代码做视频",
+          "auto zoom|cursor zoom|自动缩放",
+          "video understanding|视频理解",
+          "react video",
+          "html to video",
+          "edit decision list|timeline json|剪辑时间线",
+          "storyboard|分镜"
+        ],
+        "forms": [
+          "skill",
+          "cli",
+          "mcp",
+          "library",
+          "app"
+        ],
+        "problems": [
+          "agent video editing",
+          "AI 视频 剪辑",
+          "product demo video",
+          "代码 做 视频"
+        ],
+        "topics": []
+      },
+      "vocabulary_from": "the video-production question, whose scan of 2026-10-15 found it on the rising list"
     },
     {
       "id": "chinese-human-writing",
       "prompt": "用 github-scout：让 agent 写的中文公众号长文读不出 AI 味。",
       "stage": "working",
-      "must_find": ["KKKKhazix/human-writing", "alchaincyf/tramstop-skill", "larashero3-dotcom/lieflat-less-ai-tone"],
-      "note": "Chinese projects; tramstop is found by the Chinese term 人味, not by an English translation."
+      "must_find": [
+        "KKKKhazix/human-writing",
+        "alchaincyf/tramstop-skill",
+        "larashero3-dotcom/lieflat-less-ai-tone"
+      ],
+      "note": "Chinese projects; tramstop is found by the Chinese term 人味, not by an English translation.",
+      "vocabulary": {
+        "langs": [
+          "en",
+          "zh"
+        ],
+        "entities": [
+          "wechat|微信公众号|公众号|weixin",
+          "twitter|x.com|推特|tweet",
+          "xiaohongshu|小红书|rednote",
+          "chinese|中文"
+        ],
+        "mechanisms": [
+          "humanizer|humanize|去AI味|去 AI 味|降AI",
+          "slop|anti-slop|ai tells|AI 痕迹",
+          "ai detection|AIGC检测|AI 检测",
+          "writing style|style guide|写作风格|文风",
+          "ai writing|AI写作|写作 skill",
+          "rewrite|改写|润色",
+          "human writing|活人感|像人写"
+        ],
+        "forms": [
+          "skill",
+          "prompt",
+          "cli",
+          "library"
+        ],
+        "problems": [
+          "humanize ai text",
+          "ai writing style",
+          "去 AI 味",
+          "公众号 写作"
+        ],
+        "topics": []
+      },
+      "vocabulary_from": "the writing-no-ai-flavor question, 2026-10-15"
     },
     {
       "id": "agent-video-making",
       "prompt": "用 github-scout：研究 GitHub 上用 Claude Code（特别是 Opus 5.5）或 Codex 做视频的 skill、工作流、素材制作和下载方法，视频用于自媒体（起号、产品宣传、科普），覆盖画风、动画、转场、特效、素材、音效、剪辑，最后给完整登记表。",
       "stage": "idea",
-      "must_find": ["Vincentwei1021/video-shotcraft", "YeJe-cpu/SeeCut", "feitangyuan/onetake"],
-      "note": "ChatGPT Pro run 2026-10-17 listed 84 repos but missed these three, the local picks for agents that check their own cut; all three are linked from zhuyansen/awesome-claude-video-skills, which that run opened and did not read."
+      "must_find": [
+        "Vincentwei1021/video-shotcraft",
+        "YeJe-cpu/SeeCut",
+        "feitangyuan/onetake"
+      ],
+      "note": "ChatGPT Pro run 2026-10-17 listed 84 repos but missed these three, the local picks for agents that check their own cut; all three are linked from zhuyansen/awesome-claude-video-skills, which that run opened and did not read.",
+      "vocabulary": {
+        "langs": [
+          "en",
+          "zh"
+        ],
+        "entities": [
+          "remotion",
+          "screen recording|screen studio|录屏",
+          "product launch video|product video|app promo|宣传片|产品视频",
+          "hyperframes",
+          "motion graphics|motion design|动效|动态图形",
+          "short video|shorts|reels|短视频",
+          "after effects",
+          "claude code"
+        ],
+        "mechanisms": [
+          "programmatic video|video as code|代码做视频",
+          "auto zoom|cursor zoom|自动缩放",
+          "video understanding|视频理解",
+          "react video",
+          "html to video",
+          "edit decision list|timeline json|剪辑时间线",
+          "storyboard|分镜"
+        ],
+        "forms": [
+          "skill",
+          "cli",
+          "mcp",
+          "library",
+          "app"
+        ],
+        "problems": [
+          "agent video editing",
+          "AI 视频 剪辑",
+          "product demo video",
+          "代码 做 视频"
+        ],
+        "topics": []
+      },
+      "vocabulary_from": "the video-production question, whose scans of 2026-10-14 and 10-15 found all three"
+    },
+    {
+      "id": "search-first-skills",
+      "prompt": "Use github-scout: find agent skills that search for existing open source before building.",
+      "stage": "working",
+      "must_find": [
+        "user-w-ui/search-before-build",
+        "instructa/agent-skills"
+      ],
+      "note": "A test scan on 2026-10-18 found neither among 525 repos. Its single broad words (github, 开源, skill) returned only giants sorted by stars, and its vocabulary said each idea one way: search-before-build describes itself in Chinese (寻找已经存在的产品、开源项目和可复用组件), and instructa's search-context skill sits in a curated collection whose README says 'reference repositories'.",
+      "vocabulary": {
+        "langs": [
+          "en",
+          "zh"
+        ],
+        "entities": [
+          "github search|gh search|github api|GitHub 搜索|GitHub 仓库",
+          "claude code|claude-code|coding agent|AI 编程|编程智能体"
+        ],
+        "mechanisms": [
+          "search first|search-first|search before building|research before coding|先搜索|先搜后写|先调研再开发",
+          "reinvent the wheel|reinventing the wheel|reuse before build|reuse first|重复造轮子|复用开源",
+          "prior art|existing solutions|existing libraries|现成方案|现成的开源项目|现成的轮子",
+          "repo research|github research|open source research|开源调研|开源项目调研|GitHub 项目分析",
+          "build vs buy|library selection|compare libraries|技术选型|开源选型"
+        ],
+        "forms": [
+          "skill",
+          "cli",
+          "mcp"
+        ],
+        "problems": [
+          "find existing solutions before building",
+          "找开源项目"
+        ],
+        "topics": [
+          "search-first",
+          "reuse-first",
+          "prior-art",
+          "repo-research",
+          "github-research",
+          "build-vs-buy",
+          "library-selection",
+          "github-search",
+          "code-research",
+          "agent-skills"
+        ]
+      },
+      "vocabulary_from": "the 2026-10-18 draft (entities github|开源|open source, claude code, skill; four mechanism groups), revised by an agent that saw only the scan --plan warnings and the plan skill, not these repos. One change undone: it had put existing solutions first because a code comment said that phrase found a competitor."
     }
   ]
 }

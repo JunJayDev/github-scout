@@ -30,7 +30,8 @@ Lenses (one letter each, kept with every candidate):
                     (skill or MCP topics, or any repo past 500 stars in a month), most stars first.
                     A repo says what it makes, not every use people find for it, so words miss
                     some of the best new ones. Those that match no vocabulary are listed apart
-                    for the agent to judge by description (`h1`, `h2`... in `pick`).
+                    for the agent to judge by description (`h1`, `h2`... in `pick`), if their
+                    name, description or topics show one of the question's forms.
     K skill code    SKILL.md files that mention an entity or mechanism
     S skills.sh     the skills.sh directory (records install counts, a usage signal)
     D MCP registry  the official MCP server registry
@@ -40,6 +41,15 @@ Lenses (one letter each, kept with every candidate):
                     (U and G find nothing before you pick: rerun `scan <q> --lenses UG` after picking)
     W web / add     links found elsewhere (web search, X, chat), fed in with `scan --add`
     L list          links expanded from an awesome list with `scan --expand`
+
+Sorted by stars, a search shows only the most-starred of what it matches. When a single-term search
+(E, M, Q, R) matches over 1,000 repos, its first 30 are all large, so the scan reads it again, 100 in
+GitHub's best-match order, where a 100-star repo that says the words plainly comes up. These reads
+come after the planned searches, mechanisms first and the narrowest first, at most 12 a scan. (A test on 2026-10-18:
+"existing solutions" in READMEs, 8,176 repos, put a 131-star competitor 72nd by best match and
+nowhere in the first 100 by stars.) Generic words (github, open source, 开源, skill, tool)
+say what any repo is: they are searched once as written, are not read again, take no slot in the
+capped lenses (K, S, D, N, R) or the topics, and `scan --plan` warns about them.
 
 The ranking is for finding, so it favours what is relevant and alive over what is famous: a
 repo created this year and pushed this week usually beats an older one with ten times the
@@ -51,7 +61,11 @@ Maintenance is a hard rule, by the last push:
     over 12 months  dropped: not saved, not shown, no verdict needed
 
 Rows under the star threshold (50, GITHUB_SCOUT_MIN_STARS) are no references and are hidden too,
-counted in the header; awesome lists are exempt, being only for finding.
+counted in the header, which names the first few that fit four or more vocabulary groups (for a
+question about who else does this); awesome lists are exempt, being only for finding.
+
+A scan saves its best 400 rows, up to 400 more whose own words fit the vocabulary, every list, and
+up to 300 rising rows; the search log is kept whole.
 """
 
 from __future__ import annotations
@@ -71,6 +85,8 @@ LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "
               "G": "graph", "W": "web/add", "L": "list"}
 DEFAULT_LENSES = "EPMCQTRHKSDNUG"
 KEEP = 400  # candidates saved per scan (best first); the search log is always kept whole
+KEEP_FIT = 400  # past KEEP, up to this many more whose own words match the vocabulary: a scan that reads deeper
+                # finds on-topic repos that fresher or bigger ones outrank (a must-find eval repo was cut at 400)
 SKILL_FORMS = ("skill", "skills", "skill-pack", "rules", "plugin", "agent")
 RISE_TOPICS = {"skill": ("agent-skill", "agent-skills", "claude-skills", "claude-skill", "claude-code-skill", "skills"),
                "mcp": ("mcp-server", "mcp")}
@@ -79,6 +95,34 @@ BREAKOUT_MONTHS, BREAKOUT_STARS = 1, 500  # H for other forms: any repo past 500
 RISE_KEEP, RISE_SHOW = 300, 30           # rising repos kept beyond KEEP; rows shown apart
 RISE_TOPIC_SET = {t for ts in RISE_TOPICS.values() for t in ts}
 SLOW, HIDE, DROP = 3, 6, 12  # months since the last push: penalised, hidden by default, dropped
+BROAD, BEST_PAGE, BEST_MAX = 1000, 100, 12   # a single-term search matching over BROAD repos is read again in
+BEST_ORDER = "MQER"                          # best-match order, BEST_PAGE rows, at most BEST_MAX times a scan, after
+                                             # the planned searches: mechanisms first (a repo's own words for how it
+                                             # works), then problems; entity names already lead by stars. Within a
+                                             # lens the narrowest first: 100 rows of 3,000 matter, of 300,000 hardly
+HUGE = 10000             # `scan --plan` and the header name terms whose own search matched this many repos
+SKILLS_PAGE = 100        # skills.sh rows read per search: relevant skills with few installs sit deep
+LOW_FIT, LOW_SHOW = 4, 5  # rows under the star threshold that match this many groups are named in the header
+# Words that say what any repository is, not what this one does. Alone they bring back only the most-starred repos.
+GENERIC = frozenset("""github git repo repos repository repositories project projects code source open-source opensource
+    tool tools app apps application library framework sdk api cli plugin plugins extension skill skills agent agents
+    ai llm bot automation workflow template templates prompt prompts
+    开源 开源项目 项目 代码 仓库 工具 应用 插件 技能 智能体 自动化 工作流 模板 提示词""".split()) | {"open source"}
+# The words a repo uses about its own shape, per form a question may list: the rising list keeps a row only when its
+# name, description or topics show one of the question's forms.
+FORM_WORDS = {
+    "skill": ("skill", "skills", "skill.md", "技能", *RISE_TOPICS["skill"]),
+    "mcp": ("mcp", "model context protocol", *RISE_TOPICS["mcp"]),
+    "cli": ("cli", "command line", "command-line", "terminal", "命令行"),
+    "library": ("library", "sdk", "package", "framework", "库"),
+    "app": ("app", "application", "desktop", "ios", "android", "macos", "应用", "客户端"),
+    "extension": ("extension", "chrome extension", "browser extension", "扩展", "插件"),
+    "plugin": ("plugin", "plugins", "插件"),
+    "template": ("template", "templates", "starter", "boilerplate", "模板"),
+    "prompt": ("prompt", "prompts", "提示词"),
+    "agent": ("agent", "agents", "智能体"),
+    "rules": ("rules", "cursorrules", "agents.md", "claude.md"),
+}
 
 
 def quote(term: str) -> str:
@@ -86,8 +130,24 @@ def quote(term: str) -> str:
 
 
 def slugify(term: str) -> str | None:
+    """A topic name for an ASCII term. A term with other scripts in it gets none: cutting them out
+    leaves a broad word ("GitHub 搜索" would become topic:github, "去 AI 味" topic:ai)."""
     s = re.sub(r"[^a-z0-9]+", "-", term.lower()).strip("-")
-    return s if s and s.isascii() and len(s) <= 50 else None
+    return s if s and term.isascii() and len(s) <= 50 else None
+
+
+def query_words(query: str) -> str:
+    """A search's words, without its qualifiers (in:readme, pushed:>...) and quotes."""
+    return " ".join(re.sub(r"(?<!\S)[a-z]+:\S+", " ", query).replace('"', " ").split())
+
+
+def is_generic(term: str) -> bool:
+    return " ".join(term.lower().split()) in GENERIC
+
+
+def specific(gs: list[list[str]]) -> list[list[str]]:
+    """The groups without their generic words; a group of generic words only is left out."""
+    return [x for x in ([t for t in g if not is_generic(t)] for g in gs) if x]
 
 
 def window(months: int = 12) -> str:
@@ -157,8 +217,13 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos:
     def spread(gs: list[list[str]], limit: int | None = None) -> list[str]:
         return _turns([_breadth(_in(gs, lang)) for lang in langs], limit)
 
-    def lead(limit: int, only: list[str] | None = None) -> list[str]:   # per language: first 4 entity, 2 mechanism groups
-        return _turns([_breadth(_in(ents, lang)[:4] + _in(mech_groups, lang)[:2]) for lang in only or langs], limit)
+    def lead(limit: int, only: list[str] | None = None) -> list[str]:
+        """Per language, the heads of six groups before any synonym: entity groups first (up to 4), mechanism
+        groups fill the rest (at least 2). With few entities, the slots go to more mechanisms, not to synonyms."""
+        def six(lang: str) -> list[str]:
+            e = _in(specific(ents), lang)[:4]
+            return _breadth(e + _in(specific(mech_groups), lang)[:max(2, 6 - len(e))])
+        return _turns([six(lang) for lang in only or langs], limit)
 
     def heads(gs: list[list[str]], lang: str, n: int) -> list[str]:
         return list(dict.fromkeys(g[0] for g in _in(gs, lang)))[:n]
@@ -186,11 +251,11 @@ def plan(q: dict, lenses: str = DEFAULT_LENSES, max_pairs: int = 15, max_combos:
     for p in probs:
         add("Q", "repos", p)
     topics = [t for t in (slugify(x) for x in as_list(q.get("topics"))) if t]
-    topics += [t for t in (slugify(x) for x in ent_terms + mech_terms) if t and t not in topics]
+    topics += [t for t in (slugify(x) for x in ent_terms + mech_terms if not is_generic(x)) if t and t not in topics]
     for t in topics[:12]:
         add("T", "repos", f"topic:{t}")
-        add("T", "repos", f"topic:{t} created:>{since}")
-    for term in _in_order([_breadth(_in(ents + mech_groups, lang)) for lang in langs], 12):
+        add("T", "repos", f"topic:{t} created:>{since}")   # skipped when the first returned every repo of the topic
+    for term in _in_order([_breadth(_in(specific(ents + mech_groups), lang)) for lang in langs], 12):
         add("R", "repos", f"{quote(term)} in:name,description,readme created:>{since}")
     rise = window(RISE_MONTHS)
     if not forms or any(f in SKILL_FORMS for f in forms):
@@ -399,6 +464,8 @@ class Scan:
         self.cands: dict[str, dict] = {}
         self.dropped: set[str] = set()   # unmaintained for over DROP months; only counted
         self.log: list[dict] = []
+        self.totals: dict[str, int] = {}  # query -> repos it matches in all
+        self.broad: list[dict] = []        # log entries of broad searches, to read again in best-match order
 
     def _add(self, raw: dict, lens: str):
         c = compact(raw)
@@ -433,23 +500,49 @@ class Scan:
     def run(self, lenses: str = DEFAULT_LENSES, budget: int = 250, per_query: int = 30) -> dict:
         start = self.client.calls
         for s in plan(self.q, lenses):
+            entry = dict(s)
+            self.log.append(entry)
             if self.client.calls - start >= budget:
-                self.log.append({**s, "hits": None, "error": "skipped: budget"})
+                entry.update(hits=None, error="skipped: budget")
                 continue
             try:
-                self.log.append({**s, "hits": self._one(s, per_query)})
+                entry["hits"] = self._one(entry, per_query)
             except GitHubError as exc:
-                self.log.append({**s, "hits": None, "error": str(exc)})
+                entry.update(hits=None, error=str(exc))
             except OSError as exc:
-                self.log.append({**s, "hits": None, "error": f"network: {exc}"})
+                entry.update(hits=None, error=f"network: {exc}")
             if self.client.verbose:
-                print(f"  {s['lens']} {s['query'][:70]} -> {self.log[-1].get('hits')}", file=sys.stderr)
+                total = f" of {entry['total']}" if entry.get("total") is not None else ""
+                print(f"  {s['lens']} {s['query'][:70]} -> {entry.get('hits')}{total}", file=sys.stderr)
+        for entry in sorted(self.broad, key=lambda e: (BEST_ORDER.index(e["lens"]), e["total"]))[:BEST_MAX]:
+            if self.client.calls - start >= budget:
+                break
+            try:
+                more, _ = self.client.search_repos_total(entry["query"], sort="", per_page=BEST_PAGE)
+            except (GitHubError, OSError) as exc:
+                entry["best_error"] = str(exc)
+                continue
+            entry["best"] = len(more)
+            entry["hits"] += len(more)
+            for r in more:
+                self._add(r, entry["lens"])
+            if self.client.verbose:
+                print(f"  {entry['lens']} {entry['query'][:70]} -> {len(more)} more in best-match order", file=sys.stderr)
         return self.finish(lenses)
 
     def _one(self, s: dict, per_query: int) -> int:
+        """Run one planned search and add what it finds. Notes on `s` what the log keeps: `total` (repos the search
+        matches) and `skipped` (why it did not run); `run` adds `best`, the rows read again in best-match order."""
         kind, query, lens = s["kind"], s["query"], s["lens"]
         if kind == "repos":
-            items = self.client.search_repos(query, per_page=100 if lens == "H" else per_query)
+            base = re.sub(r" created:>\S+", "", query)
+            if lens == "T" and base != query and self.totals.get(base, per_query + 1) <= per_query:
+                s["skipped"] = f"{base.split()[0]} has {self.totals[base]} repos, all read"
+                return 0
+            items, total = self.client.search_repos_total(query, per_page=100 if lens == "H" else per_query)
+            self.totals[query] = s["total"] = total
+            if lens in BEST_ORDER and total > BROAD and not is_generic(query_words(query)):
+                self.broad.append(s)
             for r in items:
                 self._add(r, lens)
             return len(items)
@@ -458,7 +551,7 @@ class Scan:
         if kind == "npm":
             return self.add_slugs(self.client.npm_search(query)[:20], lens)
         if kind == "skills":
-            found = self.client.skills_search(query)
+            found = self.client.skills_search(query, limit=SKILLS_PAGE)
             n = self.add_slugs([slug for slug, _, _ in found], lens)
             for slug, installs, _ in found:
                 c = self.cands.get(slug.lower())
@@ -497,12 +590,15 @@ class Scan:
                 "candidates": list(self.cands.values())}
         rescore(scan, self.q)
         ranked = scan["candidates"]
-        scan["candidates"] = ranked[:KEEP] + [c for c in ranked[KEEP:] if is_rising(c)][:RISE_KEEP]
+        rest = ranked[KEEP:]   # lists are kept whole: they are listed apart, for --expand, not ranked against tools
+        scan["candidates"] = (ranked[:KEEP] + [c for c in rest if c.get("fit") and not c.get("list")][:KEEP_FIT]
+                              + [c for c in rest if c.get("list")] + [c for c in rest if is_rising(c)][:RISE_KEEP])
         return scan
 
 
 def rescore(scan: dict, q: dict) -> dict:
     """Fit and score depend on the question's current vocabulary, so they are recomputed on every view."""
+    forms = [g[0].lower() for g in groups(q.get("forms"))]
     for c in scan["candidates"]:
         c["fit"] = fit(c, q)
         c["score"] = score(c, q)
@@ -510,8 +606,19 @@ def rescore(scan: dict, q: dict) -> dict:
             c["list"] = True
         else:
             c.pop("list", None)
+        if forms and is_rising(c) and not shows_form(c, forms):
+            c["off_form"] = True
+        else:
+            c.pop("off_form", None)
     scan["candidates"].sort(key=lambda c: (-c["score"], -c["stars"]))
     return scan
+
+
+def shows_form(c: dict, forms: list[str]) -> bool:
+    """Whether a repo's own name, description or topics show one of the forms (FORM_WORDS)."""
+    text = " ".join([c["repo"].split("/")[-1].replace("-", " ").replace("_", " "), c.get("desc") or "",
+                     " ".join(c.get("topics") or [])]).lower()
+    return any(_term_re(w).search(text) for f in forms for w in FORM_WORDS.get(f, (f,)))
 
 
 def annotate(store: Store, scan: dict) -> dict:
@@ -575,6 +682,8 @@ def why_hidden(c: dict, limit: int) -> str:
         return f"stale: no push in {HIDE} months"
     if is_low(c, limit):
         return f"under {limit} stars: no reference without pick --low-stars \"why\""
+    if c.get("off_form"):
+        return "rising, but not in the question's forms: --all shows it"
     return "hidden"
 
 
@@ -595,13 +704,16 @@ def visible(scan: dict, show_all: bool = False) -> list[dict]:
             and (show_all or (is_open(c) and not is_stale(c) and not excluded(c) and not is_low(c, limit)))]
 
 
-def rising(scan: dict, show_all: bool = False) -> list[dict]:
+def rising(scan: dict, show_all: bool = False, any_form: bool = False) -> list[dict]:
     """Rows `render` lists apart as h1, h2...: fastest-growing first, those in the form's topics
-    (skills, MCP servers) ahead of breakouts from anywhere, which keep a third of the shown rows."""
+    (skills, MCP servers) ahead of breakouts from anywhere, which keep a third of the shown rows.
+    Only rows that show one of the question's forms, unless `show_all` or `any_form`: in a test on
+    2026-10-18, breakouts in other forms (a CarPlay receiver, a graphics driver) filled the list."""
     limit = min_stars()
     rows = sorted((c for c in scan["candidates"] if is_rising(c) and not c.get("card") and not excluded(c)
                    and months_since(c.get("pushed")) <= DROP
-                   and (show_all or (is_open(c) and not is_stale(c) and not is_low(c, limit)))),
+                   and (show_all or (is_open(c) and not is_stale(c) and not is_low(c, limit)
+                                     and (any_form or not c.get("off_form"))))),
                   key=lambda c: -momentum(c))
     form = [c for c in rows if RISE_TOPIC_SET & set(c.get("topics") or [])]
     other = [c for c in rows if not RISE_TOPIC_SET & set(c.get("topics") or [])]
@@ -611,7 +723,52 @@ def rising(scan: dict, show_all: bool = False) -> list[dict]:
 
 
 def human(n: int) -> str:
-    return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+    return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+
+
+def broad_terms(searches: list[dict], least: int = HUGE) -> dict[str, int]:
+    """Terms whose own entity or mechanism search (name and description) matched at least `least` repos."""
+    out: dict[str, int] = {}
+    for s in searches:
+        if s.get("lens") in ("E", "M") and (s.get("total") or 0) >= least and "in:" not in s.get("query", ""):
+            term = query_words(s["query"])
+            out[term] = max(out.get(term, 0), s["total"])
+    return out
+
+
+def said_once(g: list[str], lang: str) -> bool:
+    """A group that says its idea one way in `lang`. Variants that differ only by case, spaces, - or _ count once,
+    and so does a term inside another ("重复造轮子" in "不要重复造轮子"). A one-word Latin name (CDP, remotion)
+    needs no synonym."""
+    terms = [t for t in g if lang_of(t) == lang]
+    keys = sorted({re.sub(r"[\s_-]+", "", t.lower()) for t in terms}, key=len)
+    distinct = [k for i, k in enumerate(keys) if not any(o in k for o in keys[:i])]
+    names = all(t.isascii() and not re.search(r"[\s_-]", t) for t in terms)
+    return len(distinct) == 1 and not names
+
+
+def plan_warnings(q: dict, searches: list[dict] = ()) -> list[str]:
+    """Besides missing languages (store.lang_gaps): broad words, and mechanism groups said one way only.
+    `searches` are the logs of earlier scans of the question, for the number of repos each term matched."""
+    out = []
+    terms = list(dict.fromkeys(t for key in ("entities", "mechanisms") for g in groups(q.get(key)) for t in g))
+    counted = {k.lower(): v for k, v in broad_terms(list(searches)).items()}
+    named = [t for t in terms if is_generic(t)] + [f"{t} ({human(counted[t.lower()])} repos)" for t in terms
+                                                   if not is_generic(t) and t.lower() in counted]
+    if named:
+        out.append(f"broad: {', '.join(named[:8])}{' ...' if len(named) > 8 else ''}. Alone each brings back only the "
+                   "most-starred repos: add to its group a narrower phrase (what the repo does or uses), and keep "
+                   "shape words (skill, cli, mcp) in forms")
+    once = []
+    for g in groups(q.get("mechanisms")):
+        langs = [lang for lang in question_langs(q) if said_once(g, lang)]
+        if langs:
+            once.append(f"{g[0]} ({', '.join(langs)})")
+    if once:
+        out.append(f"said one way only: {', '.join(once[:8])}{' ...' if len(once) > 8 else ''}. Repos name one idea in "
+                   "several words: add two or three after |, as a repo would say it about itself "
+                   "(humanizer|humanize|去AI味|活人感|人味)")
+    return out
 
 
 def row(i, c: dict) -> str:
@@ -653,6 +810,10 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
                + zh_rows)
     if errors:
         out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]) + (" ..." if len(errors) > 3 else ""))
+    broad = sorted(broad_terms(scan["searches"]).items(), key=lambda kv: -kv[1])
+    if broad:
+        out.append("broad words (alone, only their most-starred repos came back; scan --plan says what to do): "
+                   + ", ".join(f"{t} {human(n)}" for t, n in broad[:6]) + (" ..." if len(broad) > 6 else ""))
     carded = [c for c in scan["candidates"] if c.get("card")]
     if carded:
         out.append("already in the registry: " + "; ".join(f"{c['repo']} ({c['card']})" for c in carded[:12]))
@@ -671,6 +832,12 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     if low:
         out.append(f"under {limit} stars: {len(low)} hidden, no references (--all shows them; to shortlist one anyway: "
                    f"pick <q> owner/repo --low-stars \"why\")")
+        on_topic = [c for c in low if (c.get("fit") or 0) >= LOW_FIT]
+        if on_topic:
+            out.append(f"  of them on topic (fit {LOW_FIT}+), for a question about who else does this: "
+                       + ", ".join(f"{c['repo']} ({c['stars']} star{'' if c['stars'] == 1 else 's'}, fit {c['fit']})"
+                                   for c in on_topic[:LOW_SHOW])
+                       + (f" and {len(on_topic) - LOW_SHOW} more" if len(on_topic) > LOW_SHOW else ""))
     lists = [c for c in scan["candidates"] if c.get("list") and is_open(c) and not is_stale(c) and not excluded(c)]
     if lists:
         out.append("lists (scan --expand <list>): " + ", ".join(f"{c['repo']} ({human(c['stars'])})" for c in lists[:8]))
@@ -686,9 +853,11 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     if len(rows) > top:
         out.append(f"... {len(rows) - top} more (--top N)")
     rise = rising(scan, show_all)
-    if rise:
+    other_forms = 0 if show_all else len(rising(scan, any_form=True)) - len(rise)
+    if rise or other_forms:
         out.append(f"rising: new in the last {RISE_MONTHS} months and growing fast, but no vocabulary in their own words "
-                   f"({len(rise)}). Judge each by what it makes, not by its words; pick with h<#>")
+                   f"({len(rise)}" + (f"; {other_forms} more not in the question's forms, --all shows them" if other_forms else "")
+                   + "). Judge each by what it makes, not by its words; pick with h<#>")
         out += [row(f"h{i}.", c) for i, c in enumerate(rise[:RISE_SHOW], 1)]
         if len(rise) > RISE_SHOW:
             out.append(f"... {len(rise) - RISE_SHOW} more rising (--json lists them)")

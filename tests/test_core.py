@@ -1245,6 +1245,175 @@ class LanguageTests(Base):
                                "1 of 2 rows shown have a Chinese description")
 
 
+class RecallTests(Base):
+    """A test scan on 2026-10-18 missed the two closest competitors: broad words sorted by stars returned only giants,
+    the vocabulary said each idea one way, rising rows in other forms buried the list, and the star gate hid 16 rivals."""
+
+    alive = f" pushed:>{discover.window(discover.HIDE)}"
+
+    def vocab(self, **data):
+        doc = self.store.question("ops/browser-ops")
+        doc.data.update(data)
+        self.store.save_question(doc)
+
+    def last_scan(self) -> dict:
+        return json.loads(self.store.scans("ops", "browser-ops")[-1].read_text(encoding="utf-8"))
+
+    def best_calls(self) -> list[str]:
+        return [c for c in self.api.calls if "search/repositories" in c and "sort=" not in c]
+
+    def test_broad_single_terms_are_read_again_in_best_match_order(self):
+        self.vocab(entities=QUESTION["entities"] + ["github|开源"])
+        q = '"logged-in browser"' + self.alive
+        giant = self.api.add(repo("big/browser", 90000, "Browser automation framework", pushed=ago(0.1)))
+        small = self.api.add(repo("s/relay", 131, "Let agents drive your logged-in browser", created=ago(3), pushed=ago(0.1)))
+        self.api.search[q], self.api.best[q], self.api.totals[q] = [giant], [small], 8176
+        self.api.search["github" + self.alive] = [giant]
+        self.api.best["github" + self.alive] = [self.api.add(repo("x/github-stats", 300, "GitHub stats", pushed=ago(0.1)))]
+        self.api.totals["github" + self.alive] = 2_182_917
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        self.assertIn("s/relay", out)                                   # 131 stars: never in the first 30 by stars
+        self.assertNotIn("x/github-stats", out)                         # a generic word is not read again
+        self.assertEqual(len(self.best_calls()), 1, self.best_calls())
+        self.assertIn("per_page=100", self.best_calls()[0])
+        e = next(s for s in self.last_scan()["searches"] if s["query"] == q)
+        self.assertEqual((e["total"], e["best"], e["hits"]), (8176, 1, 2))
+        self.assertIn("broad words (alone, only their most-starred repos came back; scan --plan says what to do): "
+                      "github 2.2M", out)
+
+    def test_best_match_reads_are_capped(self):
+        for term, total in (('"logged-in browser"', 5000), ('"chrome extension"', 300000), ("reddit", 2000),
+                            ('"logged-in browser" in:readme', 3000)):
+            self.api.totals[term + self.alive] = total
+        with unittest.mock.patch.object(discover, "BEST_MAX", 2):
+            code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(self.best_calls()), 2)                     # mechanisms before entities, narrowest first
+        self.assertEqual([s["query"] for s in self.last_scan()["searches"] if s.get("best") is not None],
+                         ['"logged-in browser"' + self.alive, '"logged-in browser" in:readme' + self.alive])
+        calls = self.api.calls
+        first_best = min(i for i, c in enumerate(calls) if c in self.best_calls())
+        self.assertGreater(first_best, max(i for i, c in enumerate(calls) if "registry.npmjs.org" in c))   # read last
+
+    def test_a_topic_read_whole_is_not_searched_again_for_the_last_year(self):
+        self.api.search["topic:reddit" + self.alive] = [self.api.add(repo("a/reddit-cli", 900, "Reddit CLI", pushed=ago(0.1)))]
+        self.api.totals["topic:xiaohongshu" + self.alive] = 500
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        searched = " ".join(self.api.calls)
+        self.assertNotIn("topic%3Areddit+created", searched)
+        self.assertIn("topic%3Axiaohongshu+created", searched)
+        e = next(s for s in self.last_scan()["searches"] if s["query"].startswith("topic:reddit created"))
+        self.assertEqual((e["hits"], e["skipped"]), (0, "topic:reddit has 1 repos, all read"))
+
+    def test_generic_words_take_no_capped_slot(self):
+        q = {"entities": ["github|开源|open source", "reddit|红迪"], "mechanisms": ["prior art|现成方案"], "forms": ["skill"]}
+        p = discover.plan(q)
+
+        def by(lens):
+            return [words(x["query"]) for x in p if x["lens"] == lens]
+        self.assertTrue({"github", "开源", "open source"} <= set(by("E")))    # searched once, as written
+        for lens in "KSNR":
+            self.assertEqual({"github", "开源", "open source"} & set(by(lens)), set(), lens)
+            self.assertIn("prior art", by(lens), lens)                   # the slot goes to a word that narrows
+        self.assertFalse(any(x["query"].startswith(("topic:github", "topic:open-source")) for x in p))
+        mixed = discover.plan({"entities": ["github search|GitHub 搜索", "去 AI 味"], "forms": ["skill"]})
+        self.assertEqual(sorted({x["query"].split()[0] for x in mixed if x["lens"] == "T"}), ["topic:github-search"])
+        self.assertTrue(discover.is_generic("Open  Source") and not discover.is_generic("open source alternative"))
+
+    def test_capped_lenses_reach_more_mechanisms_when_entities_are_few(self):
+        mechs = ["search first|先搜索", "reinvent the wheel|重复造轮子", "prior art|现成方案", "repo research|开源调研",
+                 "build vs buy|技术选型"]
+        few = discover.plan({"entities": ["github|开源", "claude code|AI 编程"], "mechanisms": mechs, "forms": ["skill"]})
+        s = [x["query"] for x in few if x["lens"] == "S"]
+        self.assertEqual(s, ["claude code", "AI 编程", "search first", "先搜索", "reinvent the wheel", "重复造轮子",
+                             "prior art", "现成方案", "repo research", "开源调研"])   # heads of five groups, no synonym
+        many = discover.plan(BILINGUAL)
+        self.assertNotIn("browser cookies", [x["query"] for x in many if x["lens"] == "S"])   # four entities: two mechanisms
+
+    def test_plan_warns_about_broad_words_and_groups_said_one_way(self):
+        self.vocab(entities=QUESTION["entities"] + ["github|开源"],
+                   mechanisms=["logged-in browser", "chrome extension|浏览器插件|Chrome 插件", "CDP",
+                               "search first|search-first|先搜索", "reuse first|reuse before build|不要重复造轮子|重复造轮子"])
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--plan")
+        self.assertEqual(code, 0, out)
+        self.assertIn("warn  broad: github, 开源. Alone each brings back only the most-starred repos", out)
+        once = next(ln for ln in out.splitlines() if ln.startswith("warn  said one way only: "))
+        self.assertIn("logged-in browser (en), chrome extension (en), search first (en, zh), reuse first (zh).", once)
+        self.assertNotIn("CDP", once)                                    # a one-word name needs no synonym
+        self.assertFalse(discover.said_once(["CDP", "cdp"], "en"))
+        self.assertTrue(discover.said_once(["logged-in browser", "logged in browser"], "en"))
+        self.api.totals["reddit" + self.alive] = 12719                  # a scan learns how broad each word is
+        self.run_cli("scan", "ops/browser-ops", "--quiet")
+        _, out, _ = self.run_cli("scan", "ops/browser-ops", "--plan")
+        self.assertIn("warn  broad: github, 开源, reddit (12.7k repos).", out)
+        self.assertEqual(self.store.check()[0], [])
+
+    def test_rising_list_keeps_only_the_questions_forms(self):
+        rise = f"created:>{discover.window(discover.RISE_MONTHS)} stars:>{discover.RISE_STARS}"
+        skill = self.api.add(repo("a/anatomy", 11000, "Isometric illustrations of machines", created=ago(0.3),
+                                  pushed=ago(0.05), topics=["agent-skill"]))
+        cli_ = self.api.add(repo("b/fast-thing", 4000, "命令行工具：一键整理照片", created=ago(0.5), pushed=ago(0.1)))
+        car = self.api.add(repo("c/DiPlay", 9000, "Independent CarPlay receiver for Android head units", created=ago(0.5),
+                                pushed=ago(0.1)))
+        self.api.search[f"topic:agent-skill {rise}" + self.alive] = [skill]
+        breakout = f"created:>{discover.window(discover.BREAKOUT_MONTHS)} stars:>{discover.BREAKOUT_STARS}" + self.alive
+        self.api.search[breakout] = [cli_, car]
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        hs = [ln for ln in out.splitlines() if re.match(r"\s*h\d+\.", ln)]
+        self.assertEqual([ln.split()[5] for ln in hs], ["a/anatomy", "b/fast-thing"])   # forms: cli, skill
+        self.assertIn("(2; 1 more not in the question's forms, --all shows them)", out)
+        _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show", "--all")
+        self.assertIn("c/DiPlay", out)
+        code, out, _ = self.run_cli("pick", "ops/browser-ops", "h2", "--rest", "no")
+        self.assertEqual(code, 0, out)
+        verdicts = {e["repo"]: e["verdict"] for e in self.store.ledger()}
+        self.assertEqual(verdicts, {"b/fast-thing": "short", "a/anatomy": "skip"})       # c/DiPlay was not shown
+        self.vocab(forms=[])
+        _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
+        self.assertIn("c/DiPlay", out)                                  # no forms: every rising row counts
+
+    def test_rows_past_the_keep_limit_stay_when_their_own_words_fit(self):
+        sc = discover.Scan(None, client(FakeAPI()), {"project": "p", "id": "q", **QUESTION})
+        for i in range(3):
+            sc._add(repo(f"big/reddit-tool-{i}", 90000, "Reddit tool", pushed=ago(0.1)), "E")
+        sc._add(repo("s/rednote-skill", 53, "A skill for rednote", created=ago(3), pushed=ago(0.2)), "M")
+        sc._add(repo("n/noise", 60, "Unrelated thing", created=ago(3), pushed=ago(0.2)), "M")
+        sc._add(repo("l/awesome-notes", 9, "A curated list", created=ago(30), pushed=ago(2)), "S")
+        with unittest.mock.patch.multiple(discover, KEEP=3, KEEP_FIT=5):
+            kept = [c["repo"] for c in sc.finish("EM")["candidates"]]
+        self.assertEqual(kept[3:], ["s/rednote-skill", "l/awesome-notes"])   # fit 1, and a list, past the first three
+        self.assertNotIn("n/noise", kept)                               # no vocabulary in its own words
+
+    def test_shows_form_reads_name_description_and_topics(self):
+        cases = [({"repo": "a/x-cli", "desc": ""}, ["cli"], True), ({"repo": "a/x", "desc": "一个命令行工具"}, ["cli"], True),
+                 ({"repo": "a/x", "desc": "", "topics": ["mcp-server"]}, ["mcp"], True),
+                 ({"repo": "a/x", "desc": "", "topics": ["claude-skills"]}, ["skill"], True),
+                 ({"repo": "a/clicker", "desc": "Auto clicker"}, ["cli"], False),
+                 ({"repo": "a/x", "desc": "Steam Play for macOS"}, ["skill", "cli", "mcp"], False),
+                 ({"repo": "a/x", "desc": "Starter for Next.js"}, ["template"], True)]
+        for c, forms, want in cases:
+            self.assertEqual(discover.shows_form(c, forms), want, (c, forms))
+
+    def test_header_names_rows_under_the_star_threshold_that_fit_well(self):
+        self.api.search["reddit" + self.alive] = [
+            self.api.add(repo("a/reddit-cli", 900, "Reddit CLI", pushed=ago(0.1))),
+            self.api.add(repo("b/rival", 12, "Reddit, Xiaohongshu and Twitter through your logged-in browser",
+                              pushed=ago(0.1))),
+            self.api.add(repo("c/one", 1, "Reddit, X.com, rednote via a chrome extension and your logged-in browser",
+                              pushed=ago(0.1))),
+            self.api.add(repo("d/tiny", 3, "Reddit notes", pushed=ago(0.1)))]
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        self.assertIn("under 50 stars: 3 hidden", out)
+        line = next(ln for ln in out.splitlines() if ln.startswith("  of them on topic"))
+        self.assertEqual(line, "  of them on topic (fit 4+), for a question about who else does this: "
+                               "b/rival (12 stars, fit 4), c/one (1 star, fit 5)")   # in table order
+        self.assertNotIn("d/tiny", out)
+
+
 class ExamineTests(unittest.TestCase):
     def test_guess_form_and_kind(self):
         g = examine.guess_kind

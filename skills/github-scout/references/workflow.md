@@ -53,6 +53,15 @@ Why each part works:
   which is why Chinese pairs only fill leftover slots.
   Write the name Chinese users write, not a translation: `登录态`, not `已登录的浏览器`. Names
   written the same way (`reddit`, `CDP`) need nothing; `scan --plan` warns about the rest.
+- **Several words per idea.** A repo names an idea in its own words, and a group that says it
+  one way misses the rest: a Chinese repo that offers "已经存在的产品、开源项目和可复用组件" is not
+  found by `现成方案` alone. `scan --plan` names the mechanism groups said one way in a language.
+- **Narrow words, not broad ones.** `github`, `开源`, `skill`, `tool` say what any repo is. Alone,
+  a search for one returns only the most-starred of hundreds of thousands, so they take no slot in
+  the capped lenses and `scan --plan` warns about them; so does any term an earlier scan found
+  matching 10,000 repos or more. Say what the repo does instead, and keep shape words (skill,
+  cli, mcp) in `forms`. A search that matches over 1,000 repos is read again, 100 rows in
+  best-match order, which brings up smaller repos that say the words plainly.
 - **Problem phrases** find the least. Keep them short.
 
 Writing mechanisms: picture the solution's README. What would it say it uses? "headless
@@ -70,16 +79,22 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
   a 282-star repo created this month that matches three vocabulary groups ranks above a famous
   old one. Picking comes later, on results, stars, a trial and fit.
 - Rows under 50 stars are left out of the table and counted in the header: they are no
-  references. `--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway.
+  references. `--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway. The
+  header names the first few that match four or more vocabulary groups: for a question about who
+  else does this (competitors, the whole field) they are what you came for.
 - `fit` is the number of vocabulary groups in the repo's own name, description and topics.
 - Lens letters show why a row is there; several letters mean several independent routes found it.
 - The header line says how many repos were dropped (no push in 12 months) or hidden (6 months).
 - The `languages:` line counts the searches per language and the rows with a Chinese
   description. Few Chinese searches or rows usually mean the vocabulary lacks Chinese terms.
+- The `broad words` line names terms whose own search matched 10,000 repos or more: only their
+  most-starred came back. `scan --plan` says what to do about them.
 - `seen:skip@other/question` means another question already judged it; read that reason first.
 - The `rising` block under the table (`h1`, `h2`...) holds new repos growing fast that match no
   vocabulary. Words cannot find a tool whose description never names your use, so read these
-  by what they make. They are counted in `pick --rest` like the table rows.
+  by what they make. They are counted in `pick --rest` like the table rows. Only rows that show
+  one of the question's forms in their name, description or topics are listed (a question for
+  skills and CLIs does not list a graphics driver); `--all` shows the rest.
 
 `look` the promising rows first: about 1.3k tokens each, with the README links that look like
 results. Open those and pick 3 to 8 that show results close to what good looks like. A repo

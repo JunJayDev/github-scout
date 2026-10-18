@@ -34,19 +34,23 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
 ## With the command line
 
 ```bash
-github-scout scan <project>/<question>                  # about 140 searches, 5 minutes
+github-scout scan <project>/<question>                  # about 140 searches, 5 to 15 minutes
 ```
 
 - **What `scan` searches, all merged into one ranked table:**
-  - every entity and mechanism, alone and in pairs;
+  - every entity and mechanism, alone and in pairs; a word that matches over 1,000 repos is
+    read again in best-match order, where smaller repos that say it plainly come up;
   - GitHub topics;
   - the last 12 months;
   - SKILL.md files;
   - skills.sh, the MCP registry, npm;
-  - a rising list: repos new in the last two months and growing fast, found without words.
+  - a rising list: repos new in the last two months and growing fast in the question's forms,
+    found without words.
 - **Ranking, for finding:** relevance first, then young and moving. It is not a verdict.
 - **Left out and counted in the header:** lures, farmed installs, and repos under 50 stars
-  (`--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway).
+  (`--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway). The header
+  names the first few under 50 stars that fit four or more vocabulary groups: for a question
+  about who else does this, read them.
 - **Widen with what the API cannot see:**
   - Do one pass of web search per direction, in English and Chinese: `site:github.com <entity> <mechanism>`.
   - Include Chinese communities (掘金, 知乎, 少数派, V2EX) and any links the user shared.
@@ -74,8 +78,10 @@ lens runs at least once for the whole question, with its main terms, and the ris
 per topic in its row. A third run of this test searched words 40 times and the rising lens once;
 the repos it missed were the ones only the other lenses find. Queries of one to three
 terms, never a list of tool names you already know: such queries only return those tools, and
-a long query returns little at all. Search the Chinese words too: Chinese projects are found by
-the words their authors use.
+a long query returns little at all. A broad word alone (`github`, `开源`, `skill`) returns only
+the most-starred repos: search it paired with a narrower word, and where the connector lets you
+choose the order, read a search that matches thousands in best-match order too. Search the
+Chinese words too: Chinese projects are found by the words their authors use.
 
 With a connector that searches GitHub, it is GitHub's own search: run the lenses as `scan` does.
 Dates: six months back for `pushed:>`, twelve for `created:>` in the recent lens, two months for

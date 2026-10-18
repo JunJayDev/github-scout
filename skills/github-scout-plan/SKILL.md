@@ -67,7 +67,9 @@ missing. Fill the question file it prints:
   synonyms joined with `|`; then `forms` and `problems`.
 
 Then `github-scout scan <project>/<question> --plan` prints the searches and warns about groups
-missing a language.
+missing a language, broad words (`github`, `开源`, `skill`: alone they return only the most-starred
+repos) and mechanism groups said one way only. Fix the vocabulary until the warnings are ones you
+chose to keep.
 
 **Stop here.** Show the user what good looks like, the directions and the search plan, and wait
 for them to confirm or change them, unless they said not to stop.

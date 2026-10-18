@@ -159,11 +159,17 @@ class Client:
                 _unlock(f)
 
     def search_repos(self, q: str, sort: str = "stars", per_page: int = 30) -> list[dict]:
+        return self.search_repos_total(q, sort, per_page)[0]
+
+    def search_repos_total(self, q: str, sort: str = "stars", per_page: int = 30) -> tuple[list[dict], int]:
+        """One page of a repository search and how many repos match in all. sort="" is GitHub's best match."""
         self._throttle("search")
         params = {"q": q, "per_page": per_page}
         if sort:
             params.update(sort=sort, order="desc")
-        return (self.get("search/repositories", params) or {}).get("items", [])
+        data = self.get("search/repositories", params) or {}
+        items = data.get("items", [])
+        return items, int(data.get("total_count") or len(items))
 
     def search_code(self, q: str, per_page: int = 30) -> list[str]:
         if not self.token:

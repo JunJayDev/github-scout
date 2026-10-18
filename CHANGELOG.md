@@ -4,6 +4,46 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Recall. A test scan on 2026-10-18 (125 searches, 525 repos) missed the two closest
+  competitors, skills with 131 and 139 stars that do what github-scout does. Broad words sorted
+  by stars returned only giants, the vocabulary said each idea one way, and the star gate hid 16
+  direct rivals.
+  - A single-term search that matches over 1,000 repos is read again, 100 rows in GitHub's
+    best-match order, after the planned searches: mechanisms first, then problems, entities and
+    recent, the narrowest first within each, at most 12 a scan. In the test, `"existing
+    solutions"` in READMEs (8,176 repos) put the 131-star competitor 72nd by best match and
+    nowhere in the first 100 by stars. Generic words (github, open source, 开源, skill, tool ...) are not read again and take
+    no slot in the capped lenses (K, S, D, N, R) or the derived topics. A term with Chinese in it
+    no longer becomes a topic (`去 AI 味` made `topic:ai`). A topic search that returned every repo
+    of its topic skips its 12-month repeat. skills.sh is read 100 rows deep instead of 30: the
+    two competitors sat at 57 and 84.
+  - The capped lenses (K, S, D, N) take the heads of six groups per language before any synonym:
+    entity groups first (up to four), mechanism groups fill the rest. With two entity groups the
+    slots used to go to synonyms (`gh search`) instead of the third mechanism (`prior art`).
+    Questions with four or more entity groups plan as before.
+  - A scan keeps, past its best 400 rows, up to 400 more whose own words match the vocabulary,
+    and every list it found (lists are listed apart for `--expand`, not ranked against tools).
+    Reading deeper found two must-find repos that the 400-row cut then dropped.
+  - `scan --plan` warns about broad words (the generic ones, and terms an earlier scan found
+    matching 10,000 repos or more) and about mechanism groups said one way only in a language.
+    The scan header names the broad words with their counts. Every search in the log keeps
+    `total`, the number of repos it matched.
+  - The rising list keeps only rows that show one of the question's forms in their name,
+    description or topics; `--all` shows the rest. In the test, 63 of 125 rising rows were
+    other forms, among them a CarPlay receiver and a graphics driver.
+  - The header names the first five rows under 50 stars that fit four or more vocabulary groups,
+    for questions about who else does this. The threshold stays at 50.
+  - `evals/run.py` scans each case in `evals/evals.json` for real, with a fixed vocabulary per
+    case, and reports where each must-find repo sits (table row, rising row, list, or why it is
+    hidden); cases with the same vocabulary share a scan. New case `search-first-skills`: the
+    2026-10-18 draft vocabulary, revised by an agent that saw only the new `scan --plan`
+    warnings. Real runs on 2026-10-19: all 10 must-find repos in 5 cases kept (OpenCLI row 3,
+    anatomy rising h1, the writing trio rows 4, 63 and 306, the video trio rows 2, 5 and 14,
+    search-before-build row 147, instructa/agent-skills as a list). The old code on the same
+    vocabularies kept 2 of 3 writing repos (tramstop never returned) and 1 of 2 competitors
+    (instructa never returned); on the 10-18 draft words it kept neither competitor, the new
+    code keeps instructa. A scan costs 159 to 196 API calls and 7 to 12 minutes (the old code:
+    156 to 175 calls on the same words).
 - Trials run apart: dig tells the agent to try repos in a throwaway directory or container, outside
   the project, with no tokens or keys in the environment, after reading install scripts and hooks.
   SECURITY.md said downloaded code never runs; that holds for the command line only, and now says

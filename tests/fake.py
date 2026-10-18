@@ -45,6 +45,8 @@ class FakeAPI:
     def __init__(self):
         self.repos: dict[str, dict] = {}
         self.search: dict[str, list] = {}       # query -> list of repo dicts
+        self.best: dict[str, list] = {}         # query -> repos in best-match order (no sort); else as in search
+        self.totals: dict[str, int] = {}        # query -> total_count, when more repos match than are listed
         self.code: dict[str, list] = {}         # query -> list of slugs
         self.npm: dict[str, list] = {}          # text -> list of repo urls
         self.skills: dict[str, list] = {}       # text -> list of (owner/repo, installs)
@@ -92,7 +94,8 @@ class FakeAPI:
                     "defaultBranchRef": {"name": r["default_branch"]}}
             return self._ok({"data": data})
         if path == "search/repositories":
-            return self._ok({"items": self.search.get(q["q"], [])})
+            items = self.search.get(q["q"], []) if "sort" in q else self.best.get(q["q"], self.search.get(q["q"], []))
+            return self._ok({"total_count": self.totals.get(q["q"], len(items)), "items": items})
         if path == "search/code":
             return self._ok({"items": [{"repository": {"full_name": s}} for s in self.code.get(q["q"], [])]})
         if path.endswith("/commits") and "path" in q:

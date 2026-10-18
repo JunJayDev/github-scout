@@ -24,8 +24,16 @@ python skills/github-scout/scripts/github-scout.py --help
 Tests must not use the network. Add a fixture to `tests/fake.py` instead.
 
 To try a change against real GitHub, create a scratch registry (`github-scout init /tmp/r`)
-and run a scan. Include before/after rankings in the pull request when you change search
-lenses or scoring. Ranking changes are judged on real needs, not on taste.
+and run a scan. Ranking changes are judged on real needs, not on taste: when you change search
+lenses or scoring, run the recall eval before and after and put both results in the pull request.
+
+```bash
+python evals/run.py                  # network and a token; five to ten minutes per scan
+python evals/run.py --case logged-in-browser --keep /tmp/evals   # one case, keep its registry
+```
+
+`evals/evals.json` holds repos people found that a scan must keep, each case with a fixed
+vocabulary. When someone finds a good repo the tool missed, add a case.
 
 ## Ideas that fit
 
