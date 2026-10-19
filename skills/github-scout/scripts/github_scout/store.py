@@ -124,10 +124,9 @@ def stars_of(v) -> int | None:
 INSTALLS_REAL = 100   # skills.sh installs (not farmed) that count as real use: strong evidence
 MEDIA = re.compile(r"\.(png|jpe?g|webp|gif|avif|svg|mp4|webm|mov|m4v)(?:[?#]|$)|github\.com/user-attachments/|"
                    r"user-images\.githubusercontent\.com|private-user-images\.githubusercontent\.com", re.I)
-POST_HOSTS = ("x.com", "twitter.com", "bilibili.com", "b23.tv", "youtube.com", "youtu.be", "vimeo.com", "loom.com",
-              "xiaohongshu.com", "xhslink.com", "douyin.com", "tiktok.com", "weibo.com", "zhihu.com", "juejin.cn",
-              "mp.weixin.qq.com", "sspai.com", "v2ex.com", "medium.com", "dev.to", "substack.com", "hashnode.dev",
-              "reddit.com", "news.ycombinator.com", "linkedin.com", "producthunt.com", "note.com", "qiita.com", "zenn.dev")
+STORE_HOSTS = ("npmjs.com", "pypi.org", "crates.io", "pkg.go.dev", "rubygems.org", "packagist.org", "apps.apple.com",
+               "play.google.com", "chromewebstore.google.com", "addons.mozilla.org", "marketplace.visualstudio.com",
+               "hub.docker.com", "huggingface.co")
 
 
 def _host(url: str) -> str:
@@ -140,10 +139,10 @@ def _on(host: str, hosts: tuple[str, ...]) -> bool:
 
 
 def link_tier(url: str, slug: str = "") -> str:
-    """The tier of one link to what a repo does, without fetching it: media and posts outside the repo are mid;
-    a package or store page and any other site are strong (a live site; `look` checks that one answers); text pages
-    inside the repo itself are weak (its own description, however long). Another repository counts as mid: a project
-    that uses it, or its showcase."""
+    """The tier of one link to what a repo does, without fetching it: a package or store page is strong (published,
+    installable); media, posts outside the repo and any other site are mid (unfetched, a site may be a blog as well as
+    a live app: `look` is what checks that a site answers); text pages inside the repo itself are weak (its own
+    description, however long). Another repository counts as mid: a project that uses it, or its showcase."""
     host = _host(url)
     if MEDIA.search(url):
         return "mid"
@@ -151,9 +150,9 @@ def link_tier(url: str, slug: str = "") -> str:
         path = re.sub(r"^https?://[^/]+/", "", url).split("?")[0].split("#")[0].strip("/").lower()
         owner_repo = "/".join(path.split("/")[:2])
         return "weak" if not slug or owner_repo == slug.lower() or host == "gist.github.com" else "mid"
-    if _on(host, POST_HOSTS):
-        return "mid"
-    return "strong" if host else "weak"
+    if _on(host, STORE_HOSTS):
+        return "strong"
+    return "mid" if host else "weak"
 
 
 def best_tier(urls, slug: str = "", installs: int = 0) -> str:

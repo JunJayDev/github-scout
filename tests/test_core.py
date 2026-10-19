@@ -641,7 +641,7 @@ class FlowTests(Base):
                  "## Goal and where we stand", "Project code: /src/ops", "## In one paragraph", "OpenCLI reads all three",
                  "## Candidates", "| jackwener/OpenCLI | cli | 30k |", "## Try first", "run `opencli reddit hot`",
                  "## Sources", "| [jackwener/OpenCLI](https://github.com/jackwener/OpenCLI) | try first | use | 30000 | "
-                 "strong: [1](https://opencli.info/) |", "## For the coding agent: try, choose, adopt",
+                 "mid: [1](https://opencli.info/) |", "## For the coding agent: try, choose, adopt",
                  "github-scout note jackwener/OpenCLI --q ops/browser-ops --take <use|adapt|learn|later|skip> --trial",
                  "## Adopt and record", "## Not recommended (leave these out)", "- xpzouying/xiaohongshu-mcp: one site",
                  "## What was searched", "repos kept.", "Star threshold 50, relaxed where a direction had under 5"]
@@ -1137,7 +1137,7 @@ class QualityGateTests(Base):
         self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
         self.assertNotIn("## Why: the ideas behind it", text)
         self.assertNotIn("## Against what we have", text)                  # left empty: no section
-        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | strong: [1](https://example.com/d/gallery) | "
+        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | mid: [1](https://example.com/d/gallery) | "
                       "trial | abcdef123456 | n |", text)
         self.assertIn("| [f/alt](https://github.com/f/alt) | alternate | - | - | - | - | - | - |", text)
         self.assertIn("| [e/gap](https://github.com/e/gap) | fills a gap | learn | 12 (official org) |", text)
@@ -1673,7 +1673,7 @@ class ReportFirstTests(Base):
 
     def test_links_are_graded_and_the_gate_needs_mid_or_strong(self):
         from github_scout.store import best_tier, link_tier
-        cases = [("https://b.dev/", "strong"), ("https://www.npmjs.com/package/b", "strong"),
+        cases = [("https://b.dev/", "mid"), ("https://www.npmjs.com/package/b", "strong"),
                  ("https://github.com/a/b/blob/main/shot.png", "mid"), ("https://x.com/a/status/1", "mid"),
                  ("https://www.bilibili.com/video/BV1", "mid"), ("https://github.com/other/user-of-b", "mid"),
                  ("https://github.com/a/b#demo", "weak"), ("https://github.com/a/b/tree/main/examples", "weak")]

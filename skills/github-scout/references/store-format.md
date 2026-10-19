@@ -128,8 +128,8 @@ its first section.
 
 | tier | links |
 |---|---|
-| strong | any site outside GitHub (a live site, a package or store page); `look` checks that the homepage and README demo links answer, and also counts npm downloads and the installs a scan recorded |
-| mid | images, GIFs and videos (by extension, or GitHub's attachment hosts); posts on X, Bilibili, YouTube, blogs, Xiaohongshu and similar hosts; another GitHub repository |
+| strong | a package or store page (npm, PyPI, App Store, Chrome Web Store and similar); `look` also grades as strong a homepage or README demo link that answers, npm downloads and the installs a scan recorded |
+| mid | images, GIFs and videos (by extension, or GitHub's attachment hosts); posts on X, Bilibili, YouTube, blogs, Xiaohongshu; any other site not checked by `look` (it may be a blog as well as a live app); another GitHub repository |
 | weak | pages of the repo itself on GitHub that are not media: its README and other text |
 
 `note` refuses `use`, `adapt` and `learn` for a repo whose best tier is weak (unless
