@@ -239,7 +239,7 @@ def parse_search_log(text: str) -> list[dict]:
 
 SECTIONS = {
     "where": ("Where we are", "我们现在"),
-    "good": ("What good looks like", "好的结果长什么样"),
+    "good": ("What good looks like", "好的结果长什么样", "目标的样子"),   # the last: questions from before 10-19
     "summary": ("In one paragraph", "一段话结论"),
     "candidates": ("Candidates", "候选"),
     "try": TRY_TITLES,
