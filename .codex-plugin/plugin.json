@@ -1,7 +1,7 @@
 {
   "name": "github-scout",
   "version": "0.2.0",
-  "description": "Find what GitHub already solved for a goal in your project, read the projects that matter, and hand concrete suggestions to your coding agent.",
+  "description": "Agent skill for Claude Code and Codex: before your agent builds something, find what GitHub already solved, keep the projects whose effect you can verify, and report the 2–3 to try first.",
   "keywords": ["github", "open-source", "search", "prior-art", "skills"],
   "skills": "./skills",
   "interface": {
