@@ -372,13 +372,16 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("(software: cli?)", out)
         self.assertIn("maintenance: active · 37 commits in 30 days", out)
-        self.assertIn("results to check: none linked in the README", out)
+        self.assertIn("verifiable effect: weak, only a text description", out)
         self.assertIn("--results <links>", out)
         self.assertIn("top one 80% of commits", out)
 
+        code, _, err = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
+                                    "--results", "https://github.com/jackwener/OpenCLI#demo")
+        self.assertIn("jackwener/OpenCLI shows only text in its own repo", err)   # its README is a weak effect
         code, out, _ = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
                                     "--where", "tools/opencli", "--watch", "clis/reddit/**",
-                                    "--results", "https://github.com/jackwener/OpenCLI#demo")
+                                    "--results", "https://opencli.info/")
         self.assertEqual(code, 0, out)
         card = self.store.card("jackwener/opencli")
         self.assertEqual(card.path.name, card_filename("jackwener/OpenCLI"))
@@ -912,7 +915,7 @@ class QualityGateTests(Base):
     def scan_with_a_tiny_repo(self):
         alive = f" pushed:>{discover.window(discover.HIDE)}"
         big = self.api.add(repo("a/reddit-cli", 900, "Reddit CLI", created=ago(3), pushed=ago(0.2)))
-        tiny = self.api.add(repo("b/reddit-tiny", 12, "Reddit CLI for agents", created=ago(1), pushed=ago(0.1)))
+        tiny = self.api.add(repo("b/reddit-tiny", 8, "Reddit CLI for agents", created=ago(1), pushed=ago(0.1)))
         lst = self.api.add(repo("c/awesome-reddit", 8, "A curated list of Reddit tools", pushed=ago(0.5)))
         self.api.search["reddit" + alive] = [big, tiny, lst]
         return self.run_cli("scan", "ops/browser-ops", "--quiet")
@@ -936,13 +939,13 @@ class QualityGateTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("a/reddit-cli", out)
         self.assertNotIn("b/reddit-tiny", out)
-        self.assertIn("under 50 stars: 1 hidden, no references", out)
+        self.assertIn("under 50 stars (or the relaxed floor): 1 hidden, no references", out)
         self.assertIn("lists (scan --expand <list>): c/awesome-reddit (8)", out)            # lists are only for finding
         _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show", "--all")
-        self.assertIn("under 50 stars", next(ln for ln in out.splitlines() if "b/reddit-tiny" in ln))
+        self.assertIn("under 10 stars", next(ln for ln in out.splitlines() if "b/reddit-tiny" in ln))   # never below 10
         code, _, err = self.run_cli("pick", "ops/browser-ops", "1", "b/reddit-tiny")
         self.assertEqual(code, 1)
-        self.assertIn("under 50 stars, no references: b/reddit-tiny (12). Shortlist one only with --low-stars", err)
+        self.assertIn("no references: b/reddit-tiny (8). Shortlist one only with --low-stars", err)
         self.assertEqual(self.store.ledger(), [])                                          # nothing half-written
         code, out, _ = self.run_cli("pick", "ops/browser-ops", "--later", "b/reddit-tiny", "--list", "c/awesome-reddit")
         self.assertEqual(code, 0, out)
@@ -957,11 +960,12 @@ class QualityGateTests(Base):
 
     def test_the_threshold_comes_from_the_environment(self):
         self.scan_with_a_tiny_repo()
-        with unittest.mock.patch.dict(os.environ, {"GITHUB_SCOUT_MIN_STARS": "10"}):
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_SCOUT_MIN_STARS": "5"}):
             _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
             self.assertIn("b/reddit-tiny", out)
             code, out, _ = self.run_cli("pick", "ops/browser-ops", "b/reddit-tiny")
             self.assertEqual(code, 0, out)
+            self.assertNotIn("relaxed", out)                              # the floors are above a threshold of 5
         with unittest.mock.patch.dict(os.environ, {"GITHUB_SCOUT_MIN_STARS": "lots"}):
             code, _, err = self.run_cli("pick", "ops/browser-ops", "b/reddit-tiny")
             self.assertEqual(code, 1)
@@ -972,12 +976,12 @@ class QualityGateTests(Base):
         code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--note", "x")
         self.assertEqual(code, 1)
         self.assertIn("b/tiny has 12 stars, under 50: no reference. Say why it is an exception with --low-stars", err)
-        self.assertIn("b/tiny has no results to look at on its card. Give --results", err)
+        self.assertIn("b/tiny shows no verifiable effect on its card. Give --results", err)
         self.assertIsNone(self.store.card("b/tiny"))
         self.assertEqual(self.store.ledger(), [])
         code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--results", "demo.mp4",
                                     "--low-stars", "x")
-        self.assertIn("--results takes links (http or https) to what it made: demo.mp4", err)
+        self.assertIn("--results takes links (http or https) to its verifiable effect: demo.mp4", err)
         code, out, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn",
                                       "--results", "https://example.com/tiny/demo.mp4", "--low-stars", "official org")
         self.assertEqual(code, 0, err)
@@ -985,16 +989,16 @@ class QualityGateTests(Base):
         self.assertEqual(card.data["results"], ["https://example.com/tiny/demo.mp4"])
         self.assertEqual(card.data["uses"][0]["low_stars"], "official org")
         self.assertEqual(self.store.ledger()[-1]["low_stars"], "official org")
-        self.assertIn("results:\n  https://example.com/tiny/demo.mp4", self.run_cli("show", "b/tiny")[1])
+        self.assertIn("verifiable effect: mid\n  mid    https://example.com/tiny/demo.mp4", self.run_cli("show", "b/tiny")[1])
 
         self.api.add(repo("c/plain", 400, "Plain tool", pushed=ago(0.1)))
         code, out, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "later", "--note", "no results yet")
         self.assertEqual(code, 0, err)                                    # later and skip need neither
         self.assertEqual(self.store.card("c/plain").data["results"], [])
-        self.assertIn("results: none recorded", self.run_cli("show", "c/plain")[1])
+        self.assertIn("verifiable effect: none recorded", self.run_cli("show", "c/plain")[1])
         code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt")
         self.assertEqual(code, 1)
-        self.assertIn("no results to look at", err)
+        self.assertIn("no verifiable effect", err)
         self.assertNotIn("stars", err)
         code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt",
                                     "--no-results", "a library: its tests are the result")
@@ -1014,7 +1018,7 @@ class QualityGateTests(Base):
         self.assertEqual(code, 0, err)
         card = self.store.card("d/tool")
         self.assertEqual(card.data["level"], "trial")
-        self.assertIn(f"## Results and trial\n\n- {today()}, ops/browser-ops: ran examples/basic: 40 s\n\n## Quality", card.body)
+        self.assertIn(f"## Verifiable effect and trial\n\n- {today()}, ops/browser-ops: ran examples/basic: 40 s\n\n## Quality", card.body)
         registry.new_question(self.store, "ops/other", "Another question", "idea")
         self.run_cli("note", "d/tool", "--q", "ops/other", "--take", "learn", "--trial", "second run")
         body = self.store.card("d/tool").body
@@ -1023,7 +1027,7 @@ class QualityGateTests(Base):
         old.body = "\n# d/tool\n\n## The idea\nRenders frames.\n\n## Read first\n"
         self.store.save_card(old)
         self.run_cli("note", "d/tool", "--q", "ops/other", "--take", "skip", "--trial", "fails on arm64")
-        self.assertIn(f"Renders frames.\n\n## Results and trial\n\n- {today()}, ops/other: fails on arm64\n\n## Read first",
+        self.assertIn(f"Renders frames.\n\n## Verifiable effect and trial\n\n- {today()}, ops/other: fails on arm64\n\n## Read first",
                       self.store.card("d/tool").body)
         code, out, _ = self.run_cli("note", "z/gone", "--q", "ops/other", "--take", "skip", "--trial", "no install")
         self.assertEqual(self.store.ledger()[-1]["reason"], "trial: no install")   # no card: the trial goes in the ledger
@@ -1038,7 +1042,8 @@ class QualityGateTests(Base):
         self.assertEqual(errors, [])
         mine = [w.split(": ", 1)[1] for w in warns if "questions/browser-ops.md" in w and "vocabulary" not in w]
         self.assertEqual(mine, ["backbone d/tool was not tried (level read): run its own example, then note --trial",
-                                "backbone d/tool has no results to look at (note --results <links>)",
+                                "backbone d/tool shows no verifiable effect (note --results <a live site, screenshots, "
+                                "videos or posts>)",
                                 "picked e/gap has 12 stars, under 50, and no reason (note --low-stars)"])
         doc = self.store.question("ops/browser-ops")
         doc.data.update(backbone="not a repo", alternate=["a/b"])
@@ -1114,17 +1119,17 @@ class QualityGateTests(Base):
 
     def test_import_keeps_a_shortlist_under_50_stars_for_later(self):
         self.api.add(repo("a/big", 900, "Reddit CLI", pushed=ago(0.2)))
-        self.api.add(repo("b/tiny", 12, "Reddit CLI", pushed=ago(0.2)))
+        self.api.add(repo("b/tiny", 8, "Reddit CLI", pushed=ago(0.2)))
         report = Path(self.tmp.name) / "cloud.md"
         report.write_text("## 3. Triage\n\n| repo | kind | results | route | verdict | reason |\n|---|---|---|---|---|---|\n"
                           "| https://github.com/a/big | cli | https://example.com/big.mp4 | read cli/ | shortlist | one command |\n"
                           "| https://github.com/b/tiny | cli | none | read all | shortlist | small |\n", encoding="utf-8")
         code, out, _ = self.run_cli("import", str(report), "--q", "ops/browser-ops")
         self.assertEqual(code, 0, out)
-        self.assertIn("under 50 stars, recorded as later, not shortlisted (1): b/tiny", out)
+        self.assertIn("under 50 stars (or the relaxed floor), recorded as later, not shortlisted (1): b/tiny", out)
         verdicts = {e["repo"]: (e["verdict"], e["reason"]) for e in self.store.ledger()}
         self.assertEqual(verdicts["a/big"], ("short", "cloud.md: shortlist: one command"))
-        self.assertEqual(verdicts["b/tiny"], ("later", "under 50 stars; cloud.md: shortlist: small"))
+        self.assertEqual(verdicts["b/tiny"], ("later", "under 10 stars; cloud.md: shortlist: small"))
 
 
 BILINGUAL = {
@@ -1409,17 +1414,17 @@ class RecallTests(Base):
     def test_header_names_rows_under_the_star_threshold_that_fit_well(self):
         self.api.search["reddit" + self.alive] = [
             self.api.add(repo("a/reddit-cli", 900, "Reddit CLI", pushed=ago(0.1))),
-            self.api.add(repo("b/rival", 12, "Reddit, Xiaohongshu and Twitter through your logged-in browser",
+            self.api.add(repo("b/rival", 9, "Reddit, Xiaohongshu and Twitter through your logged-in browser",
                               pushed=ago(0.1))),
             self.api.add(repo("c/one", 1, "Reddit, X.com, rednote via a chrome extension and your logged-in browser",
                               pushed=ago(0.1))),
             self.api.add(repo("d/tiny", 3, "Reddit notes", pushed=ago(0.1)))]
         code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
         self.assertEqual(code, 0, out)
-        self.assertIn("under 50 stars: 3 hidden", out)
+        self.assertIn("under 50 stars (or the relaxed floor): 3 hidden", out)
         line = next(ln for ln in out.splitlines() if ln.startswith("  of them on topic"))
         self.assertEqual(line, "  of them on topic (fit 4+), for a question about who else does this: "
-                               "b/rival (12 stars, fit 4), c/one (1 star, fit 5)")   # in table order
+                               "b/rival (9 stars, fit 4), c/one (1 star, fit 5)")   # in table order
         self.assertNotIn("d/tiny", out)
 
 
@@ -1560,22 +1565,99 @@ class ExamineTests(unittest.TestCase):
         self.assertEqual(examine.watched(files, ["clis/reddit/**", "src/daemon.ts", "skills/"]),
                          ["clis/reddit/read.js", "src/daemon.ts", "skills/x/SKILL.md"])
 
-    def test_result_links_point_at_what_a_repo_made(self):
+    def test_the_readme_shows_media_and_demo_links_but_not_badges(self):
         readme = ("[![CI](https://github.com/a/b/actions/workflows/ci.yml/badge.svg)](https://github.com/a/b/actions)\n"
-                  "# b\n\n![logo](docs/logo.png)\n\nhttps://github.com/user-attachments/assets/1234-abcd\n\n"
-                  "See the [gallery](https://b.dev/gallery) and [examples](./examples/basic). [Docs](https://b.dev/docs)\n"
-                  '<video src="https://cdn.b.dev/demo.mp4"></video>\n[演示视频](https://www.bilibili.com/video/BV1xx)\n'
-                  "[License](LICENSE)\n")
-        self.assertEqual(examine.result_links(readme, "a/b", "main"), [
-            "https://b.dev/gallery", "https://github.com/a/b/blob/main/examples/basic", "https://www.bilibili.com/video/BV1xx",
-            "https://cdn.b.dev/demo.mp4", "https://github.com/user-attachments/assets/1234-abcd"])
-        self.assertEqual(examine.result_links("# x\n[Docs](https://x.dev/docs)\n", "a/b", "main"), [])
+                  "# b\n\n![logo](docs/logo.png)\n<img src=\"docs/shot.png\" alt=\"main window\">\n"
+                  "<img src=\"https://x.dev/tiny.png\" width=\"24\">\n\nhttps://github.com/user-attachments/assets/1234-abcd\n\n"
+                  "Try the [live demo](https://b.dev/play) and [examples](./examples/basic). [Docs](https://b.dev/docs)\n"
+                  "[![app](https://b.dev/hero.webp)](https://app.b.dev)\n"
+                  '<video src="https://cdn.b.dev/demo.mp4"></video>\n[演示视频](https://www.bilibili.com/video/BV1xx)\n')
+        media, sites = examine.readme_effect(readme, "a/b", "main")
+        self.assertEqual([m["url"] for m in media], [
+            "https://b.dev/hero.webp", "https://github.com/a/b/blob/main/docs/shot.png", "https://cdn.b.dev/demo.mp4",
+            "https://www.bilibili.com/video/BV1xx", "https://github.com/user-attachments/assets/1234-abcd"])
+        self.assertEqual(sites, ["https://app.b.dev", "https://b.dev/play"])   # docs and in-repo links are no site
 
     def test_clean_readme_drops_badges_and_html(self):
         out = examine.clean_readme('<p align="center"><img src="x"></p>\n# T\n[![b](u)](v)\n\n\n\nBody\n```\n<keep>\n```\n', 1000)
         self.assertNotIn("img", out)
         self.assertIn("<keep>", out)
 
+
+
+class ReportFirstTests(Base):
+    """Owner, 2026-10-19: stars relaxed per direction when it has few references; results become a verifiable effect
+    in tiers (strong, mid, weak)."""
+
+    def test_a_direction_with_few_references_shows_its_rows_down_to_20_then_10(self):
+        rows = [("a/reddit-cli", 900, "Reddit CLI"), ("b/reddit-mini", 12, "Reddit CLI"), ("c/reddit-mid", 25, "Reddit app")]
+        rows += [(f"t/twitter-{i}", 60, "Twitter tool") for i in range(4)] + [("t/twitter-30", 30, "Twitter tool"),
+                                                                                ("t/twitter-12", 12, "Twitter tool")]
+        rows += [(f"x/xhs-{i}", 100, "Xiaohongshu tool") for i in range(5)] + [("x/xhs-15", 15, "Xiaohongshu tool")]
+        self.api.search[f"reddit pushed:>{discover.window(discover.HIDE)}"] = [
+            self.api.add(repo(slug, n, desc, pushed=ago(0.1))) for slug, n, desc in rows]
+        code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, out)
+        self.assertIn("relaxed (a direction with under 5 repos at 50+ stars shows its own rows down to 20 then 10): "
+                      "reddit to 10 stars (only 1 at 50+, 2 at 20+); twitter to 20 stars (only 4 at 50+); "
+                      "no repo at 10+ stars names logged-in browser, chrome extension", out)
+        shown = {ln.split()[5] for ln in out.splitlines() if re.match(r"\s*\d+\.", ln)}
+        self.assertTrue({"b/reddit-mini", "c/reddit-mid", "t/twitter-30"} <= shown)
+        self.assertFalse({"t/twitter-12", "x/xhs-15"} & shown)                  # under 20 for twitter; xhs not relaxed
+        self.assertIn("relaxed: reddit", next(ln for ln in out.splitlines() if "b/reddit-mini" in ln))
+        saved = json.loads(self.store.scans("ops", "browser-ops")[-1].read_text(encoding="utf-8"))
+        self.assertEqual([r["group"] for r in saved["relaxed"]][:2], ["reddit", "twitter"])
+        code, out, err = self.run_cli("pick", "ops/browser-ops", "b/reddit-mini")          # no --low-stars needed
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.store.ledger()[-1]["low_stars"], "relaxed: reddit had under 5 repos at 50+ stars (floor 10)")
+        code, _, err = self.run_cli("pick", "ops/browser-ops", "t/twitter-12")
+        self.assertIn("no references: t/twitter-12 (12)", err)
+        code, _, err = self.run_cli("note", "b/reddit-mini", "--q", "ops/browser-ops", "--take", "use",
+                                    "--results", "https://x.com/someone/status/1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("relaxed: reddit", self.store.card("b/reddit-mini").data["uses"][0]["low_stars"])
+        self.assertFalse([w for w in self.store.check()[1] if "b/reddit-mini" in w and "stars" in w])
+
+    def test_links_are_graded_and_the_gate_needs_mid_or_strong(self):
+        from github_scout.store import best_tier, link_tier
+        cases = [("https://b.dev/", "strong"), ("https://www.npmjs.com/package/b", "strong"),
+                 ("https://github.com/a/b/blob/main/shot.png", "mid"), ("https://x.com/a/status/1", "mid"),
+                 ("https://www.bilibili.com/video/BV1", "mid"), ("https://github.com/other/user-of-b", "mid"),
+                 ("https://github.com/a/b#demo", "weak"), ("https://github.com/a/b/tree/main/examples", "weak")]
+        self.assertEqual([link_tier(u, "a/b") for u, _ in cases], [t for _, t in cases])
+        self.assertEqual((best_tier([], "a/b"), best_tier([], "a/b", installs=4200)), ("weak", "strong"))
+        self.api.add(repo("a/b", 300, "Tool", pushed=ago(0.1)))
+        for take in ("use", "adapt", "learn"):
+            code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", take,
+                                        "--results", "https://github.com/a/b#demo")
+            self.assertIn("a/b shows only text in its own repo", err)
+        code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", "later")
+        self.assertEqual(code, 0, err)                                          # weak: later or skip only
+        code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", "learn",
+                                    "--results", "https://www.bilibili.com/video/BV1")
+        self.assertEqual(code, 0, err)
+
+    def test_look_grades_the_verifiable_effect(self):
+        sha = "c" * 40
+        self.api.add({**repo("a/b", 300, "Tool", pushed=ago(0.1)), "homepage": "https://b.dev"})
+        self.api.paths["repos/a/b/commits/main"] = {"sha": sha}
+        self.api.paths[f"repos/a/b/git/trees/{sha}"] = {"tree": [{"path": "package.json", "type": "blob", "size": 9}]}
+        self.api.paths["repos/a/b/contents/package.json"] = json.dumps({"name": "b-cli"})
+        self.api.paths["repos/a/b/readme"] = "# b\n![shot](docs/shot.png)\n[Live demo](https://old.b.dev)\n"
+        self.api.sites["https://b.dev"] = 200
+        self.api.downloads["b-cli"] = 5400
+        code, out, _ = self.run_cli("look", "a/b")
+        self.assertEqual(code, 0, out)
+        self.assertIn("verifiable effect: strong · live site (homepage) https://b.dev · npm b-cli: 5.4k downloads last "
+                      "month https://www.npmjs.com/package/b-cli", out)
+        self.assertIn("  mid: 1 image in the README: https://github.com/a/b/blob/main/docs/shot.png", out)
+        self.assertIn("  did not answer: https://old.b.dev", out)
+        self.assertEqual(self.api.token_hosts, {"api.github.com"})            # sites and npm never get the token
+        self.api.sites["https://b.dev"] = 404
+        self.api.downloads["b-cli"] = 3
+        self.assertIn("verifiable effect: mid", self.run_cli("look", "a/b")[1])
+        self.api.paths["repos/a/b/readme"] = "# b\nA tool. ![logo](logo.png)\n"
+        self.assertIn("verifiable effect: weak, only a text description", self.run_cli("look", "a/b")[1])
 
 if __name__ == "__main__":
     unittest.main()

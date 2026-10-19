@@ -1,7 +1,8 @@
 """Looking at a repository as cheaply as possible, and checking it again later.
 
-peek   API only, ~1-1.5k tokens: facts, kind guess with evidence, tree summary,
-       manifests, the start of the README. Enough to decide whether to read source.
+peek   ~1-1.5k tokens: facts, kind guess with evidence, tree summary, manifests, the start
+       of the README, and the verifiable effect (strong, mid or weak, with the links to open:
+       a live site checked with one short request, npm downloads, media in the README).
 fetch  download one commit's source into the cache and print a digest that
        says where the code is and how big each part is, so reading can be targeted.
 outdated / diff  what changed upstream since the commit a card was reviewed at,
@@ -18,8 +19,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .github import Client, GitHubError
-from .discover import DROP, HIDE, SLOW, months_since
-from .store import SHA, Store, adoptions, as_list, min_stars, repo_ref, today
+from .discover import DROP, HIDE, SLOW, human, months_since
+from .store import INSTALLS_REAL, SHA, Store, adoptions, as_list, min_stars, repo_ref, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -87,33 +88,131 @@ def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str, 
     return "library", ["code without a manifest the tool recognises"]
 
 
-# README links that may show what a repo made: demo videos, galleries, examples, benchmarks.
-RESULT_WORDS = re.compile(r"demo|gallery|showcase|examples?\b|samples?\b|benchmark|playground|preview|case.?stud|"
-                          r"演示|示例|案例|效果|作品|样例|展示|评测", re.I)
-RESULT_MEDIA = re.compile(r"\.(mp4|webm|mov|gif)(?:[?#]|$)|github\.com/user-attachments/assets/|youtube\.com/watch|youtu\.be/|"
-                          r"bilibili\.com/video|vimeo\.com/\d|loom\.com/share", re.I)
-NOT_RESULT = re.compile(r"shields\.io|badge|/actions/workflows/|codecov|star-history|contrib\.rocks|/blob/[^/]+/LICENSE", re.I)
+# What a repo shows of what it does (owner, 2026-10-19). Most show it outside the repo, so `look` grades it:
+#   strong  a live site that answers (the repo's homepage, a demo or app link in the README), an npm package with
+#           real downloads, real installs recorded by the scan (skills.sh)
+#   mid     screenshots, GIFs or videos in the README (badges, logos and icons left out)
+#   weak    none of these: only a text description
+# Posts outside the repo (X, Bilibili, YouTube, blogs) are mid too; the agent finds them and gives them to `note`.
+SITE_WORDS = re.compile(r"demo|playground|\btry\b|\blive\b|online|\bapp\b|website|homepage|gallery|showcase|preview|"
+                        r"在线|体验|演示|试用|官网|作品|展示|案例", re.I)
+NOT_EFFECT = re.compile(r"shields\.io|badgen\.net|badge|/actions/workflows/|codecov|star-history|contrib\.rocks|trendshift|"
+                        r"visitor|komarev|readme-stats|buymeacoffee|ko-fi\.com|/sponsors/|producthunt\.com/widgets", re.I)
+SMALL_PART = re.compile(r"(?<![a-z])(logo|logos|icon|icons|badge|badges|avatar|favicon|emoji)(?![a-z])", re.I)
+TINY = re.compile(r"[?&](?:s|size|w|width|h|height)=(\d+)|/(\d{1,2})x\d{1,2}/", re.I)
+IMAGE = re.compile(r"\.(png|jpe?g|webp|gif|avif)(?:[?#]|$)", re.I)
+VIDEO = re.compile(r"\.(mp4|webm|mov|m4v)(?:[?#]|$)|github\.com/user-attachments/assets/|"
+                   r"(?:^|//)(?:www\.)?(youtube\.com/watch|youtu\.be/|bilibili\.com/video|b23\.tv/|vimeo\.com/\d|loom\.com/share)",
+                   re.I)
+GITHUB_HOSTS = re.compile(r"^https?://(?:[^/]*\.)?(github\.com|githubusercontent\.com)/", re.I)
+SITES_PROBED, MEDIA_SHOWN, NPM_REAL = 3, 4, 100   # live sites checked per repo; media links printed; npm downloads a
+                                                  # month that count as real use
 
 
-def result_links(readme: str, slug: str, branch: str, limit: int = 5) -> list[str]:
-    """Links in a README that look like results, for the agent to open before reading code: media, and links whose
-    text or address says demo, gallery, examples and the like. Relative links point into the repo."""
-    found: list[tuple[str, str]] = re.findall(r"\[([^\]]*)\]\(\s*<?([^)\s>]+)>?[^)]*\)", readme)
-    found += [("", u) for u in re.findall(r"(?:src|href)=[\"']([^\"']+)[\"']", readme)]
-    found += [("", u) for u in re.findall(r"(?m)^\s*(https?://\S+)\s*$", readme)]
-    out: list[str] = []
-    for text, url in found:
-        target = url.split("?")[0].split("#")[0].lower()
-        if url.startswith(("#", "mailto:")) or NOT_RESULT.search(url) or target.endswith((".svg", ".png", ".jpg", ".jpeg", ".webp")):
-            continue
-        if not (RESULT_MEDIA.search(url) or RESULT_WORDS.search(text) or RESULT_WORDS.search(target)):
-            continue
-        if not url.startswith(("http://", "https://")):
-            path = re.sub(r"^(?:\./)+", "", url).lstrip("/")
-            url = f"https://github.com/{slug}/blob/{branch}/{path}"
-        if url not in out:
-            out.append(url)
-    return out[:limit]
+def _absolute(url: str, slug: str, branch: str) -> str:
+    if url.startswith(("http://", "https://")):
+        return url
+    path = re.sub(r"^(?:\./)+", "", url).lstrip("/")
+    return f"https://github.com/{slug}/blob/{branch}/{path}"
+
+
+def _small(url: str, alt: str = "", width: str = "", height: str = "") -> bool:
+    """A badge, logo or icon rather than a picture of what it does: by host, name, alt text or a tiny size."""
+    name = url.split("?")[0].split("#")[0].rstrip("/").rsplit("/", 1)[-1]
+    if NOT_EFFECT.search(url) or SMALL_PART.search(name) or SMALL_PART.search(alt):
+        return True
+    sizes = [int(x) for x in (width, height) if x.isdigit()]
+    sizes += [int(g) for m in TINY.finditer(url) for g in m.groups() if g]
+    return any(n <= 64 for n in sizes)
+
+
+def readme_effect(readme: str, slug: str, branch: str) -> tuple[list[dict], list[str]]:
+    """From a README: media that shows what it does (mid), and links that may be its live site, for `look` to check.
+    Relative links point into the repo."""
+    media: list[dict] = []
+    sites: list[str] = []
+
+    def add_media(url: str, alt: str = "", width: str = "", height: str = "") -> None:
+        if url.startswith(("#", "mailto:", "data:")) or _small(url, alt, width, height):
+            return
+        kind = "video" if VIDEO.search(url) else "image" if IMAGE.search(url) else None
+        url = _absolute(url, slug, branch)
+        if kind and url not in {m["url"] for m in media}:
+            media.append({"what": kind, "url": url})
+
+    def add_site(text: str, url: str) -> None:
+        if (url.startswith(("http://", "https://")) and not GITHUB_HOSTS.match(url) and not NOT_EFFECT.search(url)
+                and not IMAGE.search(url) and (SITE_WORDS.search(text) or SITE_WORDS.search(url.split("?")[0]))
+                and url not in sites):
+            sites.append(url)
+
+    for alt, url, link in re.findall(r"\[!\[([^\]]*)\]\(\s*<?([^)\s>]+)[^)]*\)\]\(\s*<?([^)\s>]+)", readme):
+        add_media(url, alt)                                     # a picture linked to its demo: both count
+        add_site(alt, link)
+    for alt, url in re.findall(r"!\[([^\]]*)\]\(\s*<?([^)\s>]+)", readme):
+        add_media(url, alt)
+    for tag in re.findall(r"<(?:img|video|source)\b[^>]*>", readme, re.I):
+        attr = dict((k.lower(), v) for k, v in re.findall(r"\b(\w+)\s*=\s*[\"']([^\"']*)[\"']", tag))
+        if attr.get("src"):
+            add_media(attr["src"], attr.get("alt", ""), attr.get("width", ""), attr.get("height", ""))
+    for text, url in re.findall(r"(?<!!)\[([^\]]*)\]\(\s*<?([^)\s>]+)>?[^)]*\)", readme):
+        if VIDEO.search(url):
+            add_media(url, text)
+        else:
+            add_site(text, url)
+    for url in re.findall(r"(?m)^\s*(https?://\S+)\s*$", readme):     # a bare link on its own line: GitHub embeds videos
+        if VIDEO.search(url):
+            add_media(url)
+        else:
+            add_site("", url)
+    for url in re.findall(r"href=[\"']([^\"']+)[\"']", readme):
+        add_site("", url)
+    return media, sites
+
+
+def effect_of(client: Client, readme: str, slug: str, branch: str, homepage: str = "", package: str = "",
+           installs: int = 0) -> dict:
+    """The repo's verifiable effect: its tier, the strong and mid items, and the sites that did not answer.
+    Asks the homepage and up to two README demo links whether they answer (no token, a few seconds each), and npm
+    for a package's downloads."""
+    media, links = readme_effect(readme, slug, branch)
+    strong: list[dict] = []
+    silent: list[str] = []
+    home = homepage.strip() if homepage and not GITHUB_HOSTS.match(homepage.strip()) else ""
+    sites = list(dict.fromkeys(([home] if home.startswith(("http://", "https://")) else []) + links))[:SITES_PROBED]
+    for url in sites:
+        if client.reachable(url):
+            strong.append({"what": "live site" + (" (homepage)" if url == home else ""), "url": url})
+        else:
+            silent.append(url)
+    if package:
+        n = client.npm_downloads(package)
+        if n is not None and n >= NPM_REAL:
+            strong.append({"what": f"npm {package}: {human(n)} downloads last month",
+                           "url": f"https://www.npmjs.com/package/{package}"})
+    if installs >= INSTALLS_REAL:
+        strong.append({"what": f"skills.sh: {human(installs)} installs", "url": ""})
+    tier = "strong" if strong else "mid" if media else "weak"
+    return {"tier": tier, "strong": strong, "mid": media, "silent": silent}
+
+
+def render_effect(e: dict) -> list[str]:
+    """`look`'s lines on the verifiable effect: the tier first, then what to open."""
+    if e["tier"] == "weak":
+        return ["verifiable effect: weak, only a text description (no live site, package downloads, installs or media "
+                "found). Look for posts outside the repo (X, Bilibili, YouTube, blogs) before you pick; with none it is "
+                "later or skip"] + ([f"  did not answer: {' '.join(e['silent'])}"] if e["silent"] else [])
+    lines = [f"verifiable effect: {e['tier']}" + "".join(f" · {x['what']}" + (f" {x['url']}" if x["url"] else "")
+                                                         for x in e["strong"])]
+    if e["mid"]:
+        kinds = {k: sum(m["what"] == k for m in e["mid"]) for k in ("image", "video")}
+        what = ", ".join(f"{n} {k}{'s' if n > 1 else ''}" for k, n in kinds.items() if n)
+        shown = e["mid"][:MEDIA_SHOWN]
+        lines.append(f"  mid: {what} in the README: " + " ".join(m["url"] for m in shown)
+                     + (f" (+{len(e['mid']) - len(shown)})" if len(e["mid"]) > len(shown) else ""))
+    if e["silent"]:
+        lines.append(f"  did not answer: {' '.join(e['silent'])}")
+    return lines
 
 
 def _json(text: str | None) -> dict:
@@ -164,7 +263,8 @@ def _tok(nbytes: int) -> str:
     return f"{t / 1000:.0f}k tok" if t >= 1000 else f"{t} tok"
 
 
-def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
+def peek(client: Client, slug: str, readme_chars: int = 2500, effect: bool = True, installs: int = 0) -> dict:
+    """What `look` prints. With `effect`, also the verifiable effect: a few short requests outside GitHub."""
     r = client.repo(slug)
     if not r:
         raise LookupError(f"{slug}: not found")
@@ -208,7 +308,9 @@ def peek(client: Client, slug: str, readme_chars: int = 2500) -> dict:
         "tree": tree_summary(entries), "skills": skills[:15],
         "manifests": [m for m in MANIFESTS if m in paths],
         "package": {k: pkg[k] for k in ("name", "version", "bin") if k in pkg} if pkg else None,
-        "result_links": result_links(readme, slug, branch),     # to open before any code: not checked, not on the card
+        "effect": effect_of(client, readme, slug, branch, r.get("homepage") or "",
+                            str(pkg.get("name") or "") if pkg and not pkg.get("private") else "", installs)
+        if effect else None,                                    # to open before picking; not on the card until noted
         "readme": clean_readme(readme, readme_chars),
     }
 
@@ -228,7 +330,9 @@ def render_peek(p: dict) -> str:
     limit = min_stars()
     lines = [f"## {p['repo']}  ({p['kind']}: {p['form']}?)  {p['url']}",
              f"{p['desc']}",
-             f"stars {p['stars']}" + (f" (UNDER {limit}: no reference without a written reason)" if p["stars"] < limit else "")
+             f"stars {p['stars']}" + ((f" (under {limit}, but {p['relaxed']} is relaxed to {p['floor']}: a reference)"
+                                        if p.get("floor") and p["stars"] >= p["floor"] else
+                                        f" (UNDER {limit}: no reference without a written reason)") if p["stars"] < limit else "")
              + f" · forks {p['forks']} · issues {p['open_issues']} · created {p['created']} · pushed {p['pushed']}"
              f" · {p['lang'] or '-'}" + (" · ARCHIVED" if p["archived"] else ""),
              f"head {p['branch']}@{p['commit']}" + (f" · release {p['release']['tag']} {p['release']['date']}" if p["release"] else " · no releases"),
@@ -238,8 +342,8 @@ def render_peek(p: dict) -> str:
              f"kind evidence: {'; '.join(p['evidence'])}"]
     if p.get("homepage"):
         lines.append(f"homepage: {p['homepage']}")
-    lines.append("results to check: " + (" · ".join(p["result_links"]) if p.get("result_links") else
-                                         "none linked in the README (look for a gallery, demo or examples)"))
+    if p.get("effect"):
+        lines += render_effect(p["effect"])
     if p["topics"]:
         lines.append("topics: " + ", ".join(p["topics"][:10]))
     if p["package"]:

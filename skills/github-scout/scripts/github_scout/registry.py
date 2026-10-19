@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .store import (
     DEFAULT_LANGS, KINDS, MODES, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, adoptions, as_list,
-    card_takes, min_stars, repo_ref, strongest, today, write_doc,
+    best_tier, card_takes, link_tier, min_stars, repo_ref, strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -76,8 +76,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## The idea
 (How it does the job, in a few lines. Where, by file.)
 
-## Results and trial
-(What it has made that we can look at: links under results:. Our trial: what we ran, what came out, how long.)
+## Verifiable effect and trial
+(What it does that anyone can check: a live site, a package with downloads, screenshots, videos, posts; links under results:. The coding agent's trial: what ran, what came out, how long.)
 
 ## Method quality
 (Concrete steps or vague advice? What it costs to load?)
@@ -96,8 +96,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## The idea
 (The key design decision, and how it differs from what we would have built. Where, by file.)
 
-## Results and trial
-(What it has made that we can look at: links under results:. Our trial: what we ran, what came out, how long.)
+## Verifiable effect and trial
+(What it does that anyone can check: a live site, a package with downloads, screenshots, videos, posts; links under results:. The coding agent's trial: what ran, what came out, how long.)
 
 ## Quality
 (New and moving? Who uses it? Do maintainers answer issues?)
@@ -115,7 +115,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 
 ## The idea
 
-## Results and trial
+## Verifiable effect and trial
 
 ## What we take
 
@@ -170,8 +170,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## 思路
 （它怎么把事做成，几行说清。写在哪个文件。）
 
-## 结果和试跑
-（它做出过什么、我们能看到的：链接写进 results:。我们的试跑：跑了什么、出来什么、花了多久。）
+## 可验证的效果和试跑
+（谁都能核对的效果：在线可用的网站、有下载量的包、截图、视频、外部帖子；链接写进 results:。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
 
 ## 方法质量
 （是具体步骤还是空泛建议？加载要多少 token？）
@@ -190,8 +190,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 ## 思路
 （关键的设计决定，和我们自己会怎么做有什么不同。写在哪个文件。）
 
-## 结果和试跑
-（它做出过什么、我们能看到的：链接写进 results:。我们的试跑：跑了什么、出来什么、花了多久。）
+## 可验证的效果和试跑
+（谁都能核对的效果：在线可用的网站、有下载量的包、截图、视频、外部帖子；链接写进 results:。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
 
 ## 质量
 （新不新、更新勤不勤、谁在用、维护者回不回 issue。）
@@ -209,7 +209,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 
 ## 思路
 
-## 结果和试跑
+## 可验证的效果和试跑
 
 ## 我们拿什么
 
@@ -219,7 +219,8 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 }
 
 # The card section a trial goes into; cards from before it get one after their first section.
-TRIAL_TITLES = {"en": "Results and trial", "zh": "结果和试跑"}
+TRIAL_TITLES = {"en": "Verifiable effect and trial", "zh": "可验证的效果和试跑"}
+OLD_TRIAL_TITLES = ("Results and trial", "结果和试跑")            # its name until 2026-10-19
 
 
 def stage_help(store: Store, stage: str) -> str:
@@ -356,13 +357,14 @@ def put_idea(store: Store, slug: str, idea: str, ref: str | None = None) -> None
 
 
 def put_trial(store: Store, slug: str, text: str, ref: str) -> None:
-    """Add a dated trial line to the card's Results and trial section, in place of its template hint. A card from
-    before that section existed gets it after its first section."""
+    """Add a dated trial line to the card's Verifiable effect and trial section (Results and trial on older cards), in
+    place of its template hint. A card from before that section existed gets it after its first section."""
     card = store.card(slug)
     lines = card.body.split("\n")
     entry = f"- {today()}, {ref}: {' '.join(text.split())}"
     heads = [i for i, ln in enumerate(lines) if ln.startswith("## ")]
-    at = next((i for i in heads if lines[i][3:].strip().lower() in {t.lower() for t in TRIAL_TITLES.values()}), None)
+    titles = {t.lower() for t in (*TRIAL_TITLES.values(), *OLD_TRIAL_TITLES)}
+    at = next((i for i in heads if lines[i][3:].strip().lower() in titles), None)
     if at is None:
         pos = heads[1] if len(heads) > 1 else len(lines)
         lines[pos:pos] = ([""] if pos and lines[pos - 1].strip() else []) + [f"## {TRIAL_TITLES[store.lang]}", "", entry, ""]
@@ -379,7 +381,7 @@ def put_trial(store: Store, slug: str, text: str, ref: str) -> None:
 
 
 def add_results(store: Store, slug: str, links: list[str]) -> list[str]:
-    """Add links to what a repo made to its card's results (no duplicates)."""
+    """Add links to a repo's verifiable effect to its card's results (no duplicates)."""
     card = store.card(slug)
     results = [str(x) for x in as_list(card.data.get("results"))]
     results += [x for x in links if x not in results]
@@ -437,7 +439,7 @@ def card_line(c: Doc) -> str:
     uses = [u for u in as_list(d.get("uses")) if isinstance(u, dict)]
     takes = [f"{u.get('project')}/{u.get('question') or '-'}:{u.get('take')}" for u in uses]
     facts = [", ".join(takes) or "no uses", f"{d['stars']} stars" if d.get("stars") is not None else "stars unknown",
-             f"{len(as_list(d.get('results')))} results" if as_list(d.get("results")) else "no results",
+             f"effect {best_tier(as_list(d.get('results')), c.id)}" if as_list(d.get("results")) else "no effect recorded",
              f"level {d.get('level') or '-'}", f"reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]}"]
     return (f"{c.id} [{d.get('kind')}{'/' + str(d['form']) if d.get('form') else ''}] {strongest(card_takes(d)) or 'unrelated'}"
             f" — {str(d.get('summary') or '')[:100]} ({'; '.join(facts)})")
@@ -554,8 +556,8 @@ def show_card(store: Store, ref: str) -> str:
     if card:
         out += [f"card: {card.path}", card.path.read_text(encoding="utf-8").strip()]
         results = [str(x) for x in as_list(card.data.get("results"))]
-        out += ["results:"] + [f"  {x}" for x in results] if results else \
-            ["results: none recorded (note --results <links to what it made>)"]
+        out += [f"verifiable effect: {best_tier(results, card.id)}"] + [f"  {link_tier(x, card.id):<6} {x}" for x in results] \
+            if results else ["verifiable effect: none recorded (note --results <a live site, screenshots, videos or posts>)"]
         adopted = adoptions(card.data, dropped=True)
         if adopted:
             out.append("adopted:")

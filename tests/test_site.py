@@ -113,7 +113,7 @@ class SiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _, _, data = build(tmp, "en")
             self.assertEqual([c["results"] for c in data["cards"]], [["https://example.com/demo.mp4"], []])
-            self.assertEqual(data["ui"]["results"], "Results")
+            self.assertEqual(data["ui"]["results"], "Verifiable effect")
 
     def test_registry_text_cannot_inject_html(self):
         with tempfile.TemporaryDirectory() as tmp:

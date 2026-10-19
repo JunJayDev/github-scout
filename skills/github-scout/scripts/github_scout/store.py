@@ -47,8 +47,13 @@ FORMAT = 2
 KINDS = ["skill", "software", "list", "other"]
 # What we take from it, strongest first. A card's status is its strongest take.
 TAKES = ["use", "adapt", "learn", "later", "skip"]
-# Takes that make a repo a reference: they need results to look at and MIN_STARS, or a written reason.
+# Takes that make a repo a reference: they need a verifiable effect (mid or strong) and MIN_STARS, or a written reason.
 REFERENCE_TAKES = ("use", "adapt", "learn")
+# How well a repo shows what it does (owner, 2026-10-19). Most show it outside the repo: a live site, posts.
+#   strong  a live site that answers, a published package with real downloads or an app in a store, real installs
+#   mid     screenshots, GIFs or videos, posts outside the repo (X, Bilibili, YouTube, blogs, Xiaohongshu), other repos
+#   weak    only a text description: the README, or text pages inside the repo itself
+TIERS = ["strong", "mid", "weak"]
 # Under this many stars a repo is no reference: not shortlisted, used, adapted or learned from unless a reason is
 # written (user, 2026-10-18). GITHUB_SCOUT_MIN_STARS changes it. Lists are exempt: they are only for finding.
 MIN_STARS = 50
@@ -114,15 +119,61 @@ def stars_of(v) -> int | None:
         return None
 
 
+INSTALLS_REAL = 100   # skills.sh installs (not farmed) that count as real use: strong evidence
+MEDIA = re.compile(r"\.(png|jpe?g|webp|gif|avif|svg|mp4|webm|mov|m4v)(?:[?#]|$)|github\.com/user-attachments/|"
+                   r"user-images\.githubusercontent\.com|private-user-images\.githubusercontent\.com", re.I)
+POST_HOSTS = ("x.com", "twitter.com", "bilibili.com", "b23.tv", "youtube.com", "youtu.be", "vimeo.com", "loom.com",
+              "xiaohongshu.com", "xhslink.com", "douyin.com", "tiktok.com", "weibo.com", "zhihu.com", "juejin.cn",
+              "mp.weixin.qq.com", "sspai.com", "v2ex.com", "medium.com", "dev.to", "substack.com", "hashnode.dev",
+              "reddit.com", "news.ycombinator.com", "linkedin.com", "producthunt.com", "note.com", "qiita.com", "zenn.dev")
+
+
+def _host(url: str) -> str:
+    m = re.match(r"^https?://(?:[^@/]*@)?([^/:?#]+)", url, re.I)
+    return (m.group(1) if m else "").lower().removeprefix("www.")
+
+
+def _on(host: str, hosts: tuple[str, ...]) -> bool:
+    return any(host == h or host.endswith("." + h) for h in hosts)
+
+
+def link_tier(url: str, slug: str = "") -> str:
+    """The tier of one link to what a repo does, without fetching it: media and posts outside the repo are mid;
+    a package or store page and any other site are strong (a live site; `look` checks that one answers); text pages
+    inside the repo itself are weak (its own description, however long). Another repository counts as mid: a project
+    that uses it, or its showcase."""
+    host = _host(url)
+    if MEDIA.search(url):
+        return "mid"
+    if host in ("github.com", "raw.githubusercontent.com", "gist.github.com"):
+        path = re.sub(r"^https?://[^/]+/", "", url).split("?")[0].split("#")[0].strip("/").lower()
+        owner_repo = "/".join(path.split("/")[:2])
+        return "weak" if not slug or owner_repo == slug.lower() or host == "gist.github.com" else "mid"
+    if _on(host, POST_HOSTS):
+        return "mid"
+    return "strong" if host else "weak"
+
+
+def best_tier(urls, slug: str = "", installs: int = 0) -> str:
+    """The best tier among a repo's links, and its real installs (strong)."""
+    tiers = {link_tier(str(u), slug) for u in urls}
+    if installs >= INSTALLS_REAL:
+        tiers.add("strong")
+    return next((t for t in TIERS if t in tiers), "weak")
+
+
 def reference_gaps(card: dict, use: dict, limit: int, trial: bool = False) -> list[str]:
-    """Why a repo falls short of a reference: no results to look at, under the star threshold, and (for a
-    backbone) never tried. A reason written on the take (`no_results`, `low_stars`) lifts its gate."""
+    """Why a repo falls short of a reference: no verifiable effect (mid or strong), under the star threshold, and
+    (for a backbone the coding agent chose) never tried. A reason written on the take (`no_results`, `low_stars`)
+    lifts its gate; a repo taken from a relaxed direction carries that as its `low_stars`."""
     out = []
     stars = stars_of(card.get("stars"))
     if trial and card.get("level") != "trial":
         out.append(f"was not tried (level {card.get('level') or '-'}): run its own example, then note --trial")
-    if not as_list(card.get("results")) and not use.get("no_results"):
-        out.append("has no results to look at (note --results <links>)")
+    links = as_list(card.get("results"))
+    if best_tier(links, str(card.get("id") or "")) == "weak" and not use.get("no_results"):
+        out.append("shows no verifiable effect (note --results <a live site, screenshots, videos or posts>)" if not links
+                   else "shows only text in its own repo, a weak effect (note --results <a live site, media or posts>)")
     if stars is not None and stars < limit and not use.get("low_stars"):
         out.append(f"has {stars} stars, under {limit}, and no reason (note --low-stars)")
     return out

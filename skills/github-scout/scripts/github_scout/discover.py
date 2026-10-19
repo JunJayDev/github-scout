@@ -62,7 +62,11 @@ Maintenance is a hard rule, by the last push:
 
 Rows under the star threshold (50, GITHUB_SCOUT_MIN_STARS) are no references and are hidden too,
 counted in the header, which names the first few that fit four or more vocabulary groups (for a
-question about who else does this); awesome lists are exempt, being only for finding.
+question about who else does this); awesome lists are exempt, being only for finding. A niche
+direction may have few repos that big (owner, 2026-10-19): for each entity or mechanism group, the
+maintained rows at the threshold whose own words name it are counted, and under 5 that group's
+rows are shown down to 20 stars, then 10, never lower. The header says which directions were
+relaxed and why; `pick` and `note` take such rows without a written reason.
 
 A scan saves its best 400 rows, up to 400 more whose own words fit the vocabulary, every list, and
 up to 300 rising rows; the search log is kept whole.
@@ -72,13 +76,16 @@ from __future__ import annotations
 
 import datetime as _dt
 import itertools
+import json
 import math
 import re
 import sys
 import time
 
 from .github import Client, GitHubError, github_slug
-from .store import HAN, MIN_STARS, Store, as_list, groups, lang_of, min_stars, now_stamp, question_langs, stars_of, today
+from .store import (
+    HAN, MIN_STARS, Store, StoreError, as_list, groups, lang_of, min_stars, now_stamp, question_langs, stars_of, today,
+)
 
 LENSES = "EPMCQTRHKSDNUGWL"
 LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "problem", "T": "topic",
@@ -105,6 +112,8 @@ HUGE = 10000             # `scan --plan` and the header name terms whose own sea
 PROGRESS_EVERY = 20      # a scan prints a progress line to stderr every this many API calls
 SKILLS_PAGE = 100        # skills.sh rows read per search: relevant skills with few installs sit deep
 LOW_FIT, LOW_SHOW = 4, 5  # rows under the star threshold that match this many groups are named in the header
+RELAX_MIN, RELAX_FLOORS = 5, (20, 10)   # a direction with fewer than 5 rows at the threshold shows its own rows down
+                                        # to 20 stars, then 10; never lower (owner, 2026-10-19)
 # Words that say what any repository is, not what this one does. Alone they bring back only the most-starred repos.
 GENERIC = frozenset("""github git repo repos repository repositories project projects code source open-source opensource
     tool tools app apps application library framework sdk api cli plugin plugins extension skill skills agent agents
@@ -344,18 +353,28 @@ def _term_re(term: str):
     return re.compile(rf"(?<![a-z0-9]){t}(?![a-z0-9])") if term.isascii() else re.compile(t)
 
 
+def _own(c: dict) -> tuple[str, set[str]]:
+    """A repo's own words (name, description, topics), as text and as stemmed tokens."""
+    text = " ".join([c["repo"].split("/")[1], c.get("desc") or "", " ".join(c.get("topics") or [])])
+    return text.lower(), _tokens(text.replace("-", " ").replace("_", " "))
+
+
+def names(g: list[str], own: tuple[str, set[str]]) -> bool:
+    """Whether a repo's own words name one of a group's terms."""
+    return any(_has(t, *own) for t in g)
+
+
 def fit(c: dict, q: dict) -> int:
     """How many vocabulary groups the repo's own name, description and topics mention.
 
     README-only matches do not count: big READMEs mention everything. Words are compared after
     light stemming and in any order, so "Edit videos with coding agents" matches "agent video editing"."""
-    text = " ".join([c["repo"].split("/")[1], c.get("desc") or "", " ".join(c.get("topics") or [])])
-    hay = text.lower()
-    tokens = _tokens(text.replace("-", " ").replace("_", " "))
+    own = _own(c)
+    hay, tokens = own
     n = 0
     for key in ("entities", "mechanisms", "topics"):
         for g in groups(q.get(key)):
-            if any(_has(t, hay, tokens) for t in g):
+            if names(g, own):
                 n += 1
     for p in groups(q.get("problems")):
         if not p[0].isascii():
@@ -621,6 +640,41 @@ class Scan:
         return scan
 
 
+def merged(store: Store, project: str, qid: str) -> dict:
+    """All candidates from every scan of a question, rescored against its current vocabulary."""
+    rows: dict[str, dict] = {}
+    searches: list = []
+    last = None
+    dropped = 0
+    for p in store.scans(project, qid):
+        s = json.loads(p.read_text(encoding="utf-8"))
+        last = s
+        searches += s["searches"]
+        dropped += int(s.get("dropped") or 0)
+        for c in s["candidates"]:
+            key = c["repo"].lower()
+            if key in rows:
+                lenses = sorted(set(rows[key]["lenses"]) | set(c["lenses"]), key=LENSES.index)
+                installs = max(rows[key].get("installs") or 0, c.get("installs") or 0)
+                rows[key] = {**c, "lenses": lenses, **({"installs": installs} if installs else {})}
+            else:
+                rows[key] = dict(c)
+    if last is None:
+        raise StoreError(f"no scan for {project}/{qid} yet (github-scout scan {project}/{qid})")
+    scan = {**last, "searches": searches, "dropped": dropped, "candidates": list(rows.values()),
+            "scans": len(store.scans(project, qid))}
+    return annotate(store, rescore(scan, store.question(f"{project}/{qid}").data))
+
+
+def scan_row(store: Store, project: str, qid: str, slug: str) -> dict:
+    """A repo's row in the question's merged scans (its relaxed floor, its installs); {} without one."""
+    try:
+        scan = merged(store, project, qid)
+    except StoreError:
+        return {}
+    return next((c for c in scan["candidates"] if c["repo"].lower() == slug.lower()), {})
+
+
 def rescore(scan: dict, q: dict) -> dict:
     """Fit and score depend on the question's current vocabulary, so they are recomputed on every view."""
     forms = [g[0].lower() for g in groups(q.get("forms"))]
@@ -636,7 +690,55 @@ def rescore(scan: dict, q: dict) -> dict:
         else:
             c.pop("off_form", None)
     scan["candidates"].sort(key=lambda c: (-c["score"], -c["stars"]))
+    return relax(scan, q)
+
+
+def relax(scan: dict, q: dict) -> dict:
+    """Lower the star threshold for directions with few references. For each entity and mechanism group, count the
+    maintained rows (not archived, lures, farmed or lists) at the threshold whose own words name it; under RELAX_MIN,
+    that group's rows are shown down to the first floor of RELAX_FLOORS that reaches RELAX_MIN, else the last.
+    Sets `relaxed` on the scan (group, floor, counts per level) and, on each row of a relaxed group, `floor` and
+    `relaxed` (the group with the lowest floor). Recomputed on every view, like fit, from the question's vocabulary."""
+    limit = min_stars()
+    floors = [f for f in RELAX_FLOORS if f < limit]
+    pool = [c for c in scan["candidates"] if not c.get("list") and not c.get("archived") and not excluded(c)
+            and not is_stale(c)]
+    own = {id(c): _own(c) for c in pool}
+    for c in scan["candidates"]:
+        c.pop("floor", None)
+        c.pop("relaxed", None)
+    out = []
+    for key in ("entities", "mechanisms"):
+        for g in groups(q.get(key)):
+            stars = [stars_of(c.get("stars")) or 0 for c in pool if names(g, own[id(c)])]
+            counts = {str(limit): sum(s >= limit for s in stars)}
+            if not floors or counts[str(limit)] >= RELAX_MIN:
+                continue
+            for floor in floors:
+                counts[str(floor)] = sum(s >= floor for s in stars)
+                if counts[str(floor)] >= RELAX_MIN:
+                    break
+            out.append({"group": g[0], "floor": floor, "counts": counts})
+            for c in pool:
+                if floor < c.get("floor", limit) and names(g, own[id(c)]):
+                    c["floor"], c["relaxed"] = floor, g[0]
+    scan["relaxed"] = out
     return scan
+
+
+def relaxed_text(scan: dict) -> str:
+    """The relaxed directions in one line: "stroke order to 20 stars (only 3 at 50+); ...", then the groups that
+    found nothing at any level."""
+    parts, empty = [], []
+    for r in scan.get("relaxed") or []:
+        if not any(r["counts"].values()):
+            empty.append(r["group"])
+            continue
+        levels = [f"{n} at {k}+" for k, n in r["counts"].items() if int(k) > r["floor"]]
+        parts.append(f"{r['group']} to {r['floor']} stars (only {', '.join(levels)})")
+    if empty:
+        parts.append(f"no repo at {min(r['floor'] for r in scan['relaxed'])}+ stars names {', '.join(empty)}")
+    return "; ".join(parts)
 
 
 def shows_form(c: dict, forms: list[str]) -> bool:
@@ -689,10 +791,21 @@ def is_stale(c: dict) -> bool:
     return months_since(c.get("pushed")) > HIDE
 
 
+def floor_of(c: dict, limit: int) -> int:
+    """The stars a row needs to be a reference: the threshold, or the relaxed floor of its direction."""
+    return min(limit, c.get("floor") or limit)
+
+
 def is_low(c: dict, limit: int) -> bool:
-    """Under the star threshold: no reference. Lists are exempt: they are only for finding."""
+    """Under the star threshold (or its direction's relaxed floor): no reference. Lists are exempt: they are only
+    for finding."""
     stars = stars_of(c.get("stars"))
-    return stars is not None and stars < limit and not c.get("list")
+    return stars is not None and stars < floor_of(c, limit) and not c.get("list")
+
+
+def relaxed_reason(c: dict, limit: int) -> str:
+    """The reason a row shown by a relaxed direction is taken under the threshold, recorded as its low_stars."""
+    return f"relaxed: {c['relaxed']} had under {RELAX_MIN} repos at {limit}+ stars (floor {c['floor']})"
 
 
 def why_hidden(c: dict, limit: int) -> str:
@@ -706,7 +819,7 @@ def why_hidden(c: dict, limit: int) -> str:
     if is_stale(c):
         return f"stale: no push in {HIDE} months"
     if is_low(c, limit):
-        return f"under {limit} stars: no reference without pick --low-stars \"why\""
+        return f"under {floor_of(c, limit)} stars: no reference without pick --low-stars \"why\""
     if c.get("off_form"):
         return "rising, but not in the question's forms: --all shows it"
     return "hidden"
@@ -805,7 +918,9 @@ def row(i, c: dict) -> str:
     if c.get("fork"):
         flags.append("fork")
     if is_low(c, min_stars()):
-        flags.append(f"under {min_stars()} stars")
+        flags.append(f"under {floor_of(c, min_stars())} stars")
+    elif c.get("relaxed") and (stars_of(c.get("stars")) or 0) < min_stars():
+        flags.append(f"relaxed: {c['relaxed']}")
     seen = c.get("seen")
     if seen and not seen.get("here"):
         flags.append(f"seen:{seen['verdict']}@{seen.get('question')}")
@@ -854,9 +969,13 @@ def render(scan: dict, top: int = 40, show_all: bool = False) -> str:
     limit = min_stars()
     low = [c for c in scan["candidates"] if is_low(c, limit) and not c.get("card") and is_open(c) and not is_stale(c)
            and not excluded(c)]
+    relaxed = relaxed_text(scan)
+    if relaxed:
+        out.append(f"relaxed (a direction with under {RELAX_MIN} repos at {limit}+ stars shows its own rows down to "
+                   f"{' then '.join(map(str, RELAX_FLOORS))}): {relaxed}")
     if low:
-        out.append(f"under {limit} stars: {len(low)} hidden, no references (--all shows them; to shortlist one anyway: "
-                   f"pick <q> owner/repo --low-stars \"why\")")
+        out.append(f"under {limit} stars{' (or the relaxed floor)' if relaxed else ''}: {len(low)} hidden, no references "
+                   f"(--all shows them; to shortlist one anyway: pick <q> owner/repo --low-stars \"why\")")
         on_topic = [c for c in low if (c.get("fit") or 0) >= LOW_FIT]
         if on_topic:
             out.append(f"  of them on topic (fit {LOW_FIT}+), for a question about who else does this: "

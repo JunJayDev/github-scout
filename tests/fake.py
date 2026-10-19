@@ -53,7 +53,10 @@ class FakeAPI:
         self.mcp: dict[str, list] = {}          # text -> list of repo urls
         self.paths: dict[str, object] = {}      # api path -> payload (dict/list/str/bytes)
         self.history: dict[str, object] = {}    # upstream path -> commits touching it (list), or an HTTP status (int)
+        self.sites: dict[str, int] = {}         # a site outside GitHub -> the status it answers with (else 404)
+        self.downloads: dict[str, int] = {}     # npm package -> downloads last month
         self.calls: list[str] = []
+        self.token_hosts: set[str] = set()      # hosts a token was sent to
 
     def add(self, r: dict):
         self.repos[r["full_name"].lower()] = r
@@ -62,8 +65,15 @@ class FakeAPI:
     def __call__(self, method, url, headers, body):
         self.calls.append(f"{method} {url}")
         u = urlparse(url)
+        if "Authorization" in headers:
+            self.token_hosts.add(u.netloc)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         path = u.path.lstrip("/")
+        if url in self.sites:
+            return self.sites[url], {}, b""
+        if u.netloc == "api.npmjs.org":
+            name = path.split("last-month/", 1)[-1]
+            return self._ok({"downloads": self.downloads[name]}) if name in self.downloads else (404, {}, b'{"error":"no"}')
         if u.netloc == "skills.sh":
             items = [{"source": slug, "skillId": "x", "installs": n} for slug, n in self.skills.get(q.get("q", ""), [])]
             return self._ok({"skills": items})

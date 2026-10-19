@@ -37,7 +37,7 @@ class EvalRunTests(unittest.TestCase):
         alive = f" pushed:>{discover.window(discover.HIDE)}"
         api = FakeAPI()
         hit = api.add(repo("a/reddit-cli", 900, "Reddit CLI", pushed="2026-10-01T00:00:00Z"))
-        small = api.add(repo("b/reddit-mini", 12, "Reddit CLI, tiny", pushed="2026-10-01T00:00:00Z"))
+        small = api.add(repo("b/reddit-mini", 8, "Reddit CLI, tiny", pushed="2026-10-01T00:00:00Z"))
         api.search["reddit" + alive] = [hit, small]
         vocab = {"entities": ["reddit"], "mechanisms": ["logged-in browser"], "forms": ["cli"]}
         cases = [{"id": "one", "prompt": "Drive Reddit", "must_find": ["a/reddit-cli", "b/reddit-mini", "c/nowhere"],
@@ -55,7 +55,7 @@ class EvalRunTests(unittest.TestCase):
         text = out.getvalue()
         self.assertIn("one: 2 of 3 found · ", text)
         self.assertIn("  found  a/reddit-cli  row 1  [E]", text)
-        self.assertIn("  found  b/reddit-mini  under 50 stars", text)
+        self.assertIn("  found  b/reddit-mini  under 10 stars", text)          # its direction relaxed, but not to 8
         self.assertIn("  MISSED c/nowhere  not returned by any search", text)
         self.assertIn("two: 1 of 1 found (scan shared with one)", text)
         self.assertIn("recall: 3 of 4 repos in 2 cases", text)

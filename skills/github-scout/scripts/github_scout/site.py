@@ -597,7 +597,7 @@ UI = {
         "allQuestions": "All questions", "count": "{n} of {total}", "clear": "Clear",
         "noRepos": "No repos match these filters.",
         "created": "created", "pushed": "pushed", "reviewed": "reviewed", "stale": "no push for {n} months",
-        "level": "Review depth", "commit": "Reviewed commit", "file": "File", "results": "Results",
+        "level": "Review depth", "commit": "Reviewed commit", "file": "File", "results": "Verifiable effect",
         "uses": "Taken by", "github": "GitHub", "stars": "stars",
         "adopted": "Adopted in", "adoptedIn": "adopted in {project} ({mode})",
         "labels": {
@@ -618,7 +618,7 @@ UI = {
         "allQuestions": "全部问题", "count": "{n} / {total}", "clear": "清除",
         "noRepos": "没有符合筛选的仓库。",
         "created": "创建", "pushed": "推送", "reviewed": "审阅", "stale": "{n} 个月没有推送",
-        "level": "看到哪一步", "commit": "审阅的提交", "file": "文件", "results": "结果",
+        "level": "看到哪一步", "commit": "审阅的提交", "file": "文件", "results": "可验证的效果",
         "uses": "用在哪", "github": "GitHub", "stars": "星",
         "adopted": "引入到", "adoptedIn": "已引入 {project}（{mode}）",
         "labels": {

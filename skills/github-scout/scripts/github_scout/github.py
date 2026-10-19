@@ -27,7 +27,9 @@ API = (os.environ.get("GITHUB_SCOUT_GITHUB_API") or os.environ.get("REUSE_FIRST_
 NPM = (os.environ.get("GITHUB_SCOUT_NPM_API") or os.environ.get("REUSE_FIRST_NPM_API") or "https://registry.npmjs.org")
 SKILLS = (os.environ.get("GITHUB_SCOUT_SKILLS_API") or os.environ.get("REUSE_FIRST_SKILLS_API") or "https://skills.sh/api")
 MCP = (os.environ.get("GITHUB_SCOUT_MCP_API") or os.environ.get("REUSE_FIRST_MCP_API") or "https://registry.modelcontextprotocol.io/v0")
+NPM_DOWNLOADS = os.environ.get("GITHUB_SCOUT_NPM_DOWNLOADS_API") or "https://api.npmjs.org"
 UA = f"github-scout/{__version__}"
+PROBE_TIMEOUT = 5   # seconds a live site gets to answer `look`; one try, no retries
 
 # Seconds between calls; GitHub allows 30 search/min and 10 code-search/min with a token.
 SEARCH_GAP = 2.2
@@ -325,6 +327,42 @@ class Client:
             if slug and slug.lower() not in {s.lower() for s in slugs}:
                 slugs.append(slug)
         return slugs
+
+    # -- outside GitHub: is it live, is it used ---------------------------
+    def reachable(self, url: str, timeout: float = PROBE_TIMEOUT) -> bool:
+        """Whether a site answers: HEAD, then GET when HEAD is not allowed; one try each, no token, a short timeout.
+        A bot wall (401, 403, 429) is a site that answers; 404, 410 and 5xx are not."""
+        for method in ("HEAD", "GET"):
+            try:
+                status = self._probe(method, url, timeout)
+            except (OSError, http.client.HTTPException, ValueError):
+                return False
+            if status < 400 or status in (401, 403, 429):
+                return True
+            if status not in (405, 501):
+                return False
+        return False
+
+    def _probe(self, method: str, url: str, timeout: float) -> int:
+        headers = {"User-Agent": UA}
+        if self.transport != self._urlopen:
+            return self.transport(method, url, headers, None)[0]
+        req = urllib.request.Request(url, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:   # the body is never read
+                return resp.status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    def npm_downloads(self, name: str) -> int | None:
+        """An npm package's downloads in the last month; None when it is not published or npm does not answer."""
+        url = f"{NPM_DOWNLOADS}/downloads/point/last-month/{urllib.parse.quote(name, safe='@/')}"
+        try:
+            status, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"}, retries=0)
+            data = _json(status, raw)
+        except (GitHubError, OSError):
+            return None
+        return int(data.get("downloads") or 0) if isinstance(data, dict) else None
 
     # -- npm -------------------------------------------------------------
     def npm_search(self, text: str, size: int = 20) -> list[str]:
