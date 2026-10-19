@@ -126,9 +126,11 @@ without `results` (unless `--no-results` gives a reason) or under the star thres
 ledger. Cards without `results` stay valid.
 
 `adopted` holds one entry per project, question and set of our paths: recording the same again
-replaces it, and `adopt --drop` adds `dropped: <date>` instead of deleting it. `updates` asks
-GitHub for the commits on the branch that touched each `from` path since the date of `at`; an
-entry without `from` gets only the repo-level report. Cards without `adopted` are valid.
+updates it (fields not given keep their value; after a drop it starts afresh), and `adopt --drop`
+adds `dropped: <date>` instead of deleting it. `updates` asks GitHub for the commits on the
+repo's current default branch that touched each `from` path since the date of `at`, and says when
+a path is no longer there; an entry without `from` gets only the repo-level report. Cards without
+`adopted` are valid.
 
 ## Ledger
 

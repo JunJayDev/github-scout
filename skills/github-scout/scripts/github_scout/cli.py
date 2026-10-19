@@ -17,8 +17,8 @@ from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated,
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
 from .registry import (
-    add_results, add_watch, adoption_text, find, new_card, new_project, new_question, put_idea, put_trial, render_find,
-    set_adoption, set_use, show_card, show_question, stage_help, write_index,
+    add_results, add_watch, adoption_text, find, live_adoption, new_card, new_project, new_question, put_idea, put_trial,
+    render_find, set_adoption, set_use, show_card, show_question, stage_help, write_index,
 )
 from .store import (
     KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, env, lang_gaps, locate,
@@ -553,6 +553,30 @@ def _head(repo: Path) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def _check_from(args, store: Store, slug: str, src: list[str], at: str) -> None:
+    """Their paths must exist at their commit: GitHub lists no commits for a path that is not there, so a typo would
+    read as unchanged for good. Refused when GitHub says no; a warning when it cannot be asked."""
+    if not src:
+        return
+    client = make_client(args, store)
+    try:
+        full = client.commit(slug, at)
+        gone = [p for p in src if not client.exists(slug, p, full["sha"])] if full else None
+    except GitHubError as exc:
+        if exc.status != 422:
+            print(f"warn  --from not checked upstream ({exc})")
+            return
+        full = gone = None
+    except OSError as exc:
+        print(f"warn  --from not checked upstream (network: {exc})")
+        return
+    if full is None:
+        raise StoreError(f"{slug} has no commit {at}: give --at their commit sha")
+    if gone:
+        raise StoreError(f"not in {slug} at {at[:7]}: {', '.join(gone)}. --from takes their files or folders, "
+                         "from the root of their repository")
+
+
 def cmd_adopt(args):
     store = _store(args)
     project, qid = store.split_ref(args.q)
@@ -593,13 +617,16 @@ def cmd_adopt(args):
         for p, r in zip(full, rel):
             if not p.exists():
                 print(f"warn  {r}: not found in {top} (relative paths are read from {base})")
-        at = (args.at or str(card.data.get("commit") or "")).lower()
+        # Recorded again (after updating our copy): --from, --at and --note left out keep what was recorded.
+        old = live_adoption(card.data, {"project": project, "question": qid, "into": rel}) or {}
+        at = (args.at or str(old.get("at") or card.data.get("commit") or "")).lower()
         if not SHA.match(at):
             raise StoreError(f"--at takes their commit sha, 7-40 hex characters (the card's commit is "
                              f"{card.data.get('commit')!r})")
         ours = (args.ours or (_head(repo) if repo else "")).lower()
         if ours and not SHA.match(ours):
             raise StoreError("--ours takes our commit sha, 7-40 hex characters")
+        _check_from(args, store, card.id, src or [str(p) for p in as_list(old.get("from"))], at)
         entry = {"project": project, "question": qid, "mode": args.mode, "into": rel, "from": src, "at": at,
                  "ours": ours, "date": today(), "note": args.note}
     a = set_adoption(store, card.id, entry, args.drop)

@@ -661,6 +661,9 @@ class AdoptTests(Base):
         registry.new_card(self.store, {"repo": self.slug, "desc": "x", "stars": 30000, "branch": "main",
                                        "commit": "aaaaaaaaaaaa"}, "software", "cli",
                           [{"project": "ops", "question": "browser-ops", "take": "use", "where": "tools"}], [], "read")
+        self.api.paths[f"repos/{self.slug}/commits/aaaaaaaaaaaa"] = {"sha": "a" * 40}   # --from is checked upstream
+        for path in ("clis/reddit/read.js", "src/daemon.ts", "src/broken.ts", "data/old.json"):
+            self.api.paths[f"repos/{self.slug}/contents/{path}"] = "x"
 
     def adopt(self, *argv):
         with cwd(self.proj):
@@ -678,11 +681,15 @@ class AdoptTests(Base):
         e = self.store.ledger()[-1]
         self.assertEqual((e["repo"], e["verdict"], e["project"], e["question"]), (self.slug, "card", "ops", "browser-ops"))
         self.assertTrue(e["reason"].startswith("adopted: vendor: tools/read.ts <- clis/reddit/read.js @aaaaaaaaaaaa"), e)
-        self.adopt("--mode", "port", "--into", "tools/read.ts", "--ours", "1234abc")       # same paths: replaced
+        self.adopt("--mode", "port", "--into", "tools/read.ts", "--ours", "2345bcd")       # same paths: updated
         self.adopt("--mode", "tool", "--into", "tools/run.sh", "--ours", "1234abc")        # other paths: added
         adopted = self.store.card(self.slug).data["adopted"]
         self.assertEqual([(a["mode"], a["into"]) for a in adopted], [("port", ["tools/read.ts"]), ("tool", ["tools/run.sh"])])
-        self.assertNotIn("note", adopted[0])
+        self.assertEqual((adopted[0]["from"], adopted[0]["note"], adopted[0]["ours"]),
+                         (["clis/reddit/read.js"], "comment ids kept", "2345bcd"))      # what was left out is kept
+        code, _, err = self.adopt("--mode", "vendor", "--into", "tools/x.ts", "--from", "clis/reddit/raed.js")
+        self.assertEqual(code, 1)
+        self.assertIn("not in jackwener/OpenCLI at aaaaaaa: clis/reddit/raed.js", err)
         self.assertEqual(len([x for x in self.store.ledger() if x.get("reason", "").startswith("adopted")]), 3)
 
     def test_drop_marks_the_entry_and_keeps_it(self):

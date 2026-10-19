@@ -278,18 +278,26 @@ def set_use(store: Store, slug: str, use: dict, level: str | None = None) -> Doc
     return card
 
 
+def _adoption_key(a: dict) -> tuple:
+    return a.get("project"), a.get("question") or None, sorted(map(str, as_list(a.get("into"))))
+
+
+def live_adoption(data: dict, entry: dict) -> dict | None:
+    """The card's adoption with the same project, question and paths as `entry`, unless it was dropped."""
+    return next((a for a in as_list(data.get("adopted")) if isinstance(a, dict) and not a.get("dropped")
+                 and _adoption_key(a) == _adoption_key(entry)), None)
+
+
 def set_adoption(store: Store, slug: str, entry: dict, drop: bool = False) -> dict:
     """Record on the card that a repo came into one of our projects (stage 6). The same project, question and
-    paths replace the earlier entry; with drop, that entry is marked dropped instead, so its history stays."""
+    paths update the earlier entry: fields `entry` leaves empty keep what was recorded. After a drop the entry starts
+    afresh; with drop, the entry is marked dropped instead, so its history stays."""
     card = store.card(slug)
     if not card or card.error:
         raise StoreError(f"{slug}: no card")
     if not drop and entry.get("mode") not in MODES:
         raise StoreError(f"mode must be one of {', '.join(MODES)}")
-
-    def key(a: dict) -> tuple:
-        return a.get("project"), a.get("question") or None, sorted(map(str, as_list(a.get("into"))))
-
+    key = _adoption_key
     items = [a for a in as_list(card.data.get("adopted")) if isinstance(a, dict)]
     i = next((n for n, a in enumerate(items) if key(a) == key(entry)), None)
     if drop:
@@ -303,8 +311,10 @@ def set_adoption(store: Store, slug: str, entry: dict, drop: bool = False) -> di
     elif i is None:
         items.append({k: v for k, v in entry.items() if v})
         i = len(items) - 1
-    else:
+    elif items[i].get("dropped"):
         items[i] = {k: v for k, v in entry.items() if v}
+    else:
+        items[i] = {**items[i], **{k: v for k, v in entry.items() if v}}
     card.data["adopted"] = items
     store.save_card(card)
     return items[i]

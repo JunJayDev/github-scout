@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .github import Client, GitHubError
 from .discover import DROP, HIDE, SLOW, months_since
-from .store import Store, adoptions, as_list, min_stars, repo_ref, today
+from .store import SHA, Store, adoptions, as_list, min_stars, repo_ref, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -348,6 +348,11 @@ def upstream_changes(client: Client, slug: str, branch: str, a: dict, dates: dic
         more = len(hist) >= 100
         hist = [c for c in hist if not str(c.get("sha", "")).startswith(at)]
         p = {"path": path, "changes": len(hist), "more": more}
+        try:                                 # GitHub lists no commits for a path that is not there: say so
+            if not client.exists(slug, path, branch):
+                p["gone"] = branch
+        except (GitHubError, OSError):
+            pass
         if hist:
             c = hist[0].get("commit") or {}
             p["newest"] = {"sha": str(hist[0].get("sha", ""))[:7],
@@ -387,7 +392,9 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
         idle = months_since((r.get("pushed_at") or "")[:10])
         if idle > SLOW:
             row["unmaintained"] = f"no push in {idle:.0f} months"
-        branch = d.get("branch") or r.get("default_branch") or "main"
+        branch = r.get("default_branch") or d.get("branch") or "main"     # upstream may have renamed it
+        if d.get("branch") and d["branch"] != branch:
+            row["branch"] = f"{d['branch']} -> {branch}"
         cmp = client.compare(r["full_name"], row["commit"], branch) if row["commit"] else None
         if cmp is None:
             row["state"] = "cannot compare (commit not on branch?)"
@@ -402,7 +409,7 @@ def outdated(store: Store, client: Client, refs: list[str] | None = None, projec
         if adopted:
             dates: dict = {}
             row["adopted"] = [upstream_changes(client, r["full_name"], branch, a, dates) for a in adopted]
-        took_changed = any(p.get("changes") for a in row.get("adopted", []) for p in a.get("paths", []))
+        took_changed = any(p.get("changes") or p.get("gone") for a in row.get("adopted", []) for p in a.get("paths", []))
         if cmp is not None and row.get("ahead", 0) == 0 and not row["releases"] and not row.get("archived") \
                 and not row.get("unmaintained") and not took_changed:
             row["state"] = "up to date"
@@ -430,6 +437,9 @@ def adoption_lines(r: dict) -> list[str]:
         for p in a.get("paths", []):
             if p.get("error"):
                 out.append(f"{head}: upstream {p['path']}: {p['error']}")
+            elif p.get("gone"):
+                out.append(f"{head}: upstream {p['path']} is not on {p['gone']} any more (moved or deleted, or a wrong "
+                           f"--from)" + (f"; changed {p['changes']} times since {at}" if p.get("changes") else ""))
             elif p.get("changes"):
                 n, new = p["changes"], p.get("newest") or {}
                 times = "once" if n == 1 else f"{n}{'+' if p.get('more') else ''} times"
@@ -457,6 +467,8 @@ def render_outdated(rows: list[dict]) -> str:
         for k in ("archived", "unmaintained", "renamed"):
             if r.get(k):
                 bits.append(f"{k}: {r[k]}" if r[k] is not True else k)
+        if r.get("branch"):
+            bits.append(f"default branch {r['branch']}")
         if r.get("stars") and r.get("stars_then") and r["stars"] != r["stars_then"]:
             bits.append(f"stars {r['stars_then']}->{r['stars']}")
         out.append(f"{r['repo']:<40} reviewed {r.get('reviewed')}: " + " · ".join(bits))
@@ -472,7 +484,7 @@ def diff(store: Store, client: Client, slug: str, every_file: bool = False, max_
     r = client.repo(card.id)
     if not r:
         raise LookupError(f"{card.id}: not found upstream")
-    branch = d.get("branch") or r.get("default_branch") or "main"
+    branch = r.get("default_branch") or d.get("branch") or "main"
     cmp = client.compare(r["full_name"], str(d.get("commit")), branch)
     if not cmp:
         raise LookupError(f"cannot compare {d.get('commit')}...{branch}")
@@ -507,10 +519,17 @@ def bump(store: Store, client: Client, slug: str, to: str | None = None) -> dict
     r = client.repo(card.id)
     if not r:
         raise LookupError(f"{card.id}: not found upstream")
-    branch = card.data.get("branch") or r.get("default_branch") or "main"
-    sha = to or client.head(r["full_name"], branch)
+    branch = r.get("default_branch") or card.data.get("branch") or "main"
+    if to and not SHA.match(to.lower()):              # a tag or branch: the commit it points at
+        sha = (client.commit(r["full_name"], to) or {}).get("sha")
+        if not sha:
+            raise LookupError(f"{card.id}: --to {to} is no commit, tag or branch upstream; the card is unchanged")
+    else:
+        sha = to or client.head(r["full_name"], branch)
+        if not sha:
+            raise LookupError(f"{card.id}: no head commit on {branch}; the card is unchanged")
     old = card.data.get("commit")
-    card.data.update(commit=str(sha)[:12], reviewed=today(), stars=r.get("stargazers_count", 0),
+    card.data.update(branch=branch, commit=str(sha).lower()[:12], reviewed=today(), stars=r.get("stargazers_count", 0),
                      pushed=(r.get("pushed_at") or "")[:10])
     store.save_card(card)
     return {"repo": card.id, "from": old, "to": card.data["commit"]}

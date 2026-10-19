@@ -214,6 +214,17 @@ class Client:
         return self.get_or_none(f"repos/{slug}/commits", {"path": path, "sha": branch, "since": since_iso,
                                                           "per_page": per_page})
 
+    def exists(self, slug: str, path: str, ref: str) -> bool:
+        """Whether a file or folder is in the repo at a commit or branch."""
+        try:
+            self.request("GET", f"{API}/repos/{slug}/contents/{urllib.parse.quote(path)}?"
+                         + urllib.parse.urlencode({"ref": ref}))
+        except GitHubError as exc:
+            if exc.status == 404:
+                return False
+            raise
+        return True
+
     def contributors(self, slug: str, n: int = 10) -> list[dict]:
         return self.get_or_none(f"repos/{slug}/contributors", {"per_page": n}) or []
 

@@ -49,12 +49,13 @@ github-scout note other/repo --q <project>/<question> --take skip --note "<why w
 
 - `--into`: our paths, comma-separated, read from the current directory; run elsewhere, they are
   read from the project's code path.
-- `--from`: their files or folders we took. `updates` watches exactly these; leave it out when
-  nothing was copied.
+- `--from`: their files or folders we took, from the root of their repository. Each must exist at
+  `--at` (a typo is refused). `updates` watches exactly these; leave it out when nothing was copied.
 - `--at`: their commit; defaults to the card's reviewed commit.
 - `--ours`: our commit; defaults to HEAD of the repository holding the first `--into` path, so
   run `adopt` after the commit.
-- The same `--q` and `--into` again replace the entry; `--drop` marks it dropped and keeps it.
+- The same `--q` and `--into` again update the entry: `--from`, `--at` and `--note` left out keep
+  what was recorded. `--drop` marks it dropped and keeps it.
 
 The brief's Adopt and record section has one such line per repo to bring in, ready to fill.
 Afterwards `github-scout updates` lists adopted repos first, with the upstream commits that

@@ -186,8 +186,9 @@ github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode port \
 ```
 
 Each writes an `adopted` entry on the card: our paths, their paths, their commit (the reviewed
-one unless `--at`) and ours (HEAD unless `--ours`). The same `--q` and `--into` again replace the
-entry; `--drop` marks it dropped and keeps it. A brief item the agent did not take gets
+one unless `--at`) and ours (HEAD unless `--ours`). Their paths must exist at their commit. The
+same `--q` and `--into` again update the entry (`--from`, `--at` and `--note` left out keep what was
+recorded); `--drop` marks it dropped and keeps it. A brief item the agent did not take gets
 `github-scout note` with the reason, so the next search knows why.
 
 ## 7. Upkeep
