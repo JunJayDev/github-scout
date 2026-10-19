@@ -98,7 +98,8 @@ SITE_WORDS = re.compile(r"demo|playground|\btry\b|\blive\b|online|\bapp\b|websit
                         r"在线|体验|演示|试用|官网|作品|展示|案例", re.I)
 NOT_EFFECT = re.compile(r"shields\.io|badgen\.net|badge|/actions/workflows/|codecov|star-history|contrib\.rocks|trendshift|"
                         r"visitor|komarev|readme-stats|buymeacoffee|ko-fi\.com|/sponsors/|producthunt\.com/widgets", re.I)
-SMALL_PART = re.compile(r"(?<![a-z])(logo|logos|icon|icons|badge|badges|avatar|favicon|emoji)(?![a-z])", re.I)
+SMALL_PART = re.compile(r"(?<![a-z])(logo|logos|icon|icons|badge|badges|avatar|favicon|emoji|qr|qrcode|wechat|weixin|"
+                        r"alipay|wxpay|donate|donation|sponsors?|discord)(?![a-z])", re.I)   # and QR codes to join a group
 TINY = re.compile(r"[?&](?:s|size|w|width|h|height)=(\d+)|/(\d{1,2})x\d{1,2}/", re.I)
 IMAGE = re.compile(r"\.(png|jpe?g|webp|gif|avif)(?:[?#]|$)", re.I)
 VIDEO = re.compile(r"\.(mp4|webm|mov|m4v)(?:[?#]|$)|github\.com/user-attachments/assets/|"
@@ -117,7 +118,7 @@ def _absolute(url: str, slug: str, branch: str) -> str:
 
 
 def _small(url: str, alt: str = "", width: str = "", height: str = "") -> bool:
-    """A badge, logo or icon rather than a picture of what it does: by host, name, alt text or a tiny size."""
+    """A badge, logo, icon or QR code rather than a picture of what it does: by host, name, alt text or a tiny size."""
     name = url.split("?")[0].split("#")[0].rstrip("/").rsplit("/", 1)[-1]
     if NOT_EFFECT.search(url) or SMALL_PART.search(name) or SMALL_PART.search(alt):
         return True

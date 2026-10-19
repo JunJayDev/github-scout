@@ -1620,7 +1620,7 @@ class ExamineTests(unittest.TestCase):
 
     def test_the_readme_shows_media_and_demo_links_but_not_badges(self):
         readme = ("[![CI](https://github.com/a/b/actions/workflows/ci.yml/badge.svg)](https://github.com/a/b/actions)\n"
-                  "# b\n\n![logo](docs/logo.png)\n<img src=\"docs/shot.png\" alt=\"main window\">\n"
+                  "# b\n\n![logo](docs/logo.png)\n<img src=\"docs/shot.png\" alt=\"main window\">\n![join](assets/wechat-group.jpg)\n"
                   "<img src=\"https://x.dev/tiny.png\" width=\"24\">\n\nhttps://github.com/user-attachments/assets/1234-abcd\n\n"
                   "Try the [live demo](https://b.dev/play) and [examples](./examples/basic). [Docs](https://b.dev/docs)\n"
                   "[![app](https://b.dev/hero.webp)](https://app.b.dev)\n"
