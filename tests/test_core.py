@@ -1,5 +1,6 @@
 import contextlib
 import datetime as dt
+import http.client
 import io
 import json
 import os
@@ -14,7 +15,7 @@ from pathlib import Path
 from fake import FakeAPI, client, commit, repo, tarball
 
 from github_scout import cli, discover, examine, registry, yamlish
-from github_scout.github import github_slug
+from github_scout.github import Client, github_slug
 from github_scout.store import PROJECT_ORDER, Store, StoreError, card_filename, today, write_doc
 
 QUESTION = {
@@ -1494,6 +1495,27 @@ class ReviewFixTests(Base):
         code, _, err = self.run_cli("updates", "--done", url)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.store.card(self.slug).data["commit"], "b" * 12)
+
+
+    def test_a_reply_that_is_not_json_fails_only_its_search(self):
+        def transport(method, url, headers, body):
+            if "skills.sh" in url:
+                return 200, {}, b"<!doctype html><title>Just a moment...</title>"
+            if "npmjs" in url:
+                raise http.client.IncompleteRead(b"{")
+            return self.api(method, url, headers, body)
+        cli.make_client = lambda args, store=None: Client(token="t", transport=transport, verbose=False)
+        code, out, err = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, err)
+        self.assertIn("reply is not JSON: <!doctype html>", out)
+        self.assertEqual(len(self.store.scans("ops", "browser-ops")), 1)
+
+    def test_a_scan_reports_progress_on_stderr(self):
+        code, out, err = self.run_cli("scan", "ops/browser-ops")
+        self.assertEqual(code, 0, err)
+        self.assertRegex(err, r"scan: \d+ of \d+ searches, 2\d API calls, \d+s so far, about \d+s left")
+        self.assertNotIn("so far", out)
+        self.assertNotIn("so far", self.run_cli("scan", "ops/browser-ops", "--quiet")[2])
 
 
 class ExamineTests(unittest.TestCase):

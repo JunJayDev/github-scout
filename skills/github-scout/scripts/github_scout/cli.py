@@ -286,7 +286,7 @@ def cmd_scan(args):
         if gaps and not (args.add or args.expand):
             print("\n".join(gaps), file=sys.stderr)
         client = make_client(args, store)
-        sc = Scan(store, client, q)
+        sc = Scan(store, client, q, progress=not args.quiet)
         if args.add or args.expand:
             if args.add:
                 slugs = slugs_in_text("\n".join(_read_source(s) for s in args.add))

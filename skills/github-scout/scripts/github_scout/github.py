@@ -7,6 +7,7 @@ Search endpoints are throttled to stay under GitHub's per-minute limits.
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import os
@@ -92,7 +93,10 @@ class Client:
             h["Content-Type"] = "application/json"
         for attempt in range(retries + 1):
             self.calls += 1
-            status, rh, raw = self.transport(method, url, h, data)
+            try:
+                status, rh, raw = self.transport(method, url, h, data)
+            except http.client.HTTPException as exc:      # a reply cut short (IncompleteRead) or garbled
+                raise ConnectionError(f"bad reply from {urllib.parse.urlsplit(url).netloc}: {exc!r}") from None
             if status in (403, 429) and attempt < retries:
                 wait = _retry_wait(rh, status)
                 if wait is None and b"secondary rate limit" in raw.lower():
@@ -114,10 +118,10 @@ class Client:
         url = path if path.startswith("http") else f"{API}/{path.lstrip('/')}"
         if params:
             url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
-        _, _, raw = self.request("GET", url, accept=accept)
+        status, _, raw = self.request("GET", url, accept=accept)
         if accept and "raw" in accept:
             return raw.decode("utf-8", "replace")
-        return json.loads(raw.decode() or "null")
+        return _json(status, raw)
 
     def get_or_none(self, path: str, params: dict | None = None, accept: str | None = None):
         try:
@@ -260,8 +264,8 @@ class Client:
                         out[data["full_name"].lower()] = data
                         out.setdefault(slug.lower(), data)
                 continue
-            _, _, raw = self.request("POST", f"{API}/graphql", body={"query": query})
-            payload = json.loads(raw.decode())
+            status, _, raw = self.request("POST", f"{API}/graphql", body={"query": query})
+            payload = _json(status, raw) or {}
             for n, slug in enumerate(chunk):
                 node = (payload.get("data") or {}).get(f"r{n}")
                 if node:
@@ -298,8 +302,8 @@ class Client:
 
     # -- directories -----------------------------------------------------
     def _get_json(self, url: str):
-        _, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"})
-        return json.loads(raw.decode() or "null")
+        status, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"})
+        return _json(status, raw)
 
     def skills_search(self, text: str, limit: int = 30) -> list[tuple[str, int, str]]:
         """skills.sh search: [(owner/repo, installs, skill id)], most installed first."""
@@ -325,9 +329,9 @@ class Client:
     # -- npm -------------------------------------------------------------
     def npm_search(self, text: str, size: int = 20) -> list[str]:
         url = f"{NPM}/-/v1/search?" + urllib.parse.urlencode({"text": text, "size": size})
-        _, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"})
+        status, _, raw = self.request("GET", url, headers={"User-Agent": UA, "Accept": "application/json"})
         slugs = []
-        for obj in json.loads(raw.decode()).get("objects", []):
+        for obj in (_json(status, raw) or {}).get("objects", []):
             links = obj.get("package", {}).get("links", {})
             slug = github_slug(links.get("repository") or "") or github_slug(links.get("homepage") or "")
             if slug:
@@ -367,6 +371,15 @@ def _retry_wait(headers: dict, status: int) -> float | None:
         except ValueError:
             return None
     return 30.0 if status == 429 else None
+
+
+def _json(status: int, raw: bytes):
+    """A reply's JSON. A page that is not JSON (a challenge or proxy page sent with 200) is an error like a 5xx."""
+    try:
+        return json.loads(raw.decode("utf-8", "replace") or "null")
+    except ValueError:
+        text = " ".join(raw[:80].decode("utf-8", "replace").split())
+        raise GitHubError(status, f"reply is not JSON: {text}") from None
 
 
 def _message(raw: bytes) -> str:

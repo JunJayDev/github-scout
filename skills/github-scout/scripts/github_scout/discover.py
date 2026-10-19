@@ -75,6 +75,7 @@ import itertools
 import math
 import re
 import sys
+import time
 
 from .github import Client, GitHubError, github_slug
 from .store import HAN, MIN_STARS, Store, as_list, groups, lang_of, min_stars, now_stamp, question_langs, stars_of, today
@@ -101,6 +102,7 @@ BEST_ORDER = "MQER"                          # best-match order, BEST_PAGE rows,
                                              # works), then problems; entity names already lead by stars. Within a
                                              # lens the narrowest first: 100 rows of 3,000 matter, of 300,000 hardly
 HUGE = 10000             # `scan --plan` and the header name terms whose own search matched this many repos
+PROGRESS_EVERY = 20      # a scan prints a progress line to stderr every this many API calls
 SKILLS_PAGE = 100        # skills.sh rows read per search: relevant skills with few installs sit deep
 LOW_FIT, LOW_SHOW = 4, 5  # rows under the star threshold that match this many groups are named in the header
 # Words that say what any repository is, not what this one does. Alone they bring back only the most-starred repos.
@@ -457,9 +459,14 @@ def slugs_in_text(text: str) -> list[str]:
     return out
 
 
+def _span(seconds: float) -> str:
+    s = int(seconds)
+    return f"{s // 60}m{s % 60:02d}s" if s >= 60 else f"{s}s"
+
+
 class Scan:
-    def __init__(self, store: Store, client: Client, question: dict):
-        self.store, self.client, self.q = store, client, question
+    def __init__(self, store: Store, client: Client, question: dict, progress: bool = True):
+        self.store, self.client, self.q, self.progress = store, client, question, progress
         self.project, self.qid = question["project"], question["id"]
         self.cands: dict[str, dict] = {}
         self.dropped: set[str] = set()   # unmaintained for over DROP months; only counted
@@ -498,8 +505,23 @@ class Scan:
         return added
 
     def run(self, lenses: str = DEFAULT_LENSES, budget: int = 250, per_query: int = 30) -> dict:
-        start = self.client.calls
-        for s in plan(self.q, lenses):
+        start, began = self.client.calls, time.monotonic()
+        planned = plan(self.q, lenses)
+        tick = PROGRESS_EVERY
+
+        def progress(done: int) -> None:
+            """Every PROGRESS_EVERY calls, one line on stderr: a scan takes minutes. The time left is a rough guess."""
+            nonlocal tick
+            calls = self.client.calls - start
+            if not self.progress or calls < tick:
+                return
+            tick = (calls // PROGRESS_EVERY + 1) * PROGRESS_EVERY
+            total = len(planned) + min(len(self.broad), BEST_MAX)
+            spent = time.monotonic() - began
+            print(f"scan: {done} of {total} searches, {calls} API calls, {_span(spent)} so far, "
+                  f"about {_span(spent / done * max(total - done, 0))} left", file=sys.stderr, flush=True)
+
+        for done, s in enumerate(planned, 1):
             entry = dict(s)
             self.log.append(entry)
             if self.client.calls - start >= budget:
@@ -514,7 +536,9 @@ class Scan:
             if self.client.verbose:
                 total = f" of {entry['total']}" if entry.get("total") is not None else ""
                 print(f"  {s['lens']} {s['query'][:70]} -> {entry.get('hits')}{total}", file=sys.stderr)
-        for entry in sorted(self.broad, key=lambda e: (BEST_ORDER.index(e["lens"]), e["total"]))[:BEST_MAX]:
+            progress(done)
+        best = sorted(self.broad, key=lambda e: (BEST_ORDER.index(e["lens"]), e["total"]))[:BEST_MAX]
+        for done, entry in enumerate(best, len(planned) + 1):
             if self.client.calls - start >= budget:
                 break
             try:
@@ -528,6 +552,7 @@ class Scan:
                 self._add(r, entry["lens"])
             if self.client.verbose:
                 print(f"  {entry['lens']} {entry['query'][:70]} -> {len(more)} more in best-match order", file=sys.stderr)
+            progress(done)
         return self.finish(lenses)
 
     def _one(self, s: dict, per_query: int) -> int:
