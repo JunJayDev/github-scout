@@ -4,6 +4,36 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Fixes from a review on 2026-10-19, each reproduced first.
+  - `updates` compares against the repo's current default branch, and says when it moved
+    (`default branch master -> main`); before, a renamed branch broke the compare for good and
+    `--done` wrote `commit: None`, which `check` refused. `--done` never writes an empty commit,
+    and `--to` takes a tag or branch.
+  - `adopt` again with the same `--q` and `--into` updates the entry: `--from`, `--at` and `--note`
+    left out keep what was recorded. Following the hint after `updates` used to erase them.
+  - `adopt --from` paths must exist upstream at `--at` (GitHub lists no commits for a path that is
+    not there, so a typo read as unchanged for ever); `updates` says when a path we took is gone
+    from the default branch.
+  - `pick` reads row numbers against the table printed last: after `scan --show --all`, `pick 2`
+    is row 2 of that table, not of the default one. Numbers outside it are refused. The table's
+    rows are kept in `cache/tables/`.
+  - `import` finds the repository column by its github.com links, so `| Project | Link | Verdict |`
+    and `| 项目 | 地址 | 结论 |` give rows; a verdict header must be one of the verdict words
+    (`Takeaway` was read as the verdict); GitHub links that are not repositories (docs.github.com,
+    gists, advisories) are no longer taken for repos and reported as invented.
+  - `brief` shows the take recorded for the question's own project, not another project's
+    question of the same name.
+  - A repo given as a github.com URL finds its card in `note`, `show`, `adopt`, `look` and
+    `updates`.
+  - `ask` without a project names it after the git folder as a valid id (`My App` -> `my-app`).
+  - Two scans of a question in the same second keep both (the second id gets `-2`).
+  - A reply that is not JSON (a challenge page from skills.sh) or is cut short fails only its own
+    search; before, it ended the whole scan with a traceback and nothing saved.
+  - A scan prints a progress line to stderr every 20 API calls: searches done of planned, time so
+    far, a rough guess of the time left. stdout is unchanged; `--quiet` turns it off.
+  - The ledger: a reason with U+2028 (text pasted from web pages) no longer splits its entry in
+    two, entries appended to a file without a final newline stay separate, and a line that is JSON
+    but not an object is reported by `check` instead of crashing it and `show`.
 - Windows (found by the first CI run): output is written as UTF-8, so a piped scan table with
   Chinese rows no longer crashes on the default codepage; `check` and `look --source` print
   registry and repo paths with forward slashes; `ask` stores the project's resolved path; tests
