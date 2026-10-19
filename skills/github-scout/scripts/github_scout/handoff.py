@@ -53,12 +53,25 @@ def _cells(line: str) -> list[str]:
 
 
 def _column(header: list[str], key: str, table: dict = COLUMNS) -> int | None:
+    """The first column whose header is one of the names, or starts with one; a verdict header must be one exactly
+    (an optional note in brackets aside): "Takeaway" is not "take"."""
     names = table[key]
     for i, h in enumerate(header):
         low = re.sub(r"[*_`]", "", h).strip().lower()
-        if any(low == n or low.startswith(n) for n in names):
+        if key == "take" and table is COLUMNS:
+            if re.sub(r"\s*[(（].*$", "", low) in names:
+                return i
+        elif any(low == n or low.startswith(n) for n in names):
             return i
     return None
+
+
+def _repo_column(header: list[str], body: list) -> int | None:
+    """The column holding github.com/owner/repo links in most rows; without links, the one a repo header names.
+    "| Project | Link |" puts the name first and the link second."""
+    counts = [sum(1 for cells, _ in body if slugs_in_text(_cell(cells, j))) for j in range(len(header))]
+    best = max(range(len(counts)), key=lambda j: counts[j], default=None)
+    return best if best is not None and counts[best] else _column(header, "repo")
 
 
 def _take(text: str) -> str | None:
@@ -116,6 +129,7 @@ def parse_report(text: str) -> tuple[list[str], dict[str, dict]]:
         if _column(header, "query", LOG_COLUMNS) is not None:
             continue
         cols = {k: _column(header, k) for k in COLUMNS}
+        cols["repo"] = _repo_column(header, body)
         for cells, line in body:
             found = slugs_in_text(_cell(cells, cols["repo"]) if cols["repo"] is not None else line)
             if not found:
@@ -337,7 +351,8 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
     cards = {slug: store.card(slug) for slug in sources}
 
     def use_of(card) -> dict:
-        return next((u for u in as_list(card.data.get("uses")) if isinstance(u, dict) and u.get("question") == q["id"]), {})
+        return next((u for u in as_list(card.data.get("uses")) if isinstance(u, dict)
+                     and u.get("project") == q["project"] and u.get("question") == q["id"]), {})
 
     def role(slug: str) -> str:
         return t["roles"]["backbone"] if slug == backbone else t["roles"]["alternate"] if slug == alternate \

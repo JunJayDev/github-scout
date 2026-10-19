@@ -428,6 +428,7 @@ def github_slug(text: str) -> str | None:
     if not m:
         return None
     owner, name = m.group(1), m.group(2)
-    if name in (".", "..") or owner.lower() in ("orgs", "topics", "sponsors", "features", "marketplace", "settings", "about", "apps", "collections", "trending", "search", "login", "site", "explore"):
+    if name in (".", "..") or owner.lower() in ("orgs", "topics", "sponsors", "features", "marketplace", "settings", "about", "apps", "collections", "trending", "search", "login", "site", "explore",
+                                                "advisories", "enterprise", "security", "pricing", "readme", "resources", "solutions", "customer-stories", "users", "organizations", "notifications", "codespaces", "events"):
         return None
     return f"{owner}/{name}"

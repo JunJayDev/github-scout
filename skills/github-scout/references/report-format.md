@@ -108,6 +108,10 @@ Column names the importer understands:
 | reason | why, reason, idea, notes | 理由, 为什么, 能借什么, 思路, 说明 |
 | direction | direction | 方向 |
 
+The repository column is the one whose cells hold github.com/owner/repo links, whatever its
+header; a verdict header must be one of the words above (`Takeaway` is not a verdict). Links to
+GitHub pages that are not repositories (docs, gists, advisories) are ignored.
+
 A table with a query column is read as the search log, one search per row:
 
 | meaning | English | Chinese |

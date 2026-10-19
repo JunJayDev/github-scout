@@ -1375,6 +1375,7 @@ class RecallTests(Base):
         self.assertIn("(2; 1 more not in the question's forms, --all shows them)", out)
         _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show", "--all")
         self.assertIn("c/DiPlay", out)
+        self.run_cli("scan", "ops/browser-ops", "--show")                    # pick numbers refer to the last table
         code, out, _ = self.run_cli("pick", "ops/browser-ops", "h2", "--rest", "no")
         self.assertEqual(code, 0, out)
         verdicts = {e["repo"]: e["verdict"] for e in self.store.ledger()}
@@ -1496,6 +1497,28 @@ class ReviewFixTests(Base):
         self.assertEqual(code, 0, err)
         self.assertEqual(self.store.card(self.slug).data["commit"], "b" * 12)
 
+
+    def test_pick_reads_numbers_from_the_table_last_shown(self):
+        self.api.add(repo("a/reddit-old", 900, "reddit logged-in browser cli", pushed=ago(8)))   # stale: hidden by default
+        self.api.add(repo("b/reddit-cli", 300, "reddit cli", pushed=ago(0.2)))
+        self.run_cli("scan", "ops/browser-ops", "--add", "github.com/b/reddit-cli github.com/a/reddit-old", "--quiet")
+        out = self.run_cli("scan", "ops/browser-ops", "--show", "--all")[1]
+        self.assertIn("2.", next(ln for ln in out.splitlines() if "a/reddit-old" in ln))
+        code, _, err = self.run_cli("pick", "ops/browser-ops", "--skip", "2=too old")
+        self.assertEqual((code, self.store.ledger()[-1]["repo"]), (0, "a/reddit-old"), err)
+        self.run_cli("scan", "ops/browser-ops", "--show")
+        code, _, err = self.run_cli("pick", "ops/browser-ops", "2")
+        self.assertEqual(code, 1)
+        self.assertIn("#2 is not in the last table (1-1", err)
+
+    def test_ask_names_the_project_after_the_folder_as_an_id(self):
+        repo_dir = Path(self.tmp.name) / "My App"
+        (repo_dir / ".git").mkdir(parents=True)
+        with cwd(repo_dir):
+            code, out, err = self.run_cli("ask", "video", "Make promo videos", "--stage", "idea")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.store.project("my-app").data["code"], str(repo_dir.resolve()))
+        self.assertEqual(self.store.check()[0], [])
 
     def test_a_reply_that_is_not_json_fails_only_its_search(self):
         def transport(method, url, headers, body):

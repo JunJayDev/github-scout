@@ -446,7 +446,7 @@ def matches_vocab(r: dict, terms: list[str]) -> bool:
     return any(t in hay or t in hay.replace("-", " ") for t in terms)
 
 
-GITHUB_URL = re.compile(r"github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/([A-Za-z0-9_.-]+)")
+GITHUB_URL = re.compile(r"(?<![\w.-])(?:www\.)?github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/([A-Za-z0-9_.-]+)")  # not docs. or gist.
 
 
 def slugs_in_text(text: str) -> list[str]:

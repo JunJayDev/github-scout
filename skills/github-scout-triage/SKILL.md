@@ -50,7 +50,8 @@ github-scout pick <q> owner/repo --low-stars "<why it is an exception>"   # a re
 
 `look` lists the links in a README that look like results (demos, galleries, examples, videos):
 open them before you pick. Every row you were shown and did not pick is recorded as skipped with
-your reason. `pick` refuses a repo under 50 stars without `--low-stars`. Use `--later` for
+your reason. Numbers refer to the table printed last (`scan --show --all` numbers hidden rows
+too). `pick` refuses a repo under 50 stars without `--low-stars`. Use `--later` for
 promising but not now (no results yet, too few stars), `--list` for lists to expand. After picking, run
 `github-scout scan <q> --lenses UG`: it follows the owners' stars and the links in the picked
 READMEs, which find nothing before you pick.

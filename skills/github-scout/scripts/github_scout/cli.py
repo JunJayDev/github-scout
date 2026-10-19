@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -78,6 +79,27 @@ def _entry(args, repo: str, project: str, qid: str, verdict: str, level: str, re
     return e
 
 
+def _table_file(store: Store, project: str, qid: str) -> Path:
+    return store.root / "cache" / "tables" / project / f"{qid}.json"
+
+
+def _remember_table(store: Store, scan: dict, rows: list[dict], rise: list[dict], show_all: bool) -> None:
+    """The rows a table numbered, so `pick` reads numbers against what was shown (in cache/, not committed)."""
+    p = _table_file(store, scan["project"], scan["question"])
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"scan": scan.get("id"), "all": show_all, "rows": [c["repo"] for c in rows],
+                             "rising": [c["repo"] for c in rise]}) + "\n", encoding="utf-8")
+
+
+def _shown_table(store: Store, scan: dict) -> dict | None:
+    """The table last printed for this question, if it was printed from the latest scans."""
+    try:
+        t = json.loads(_table_file(store, scan["project"], scan["question"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return t if isinstance(t, dict) and t.get("scan") == scan.get("id") else None
+
+
 def _merged(store: Store, project: str, qid: str) -> dict:
     """All candidates from every scan of a question, rescored against its current vocabulary."""
     merged: dict[str, dict] = {}
@@ -116,7 +138,7 @@ def cmd_import(args):
     if not store.question_path(project, qid).is_file():
         if not store.project(project):
             repo = _git_root(Path.cwd())
-            new_project(store, project, project, "", str(repo) if repo and repo.name.lower() == project.lower() else "")
+            new_project(store, project, project, "", str(repo) if repo and _project_id(repo.name) == project else "")
         new_question(store, f"{project}/{qid}", goal or f"(imported from {Path(args.file).name})", stage or "idea")
         print(f"question {project}/{qid} created from the report (stage {stage or 'idea'}: check it, and fill in where we stand)")
     doc = store.question(f"{project}/{qid}")
@@ -206,6 +228,12 @@ def cmd_new_project(args):
     print(new_project(_store(args), args.id, args.name, args.summary or "", args.code or ""))
 
 
+def _project_id(name: str) -> str:
+    """A project id from a folder name: "My App" -> my-app; scratch when nothing usable is left."""
+    s = re.sub(r"[^a-z0-9._-]", "", re.sub(r"\s+", "-", name.strip().lower())).lstrip("._-")
+    return s or "scratch"
+
+
 def _git_root(path: Path) -> Path | None:
     for p in [path, *path.parents]:
         if (p / ".git").exists():
@@ -217,11 +245,11 @@ def cmd_ask(args):
     cjk = any("\u4e00" <= ch <= "\u9fff" for ch in args.question)
     store = _store(args, create_lang="zh" if cjk else "en")
     if "/" not in args.ref and not (store.settings.get("default_project") or read_config().get("GITHUB_SCOUT_PROJECT")):
-        args.ref = f"{_git_root(Path.cwd()).name if _git_root(Path.cwd()) else 'scratch'}/{args.ref}"
+        args.ref = f"{_project_id(_git_root(Path.cwd()).name) if _git_root(Path.cwd()) else 'scratch'}/{args.ref}"
     project, qid = store.split_ref(args.ref)
     if not args.update and not store.project(project):
         repo = _git_root(Path.cwd().resolve())
-        code = args.code or (str(repo) if repo and repo.name.lower() == project.lower() else "")
+        code = args.code or (str(repo) if repo and _project_id(repo.name) == project else "")
         new_project(store, project, project, "", code)
         print(f"project {project} created" + (f" (code: {code})" if code else
               " (no code path: pass --code <path> to compare answers with your own code)"))
@@ -308,9 +336,10 @@ def cmd_scan(args):
         print(f"saved {path.relative_to(store.root).as_posix()} · {client.calls} API calls", file=sys.stderr)
     merged = _merged(store, q["project"], q["id"])
     if (args.add or args.expand) and not args.show and not args.json:
-        rows = visible(merged)
+        rows, rise = visible(merged), rising(merged)
+        _remember_table(store, merged, rows, rise, False)
         index = {c["repo"].lower(): i for i, c in enumerate(rows, 1)}
-        index.update({c["repo"].lower(): f"h{i}." for i, c in enumerate(rising(merged), 1)})
+        index.update({c["repo"].lower(): f"h{i}." for i, c in enumerate(rise, 1)})
         added = [c["repo"] for c in scan["candidates"]]
         print(f"added {len(added)} repos ({scan.get('dropped', 0)} dropped: no push in 12 months). Where they rank now:")
         by = {c["repo"].lower(): c for c in merged["candidates"]}
@@ -323,6 +352,8 @@ def cmd_scan(args):
             print(row(i, c) if i else f"  -  {slug}  ({why_hidden(c, limit)})")
         print(f"full table: github-scout scan {ref} --show")
         return
+    if not args.json:
+        _remember_table(store, merged, visible(merged, args.all), rising(merged, args.all), args.all)
     _out(args, render(merged, args.top, args.all)
          + f"\nnext: github-scout pick {ref} <#>... --rest \"<why the rest do not help>\" "
            f"(numbers refer to this table)", merged)
@@ -335,20 +366,25 @@ def cmd_pick(args):
     rows = visible(scan)
     rise = rising(scan)
     by_repo = {c["repo"].lower(): c for c in scan["candidates"]}
+    # Numbers refer to the table last shown (with --all it numbers hidden rows too); --rest covers the open rows.
+    shown = _shown_table(store, scan)
+    numbered = [by_repo.get(r.lower(), {"repo": r}) for r in shown["rows"]] if shown else rows
+    numbered_rise = [by_repo.get(r.lower(), {"repo": r}) for r in shown["rising"]] if shown else rise
+    table = f"scan {args.ref} --show" + (" --all" if shown and shown.get("all") else "")
 
     def resolve(item: str) -> tuple[dict, str | None]:
         ref, _, reason = item.partition("=")
         ref = ref.strip()
         if ref.isdigit():
             i = int(ref)
-            if not 1 <= i <= len(rows):
-                raise StoreError(f"#{i} is not in the list (1-{len(rows)}); run `github-scout scan {args.ref} --show`")
-            return rows[i - 1], reason or None
+            if not 1 <= i <= len(numbered):
+                raise StoreError(f"#{i} is not in the last table (1-{len(numbered)}, `github-scout {table}`)")
+            return numbered[i - 1], reason or None
         if ref[:1].lower() == "h" and ref[1:].isdigit():
             i = int(ref[1:])
-            if not 1 <= i <= len(rise):
-                raise StoreError(f"h{i} is not in the rising list (h1-h{len(rise)}); run `github-scout scan {args.ref} --show`")
-            return rise[i - 1], reason or None
+            if not 1 <= i <= len(numbered_rise):
+                raise StoreError(f"h{i} is not in the last rising list (h1-h{len(numbered_rise)}, `github-scout {table}`)")
+            return numbered_rise[i - 1], reason or None
         slug = _slug(ref)
         return by_repo.get(slug.lower(), {"repo": slug}), reason or None
 

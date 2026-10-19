@@ -438,7 +438,8 @@ github-scout pick <q> owner/repo --low-stars "<why it is an exception>"   # a re
 
 `look` lists the links in a README that look like results (demos, galleries, examples, videos):
 open them before you pick. Every row you were shown and did not pick is recorded as skipped with
-your reason. `pick` refuses a repo under 50 stars without `--low-stars`. Use `--later` for
+your reason. Numbers refer to the table printed last (`scan --show --all` numbers hidden rows
+too). `pick` refuses a repo under 50 stars without `--low-stars`. Use `--later` for
 promising but not now (no results yet, too few stars), `--list` for lists to expand. After picking, run
 `github-scout scan <q> --lenses UG`: it follows the owners' stars and the links in the picked
 READMEs, which find nothing before you pick.
@@ -727,6 +728,10 @@ Column names the importer understands:
 | verdict | verdict, take, decision | 结论, 取舍, 处理, 建议 |
 | reason | why, reason, idea, notes | 理由, 为什么, 能借什么, 思路, 说明 |
 | direction | direction | 方向 |
+
+The repository column is the one whose cells hold github.com/owner/repo links, whatever its
+header; a verdict header must be one of the words above (`Takeaway` is not a verdict). Links to
+GitHub pages that are not repositories (docs, gists, advisories) are ignored.
 
 A table with a query column is read as the search log, one search per row:
 
