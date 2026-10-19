@@ -26,13 +26,15 @@ from .store import (
     locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
 )
 
-EPILOG = """stages (one skill each; github-scout runs 1 to 5, which never change the project):
-  plan    find, ask, scan --plan       the goal, what good looks like, search directions
-  search  scan, scan --add/--expand     every lens, merged and ranked; lures, farmed installs and repos under 50 stars left out
-  triage  pick, look                    keep repos with results to look at and 50+ stars; decide how to read each
-  dig     note --trial, look --source   try the top 2-3, then read the code of the one to follow
-  brief   write the answer, brief       one backbone and what fills its gaps; the project is not changed
-  adopt   adopt                         the coding agent brings it into the project; updates then watches it
+EPILOG = """stages (one skill each; github-scout runs 1 to 4 and ends with a report; the project is not changed):
+  1 plan    find, ask, scan --plan       the goal, what good looks like, search directions
+  2 search  scan, scan --add/--expand     every lens, merged and ranked; lures, farmed installs and repos under 50 stars
+                                          left out (a direction with under 5 at 50+ shows its rows down to 20, then 10)
+  3 triage  pick, look, note              keep repos with a verifiable effect (mid or strong) and enough stars
+  4 brief   write the report, brief       what exists, the 2-3 to try first and how
+then the project's coding agent, when the user asks:
+  5 dig     note --trial, look --source   try the 2-3, choose one to follow as a whole, fill its gaps with reasons
+  6 adopt   adopt                         bring it into the project; updates then watches it
   also: import (a report from a cloud chat), updates, show, site, check
 star threshold: 50, or $GITHUB_SCOUT_MIN_STARS
 
@@ -194,8 +196,8 @@ def cmd_import(args):
 
 def cmd_brief(args):
     path = brief(_store(args), args.ref, Path(args.out).expanduser() if args.out else None)
-    print(f"{path}\nhand this file to the coding agent, which adopts it with the github-scout-adopt skill; "
-          "nothing in the project was changed")
+    print(f"{path}\nhand this report to the project's coding agent: when the user asks, it tries the repos under Try first "
+          "and chooses one (github-scout-dig), then adopts it (github-scout-adopt); nothing in the project was changed")
 
 
 def cmd_init(args):
@@ -849,11 +851,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--q", required=True, metavar="P/Q", help="the question the report answers")
     p.add_argument("--note", help="where the report came from, e.g. 'ChatGPT Pro 2026-10-17'")
 
-    p = add("brief", cmd_brief, "turn an answered question into a hand-off for the coding agent (changes nothing)")
+    p = add("brief", cmd_brief, "turn an answered question into the report for the coding agent: what exists, what to "
+            "try first and how (changes nothing)")
     p.add_argument("ref", metavar="P/Q")
     p.add_argument("--out", help="output file (default <store>/projects/<p>/briefs/<q>.md)")
 
-    p = add("adopt", cmd_adopt, "record a repo brought into a project (stage 6): how, into which of our paths, from "
+    p = add("adopt", cmd_adopt, "record a repo brought into a project (stage 6, the coding agent): how, into which of our paths, from "
             "which of theirs, at which commits; updates then watches those files")
     p.add_argument("repo", help="owner/repo or an alias; it needs a card")
     p.add_argument("--q", required=True, metavar="P/Q", help="the question whose brief it came from")

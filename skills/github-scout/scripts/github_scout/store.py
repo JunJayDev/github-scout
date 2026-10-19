@@ -74,7 +74,9 @@ CARD_ORDER = ["id", "repo", "kind", "form", "summary", "license", "stars",  # li
               "reviewed", "level", "results", "watch", "aliases", "uses", "adopted"]
 QUESTION_ORDER = ["id", "project", "ask", "stage", "status", "langs", "entities", "mechanisms", "forms", "problems",
                   "topics", "backbone", "alternate", "picked", "scanned"]
-# Answer sections a check or a brief looks for, in both template languages.
+# Answer sections a check or a brief looks for, in both template languages. A report (2026-10-19) names the repos
+# to try first; answers from 2026-10-18 named a backbone, which the coding agent now sets after trying.
+TRY_TITLES = ("Try first", "先试")
 BACKBONE_TITLES = ("Backbone", "主干")
 PROJECT_ORDER = ["id", "name", "summary", "code", "stack", "constraints", "languages"]
 
@@ -590,18 +592,19 @@ class Store:
 
     # -- validation ------------------------------------------------------
     def _reference_warnings(self, r: str, d: dict, pid: str, qid: str) -> list[str]:
-        """For an answer that names a backbone: the backbone and the alternate were tried, and every repo it relies on
-        has results to look at and enough stars, or a written reason. Answers without `backbone:` are left alone."""
+        """Every repo a report names to try first (`picked`) has a verifiable effect and enough stars, or a written
+        reason. A backbone and an alternate, set by the coding agent after trying, were also tried. A report is not
+        asked for a backbone or for trials: trying and choosing come after it."""
         def slug(key: str) -> str | None:
             v = d.get(key)
             return v if isinstance(v, str) and SLUG.match(v) else None
 
         backbone, alternate = slug("backbone"), slug("alternate")
-        if not backbone:
+        if not (backbone or as_list(d.get("picked"))):
             return []
         limit = min_stars()
         out = []
-        for s in dict.fromkeys([backbone, *([alternate] if alternate else []), *map(str, as_list(d.get("picked")))]):
+        for s in dict.fromkeys(x for x in (backbone, alternate, *map(str, as_list(d.get("picked")))) if x):
             role = "backbone" if s == backbone else "alternate" if s == alternate else "picked"
             card = self.card(s)
             if not card or card.error:
@@ -664,9 +667,9 @@ class Store:
                 errors.append(f"{r}: scanned must be YYYY-MM-DD")
             errors += [f"{r}: {key} must be one repository, owner/repo" for key in ("backbone", "alternate")
                        if d.get(key) is not None and not (isinstance(d[key], str) and SLUG.match(d[key]))]
-            if d.get("status") == "answered" and not d.get("backbone") and section(doc.body, BACKBONE_TITLES) == "":
-                warns.append(f"{r}: answered without a backbone: name the repo the answer follows (backbone:), "
-                             "or say under Backbone why none qualifies")
+            if d.get("status") == "answered" and not as_list(d.get("picked")) and section(doc.body, TRY_TITLES) == "":
+                warns.append(f"{r}: answered without repos to try first: name 2-3 under Try first and in picked:, "
+                             "or say there why none qualifies")
             warns += self._reference_warnings(r, d, pid, qid)
         seen_ids: dict[str, Path] = {}
         for doc in self.cards():

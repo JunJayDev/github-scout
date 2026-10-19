@@ -26,6 +26,25 @@ QUESTION = {
 }
 
 
+# The answer as the question template wrote it on 2026-10-18 (a backbone and its gaps): such answers still brief.
+OLD_ANSWER = {
+    "en": "\n## Answer\n(The deliverable: one repo to follow as a whole.)\n\n### In one paragraph\n(Which repo.)\n\n"
+          "### Backbone\n(The repo we follow.)\n\n### Gaps to fill\n| what the backbone lacks | filled from | why |\n|---|---|---|\n\n"
+          "### Trial runs\n(Each repo tried.)\n\n### Against what we have\n| we have | the backbone does | difference | take it? |\n"
+          "|---|---|---|---|\n\n### Next steps in our project\n\n### Not adopted\n(Ideas we did not take.)\n\n",
+    "zh": "\n## 答案\n（交付物：整套照做的一个仓库。）\n\n### 一段话结论\n（照哪个仓库做。）\n\n### 主干\n（整套照做的那个仓库。）\n\n"
+          "### 补什么\n| 主干缺什么 | 从哪补 | 为什么 |\n|---|---|---|\n\n### 试跑记录\n（每个试过的仓库。）\n\n"
+          "### 和我们已有的对照\n| 我们已有 | 主干的做法 | 差在哪 | 拿不拿 |\n|---|---|---|---|\n\n### 我们接下来改什么\n\n"
+          "### 没采用\n（别家的思路。）\n\n",
+}
+
+
+def old_answer(doc, lang: str = "en") -> None:
+    """Put the 2026-10-18 answer sections in place of the report's."""
+    start, end = ("\n## Answer\n", "\n## Searched\n") if lang == "en" else ("\n## 答案\n", "\n## 搜过哪些\n")
+    doc.body = doc.body[:doc.body.index(start)] + OLD_ANSWER[lang] + doc.body[doc.body.index(end) + 1:]
+
+
 def ago(months: float) -> str:
     return (dt.date.today() - dt.timedelta(days=int(months * 30.4))).isoformat() + "T00:00:00Z"
 
@@ -196,8 +215,10 @@ class StoreTests(Base):
     def test_question_template_carries_the_stage(self):
         body = self.store.question("ops/browser-ops").body
         self.assertIn("Stage: working (it works: borrow techniques", body)
-        for heading in ("## What good looks like", "### Backbone", "### Gaps to fill", "### Trial runs", "### Not adopted"):
+        for heading in ("## What good looks like", "### In one paragraph", "### Candidates", "### Try first",
+                        "### Not recommended", "### Trials and choice"):
             self.assertIn(heading, body)
+        self.assertNotIn("### Backbone", body)                          # the coding agent chooses, after the report
         self.assertNotIn("### Ideas worth taking", body)
         self.assertIn("50+ stars", body)
         self.assertEqual((self.store.question("ops/browser-ops").data["backbone"], self.store.check()[0]), (None, []))
@@ -274,11 +295,11 @@ class ChineseStoreTests(Base):
     def test_chinese_templates(self):
         body = self.store.question("ops/browser-ops").body
         self.assertIn("阶段：working（已经能用：借技巧", body)
-        for heading in ("## 好的结果长什么样", "### 主干", "### 补什么", "### 试跑记录", "### 没采用"):
+        for heading in ("## 好的结果长什么样", "### 候选", "### 先试这几个", "### 不推荐", "### 试跑和选定"):
             self.assertIn(heading, body)
         self.assertIn("50 星以上", body)
 
-    def test_chinese_brief_ends_with_the_adopt_section(self):
+    def test_chinese_brief_is_a_report(self):
         doc = self.store.question("ops/browser-ops")
         doc.body = doc.body.replace("### 一段话结论\n", "### 一段话结论\n读用 OpenCLI。\n")
         doc.data["picked"] = ["z/no-card"]
@@ -286,12 +307,18 @@ class ChineseStoreTests(Base):
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
-        self.assertIn("本身不改任何东西。用 github-scout-adopt skill 落地", text)
+        self.assertTrue(text.startswith("# GitHub scout 报告：Drive our logged-in sites from scripts\n"))
+        self.assertIn("github-scout 负责找、筛、写报告；试跑和选定由开发 agent 来做", text)
+        self.assertIn("## 给开发 agent：试跑、选定、落地", text)
+        self.assertIn('github-scout note z/no-card --q ops/browser-ops --take <use|adapt|learn|later|skip> '
+                      '--trial "<跑了什么、出来什么、花了多久>"', text)
         self.assertIn("\n## 落地和登记\n", text)
         self.assertIn("github-scout adopt z/no-card --q ops/browser-ops --mode <方式> --into <我们的路径> --from <他们的文件>", text)
+        self.assertIn("## 搜过哪些\n\n没有扫描记录", text)
 
     def test_chinese_brief_follows_the_backbone(self):
         doc = self.store.question("ops/browser-ops")
+        old_answer(doc, "zh")
         doc.body = doc.body.replace("### 主干\n", "### 主干\nd/tool：成片和目标最像，试跑 40 秒出片。\n")
         doc.body = doc.body.replace("### 补什么\n| 主干缺什么 | 从哪补 | 为什么 |\n|---|---|---|\n",
                                     "### 补什么\n| 主干缺什么 | 从哪补 | 为什么 |\n|---|---|---|\n| 字幕 | e/gap | 主干没有 |\n")
@@ -586,21 +613,40 @@ class FlowTests(Base):
         q = self.store.question("ops/xhs-read").data
         self.assertEqual((q["ask"], q["stage"]), ("Read Xiaohongshu notes from scripts", "prototype"))
 
-    def test_brief_packs_the_answer_for_the_coding_agent(self):
+    def test_brief_is_a_report_for_the_coding_agent(self):
+        """Owner, 2026-10-19: github-scout finds, filters and reports; the coding agent tries and chooses."""
+        self.seed()
+        self.run_cli("scan", "ops/browser-ops", "--quiet")
         doc = self.store.question("ops/browser-ops")
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertNotEqual(code, 0)                                  # no answer yet
-        doc.body = doc.body.replace("### In one paragraph\n", "### In one paragraph\nUse OpenCLI for reads.\n")
-        doc.body = doc.body.replace("### Next steps in our project\n", "### Next steps in our project\n1. Pin OpenCLI 1.8.\n")
-        doc.data["picked"] = ["jackwener/OpenCLI"]
+        self.seed_repo_files()
+        code, _, err = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
+                                    "--results", "https://opencli.info/", "--note", "one JSON command per site")
+        self.assertEqual(code, 0, err)
+        for heading, text in (("In one paragraph", "OpenCLI reads all three sites; posting is left to build."),
+                              ("Candidates", "| repo | kind | stars |\n|---|---|---|\n| jackwener/OpenCLI | cli | 30k |"),
+                              ("Try first", "1. jackwener/OpenCLI: run `opencli reddit hot`; look for JSON with ids."),
+                              ("Not recommended", "- xpzouying/xiaohongshu-mcp: one site only.")):
+            doc.body = re.sub(rf"(\n### {heading}\n)(?:\(.*\)\n|\|.*\|\n\|[-|]+\|\n)?",
+                              lambda m, text=text: m.group(1) + text + "\n", doc.body, count=1)
+        doc.data.update(status="answered", picked=["jackwener/OpenCLI"])
         self.store.save_question(doc)
+        mine = [w for w in self.store.check()[1] if "questions/browser-ops.md" in w and "vocabulary" not in w]
+        self.assertEqual(mine, [])                                    # no backbone and no trial asked of a report
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
-        self.assertIn("# Brief for the coding agent:", text)
-        self.assertIn("1. Pin OpenCLI 1.8.", text)
-        self.assertIn("Project code: /src/ops", text)
-        self.assertIn("[jackwener/OpenCLI](https://github.com/jackwener/OpenCLI)", text)
+        order = ["# GitHub scout report: Drive our logged-in sites", "github-scout found the candidates, filtered them",
+                 "## Goal and where we stand", "Project code: /src/ops", "## In one paragraph", "OpenCLI reads all three",
+                 "## Candidates", "| jackwener/OpenCLI | cli | 30k |", "## Try first", "run `opencli reddit hot`",
+                 "## Sources", "| [jackwener/OpenCLI](https://github.com/jackwener/OpenCLI) | try first | use | 30000 | "
+                 "strong: [1](https://opencli.info/) |", "## For the coding agent: try, choose, adopt",
+                 "github-scout note jackwener/OpenCLI --q ops/browser-ops --take <use|adapt|learn|later|skip> --trial",
+                 "## Adopt and record", "## Not recommended (leave these out)", "- xpzouying/xiaohongshu-mcp: one site",
+                 "## What was searched", "repos kept.", "Star threshold 50, relaxed where a direction had under 5"]
+        self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
+        self.assertNotIn("## Backbone", text)
 
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed()
@@ -812,9 +858,9 @@ class AdoptTests(Base):
         code, out, _ = self.run_cli("brief", "ops/browser-ops")
         self.assertEqual(code, 0, out)
         text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
-        self.assertIn("by itself it changes nothing. Adopt it with the github-scout-adopt skill", text)
-        tail = text.split("\n## Adopt and record\n", 1)[1]
-        self.assertNotIn("\n## ", tail)                                      # the closing section
+        self.assertIn("the github-scout-dig skill, then github-scout-adopt", text)
+        tail = text.split("\n## Adopt and record\n", 1)[1].split("\n## What was searched\n")[0]
+        self.assertNotIn("\n## ", tail)
         self.assertEqual([ln for ln in tail.splitlines() if ln.startswith("github-scout adopt ")], [
             "github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode <mode> --into tools --from <their files>",
             "github-scout adopt z/no-card --q ops/browser-ops --mode <mode> --into <our paths> --from <their files>   "
@@ -1033,6 +1079,10 @@ class QualityGateTests(Base):
         self.assertEqual(self.store.ledger()[-1]["reason"], "trial: no install")   # no card: the trial goes in the ledger
 
     def test_check_holds_the_backbone_to_the_gates(self):
+        """A backbone is set by the coding agent after trying; check then holds it to the gates."""
+        doc = self.store.question("ops/browser-ops")
+        old_answer(doc)
+        self.store.save_question(doc)
         self.card("d/tool", 300)                                          # read, no results
         self.card("e/gap", 12, take="learn", results=["https://example.com/e"])
         self.card("f/alt", 900, level="trial", results=["https://example.com/f"])
@@ -1051,18 +1101,21 @@ class QualityGateTests(Base):
         errors = self.store.check()[0]
         self.assertIn("projects/ops/questions/browser-ops.md: backbone must be one repository, owner/repo", errors)
         self.assertIn("projects/ops/questions/browser-ops.md: alternate must be one repository, owner/repo", errors)
-        registry.new_question(self.store, "ops/empty", "Answered with nothing under Backbone", "idea")
+        registry.new_question(self.store, "ops/empty", "Answered with nothing under Try first", "idea")
         doc = self.store.question("ops/empty")
         doc.data["status"] = "answered"
         self.store.save_question(doc)
-        self.assertIn("projects/ops/questions/empty.md: answered without a backbone: name the repo the answer follows "
-                      "(backbone:), or say under Backbone why none qualifies", self.store.check()[1])
+        self.assertIn("projects/ops/questions/empty.md: answered without repos to try first: name 2-3 under Try first "
+                      "and in picked:, or say there why none qualifies", self.store.check()[1])
         card = self.store.card("f/alt")
         card.data["results"] = ["javascript:alert(1)"]
         self.store.save_card(card)
         self.assertIn("repos/f__alt.md: results are links (http or https): javascript:alert(1)", self.store.check()[0])
 
     def test_brief_follows_the_backbone_and_leaves_the_rest_in_an_appendix(self):
+        doc = self.store.question("ops/browser-ops")                    # an answer written on 2026-10-18
+        old_answer(doc)
+        self.store.save_question(doc)
         self.card("d/tool", 300, level="trial", results=["https://example.com/d/gallery"], where="tools/video")
         self.card("e/gap", 12, take="learn", results=["https://example.com/e"], low_stars="official org")
         self.answered({"What good looks like": "The three films at https://example.com/target.",
@@ -1084,7 +1137,7 @@ class QualityGateTests(Base):
         self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
         self.assertNotIn("## Why: the ideas behind it", text)
         self.assertNotIn("## Against what we have", text)                  # left empty: no section
-        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | [1](https://example.com/d/gallery) | "
+        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | strong: [1](https://example.com/d/gallery) | "
                       "trial | abcdef123456 | n |", text)
         self.assertIn("| [f/alt](https://github.com/f/alt) | alternate | - | - | - | - | - | - |", text)
         self.assertIn("| [e/gap](https://github.com/e/gap) | fills a gap | learn | 12 (official org) |", text)

@@ -40,32 +40,26 @@ Stage: {stage} ({stage_help})
 (2-3 finished results we want to match, as links, or checks anyone can run on an output. Every candidate is judged against these.)
 
 ## Answer
-(The deliverable: one repo to follow as a whole, and what fills its gaps. A repo qualifies with results to look at, {stars}+ stars and a trial that ran.)
+(The deliverable is a report for the coding agent: what exists, and the two or three to try first and how. github-scout does not try or choose; the coding agent does, when the user asks. A repo qualifies with a verifiable effect (a live site, a package with downloads, screenshots, videos, posts outside the repo) and {stars}+ stars, or the relaxed floor of its direction.)
 
 ### In one paragraph
-(Which repo to follow and why; what fills its gaps; what is left to build. Or "nothing qualifies, so we build it, because ...".)
+(What exists; which 2-3 look most promising for us and why; what is likely left to build. Or "nothing qualifies, so we build it, because ...".)
 
-### Backbone
-(The repo we follow as a whole, and at most one alternate. Why it passed: its results (links), its stars, our trial.)
+### Candidates
+| repo | kind | stars | last push | verifiable effect | what it does for our goal | how it relates to our project |
+|---|---|---|---|---|---|---|
 
-### Gaps to fill
-| what the backbone lacks | filled from | why |
-|---|---|---|
+### Try first
+(The 2-3 to try, each: how to try it (open its live site, run its own smallest example, or one short task from our project) and what to look for against what good looks like. Their names go in picked:.)
 
-### Trial runs
-(Each repo tried: what we ran, what came out, how long; where we stopped.)
+### Not recommended
+(One line each, with the reason.)
 
-### Against what we have
-| we have | the backbone does | difference | take it? |
-|---|---|---|---|
-
-### Next steps in our project
-
-### Not adopted
-(Ideas from other repos we did not take, one line each, with the reason. The coding agent leaves them out.)
+### Trials and choice
+(Written by the coding agent after trying: what ran, what came out, how long; the one repo to follow as a whole (backbone:), at most one alternate, and what fills its gaps, each with a reason.)
 
 ## Searched
-(Scans are in scans/{project}/{id}/. Note the web and X pass here.
+(Scans are in scans/{project}/{id}/; the brief adds their coverage and any relaxed star threshold. Note the web and X pass here.
 Vocabulary, in the frontmatter: every entity and mechanism group needs a term in each language of `langs`,
 in the words those users actually write, not a translation: "xiaohongshu|小红书|xhs|红书",
 "humanizer|去AI味|活人感|人味", "product video|宣传片|产品视频".)
@@ -83,7 +77,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 (Concrete steps or vague advice? What it costs to load?)
 
 ## What we take
-(The whole of it as our backbone, or the gap in the backbone it fills, with file paths.)
+(How it would serve our goal: the whole of it to follow, or the gap it fills, with file paths. The coding agent settles it after a trial.)
 
 ## Safety
 (Network calls, credential reads, self-update, broad permissions. "None found in <files>" is an answer.)
@@ -103,7 +97,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 (New and moving? Who uses it? Do maintainers answer issues?)
 
 ## What we take
-(The whole of it as our backbone, or the gap in the backbone it fills: how we run or adapt it, with file paths.)
+(How it would serve our goal: the whole of it to follow, or the gap it fills; how we run or adapt it, with file paths. The coding agent settles it after a trial.)
 
 ## Risks
 (Permissions, data it can reach, lock-in.)
@@ -135,32 +129,26 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （2–3 个想做到的成品（给链接），或者任何人都能拿产出去核对的标准。每个候选都拿这个比。）
 
 ## 答案
-（交付物：整套照做的一个仓库，加上补它缺口的东西。有能看的结果、{stars} 星以上、试跑跑通的仓库才算数。）
+（交付物是给开发 agent 的报告：现在有什么、先试哪两三个、怎么试。github-scout 不试跑、不选定；用户要时由开发 agent 来做。有可验证的效果（在线网站、有下载量的包、截图、视频、仓库外的帖子）、{stars} 星以上（或所在方向放宽后的下限）的仓库才算数。）
 
 ### 一段话结论
-（照哪个仓库做、为什么；缺口从哪补；还剩什么要自己做。或者「没有过关的，只能自己做，因为……」。）
+（现在有什么；哪两三个对我们最有希望、为什么；大概还剩什么要自己做。或者「没有过关的，只能自己做，因为……」。）
 
-### 主干
-（整套照做的那个仓库，最多再加一个备选。为什么过关：它的结果（链接）、星数、我们的试跑。）
+### 候选
+| 仓库 | 类型 | 星数 | 最近推送 | 可验证的效果 | 对目标有什么用 | 和我们项目的关系 |
+|---|---|---|---|---|---|---|
 
-### 补什么
-| 主干缺什么 | 从哪补 | 为什么 |
-|---|---|---|
+### 先试这几个
+（两三个，每个写：怎么试（打开它的在线网站、跑它自带的最小示例，或者拿我们项目里的一个小任务试），对照「好的结果长什么样」看什么。仓库名写进 picked:。）
 
-### 试跑记录
-（每个试过的仓库：跑了什么、出来什么、花了多久；在哪一步停下。）
+### 不推荐
+（一行一条，写清原因。）
 
-### 和我们已有的对照
-| 我们已有 | 主干的做法 | 差在哪 | 拿不拿 |
-|---|---|---|---|
-
-### 我们接下来改什么
-
-### 没采用
-（别家的思路，一行一条，写清为什么没用。开发 agent 不把这些加进来。）
+### 试跑和选定
+（开发 agent 试过之后写：跑了什么、出来什么、花了多久；整套照做的那一个（backbone:），最多一个备选，缺口从哪补、各自为什么。）
 
 ## 搜过哪些
-（扫描记录在 scans/{project}/{id}/；网页和 X 那一轮写在这里。
+（扫描记录在 scans/{project}/{id}/；简报会补上检索覆盖和放宽过的星数门槛。网页和 X 那一轮写在这里。
 词表写在开头的 frontmatter：每组实体和机制都要有 langs 里每种语言的词，写那种语言的用户真正在用的叫法，
 不是翻译：「xiaohongshu|小红书|xhs|红书」「humanizer|去AI味|活人感|人味」「product video|宣传片|产品视频」。）
 """,
@@ -177,7 +165,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （是具体步骤还是空泛建议？加载要多少 token？）
 
 ## 我们拿什么
-（整套当主干，还是补主干的哪个缺口；写到文件。）
+（它对目标有什么用：整套照做，还是补哪个缺口；写到文件。开发 agent 试跑后再定。）
 
 ## 安全
 （联网、读凭证、自动更新、要宽权限。没有就写「在哪些文件里没看到」。）
@@ -197,7 +185,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （新不新、更新勤不勤、谁在用、维护者回不回 issue。）
 
 ## 我们拿什么
-（整套当主干，还是补主干的哪个缺口：怎么直接用、怎么改了用，写到文件。）
+（它对目标有什么用：整套照做，还是补哪个缺口；怎么直接用、怎么改了用，写到文件。开发 agent 试跑后再定。）
 
 ## 风险
 （权限、能碰到的数据、锁定。）

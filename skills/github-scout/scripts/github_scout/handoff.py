@@ -5,14 +5,14 @@ registry. Only GitHub links are trusted; every one is checked against GitHub, an
 do not exist are listed, since a chat model may invent them. Table columns it recognises (kind,
 verdict, reason) ride along as notes.
 
-`brief`: an answered question becomes a hand-off for the agent that will change the code. It
-copies the answer's own sections (the backbone to follow, the gaps and where they are filled
-from, the trials) and adds the facts from the cards (role, take, stars, results, level,
-reviewed commit), so the coding agent gets what to change, why, and from where, without
-reading the registry. Answers written before the backbone are still read.
-It ends with one `github-scout adopt` line per repo to bring in, for the coding agent to fill in
-as it adopts (stage 6), so the registry learns which repo went where, and an appendix of what
-was left out. The brief itself changes nothing.
+`brief`: an answered question becomes the report for the project's coding agent (owner,
+2026-10-19: github-scout finds, filters and reports; the coding agent tries and chooses). It
+copies the answer's own sections (what exists, the candidates, the two or three to try first and
+how, what is not recommended), adds the facts from the cards (take, stars, verifiable effect,
+level, reviewed commit) and the coverage of the scans, and tells the coding agent how to try,
+choose one repo to follow and record both: one `github-scout note --trial` line and one
+`github-scout adopt` line per repo to try. Answers written on 2026-10-18 (a backbone, its gaps,
+the steps) and before (ideas worth taking) still brief as they did. The brief changes nothing.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .discover import slugs_in_text
-from .store import BACKBONE_TITLES, SLUG, Store, StoreError, as_list, section, today
+from .discover import merged, relaxed_text, slugs_in_text
+from .store import BACKBONE_TITLES, SLUG, TRY_TITLES, Store, StoreError, as_list, best_tier, min_stars, section, today
 
 # Column names a report may use, in English and Chinese.
 COLUMNS = {
@@ -241,6 +241,12 @@ SECTIONS = {
     "where": ("Where we are", "我们现在"),
     "good": ("What good looks like", "好的结果长什么样"),
     "summary": ("In one paragraph", "一段话结论"),
+    "candidates": ("Candidates", "候选"),
+    "try": TRY_TITLES,
+    "notrec": ("Not recommended", "不推荐"),
+    "choice": ("Trials and choice", "试跑和选定"),
+    "searched": ("Searched", "搜过哪些"),
+    # answers written on 2026-10-18 named a backbone and the steps
     "backbone": BACKBONE_TITLES,
     "gaps": ("Gaps to fill", "补什么"),
     "trials": ("Trial runs", "试跑记录"),
@@ -265,8 +271,8 @@ T = {
         "gaps": "## Gaps to fill", "trials": "## Trial runs",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
-        "repos": "## Sources", "head": "| repo | role | take | stars | results | level | reviewed at | what we take |",
-        "roles": {"backbone": "backbone", "alternate": "alternate", "gap": "fills a gap"}, "none": "none",
+        "repos": "## Sources", "head": "| repo | role | take | stars | verifiable effect | level | reviewed at | what we take |",
+        "roles": {"backbone": "backbone", "alternate": "alternate", "gap": "fills a gap", "try": "try first"}, "none": "none",
         "skipped": "## Not adopted (leave these out)",
         "empty": "(the answer has no such section yet)", "noanswer": "{ref} has no answer yet: write its answer section first",
         "adopt": "## Adopt and record",
@@ -281,6 +287,29 @@ T = {
         "mode": "<mode>", "whole": "<depend|skill|tool>", "gap": "<the gap in the backbone it fills>",
         "into": "<our paths>", "src": "<their files>", "repo": "<owner/repo>",
         "nocard": "# no card yet: github-scout note {repo} --q {ref} first",
+        # the report (2026-10-19)
+        "rtitle": "GitHub scout report: {ask}",
+        "rrule": "This report only advises; by itself it changes nothing. github-scout found the candidates, filtered them "
+                 "and wrote this. Trying them and choosing one to follow are the coding agent's work, and only when the "
+                 "user asks: the github-scout-dig skill, then github-scout-adopt.",
+        "summary": "## In one paragraph", "candidates": "## Candidates", "try": "## Try first",
+        "howto": "## For the coding agent: try, choose, adopt",
+        "howto_text": "1. Try each repo under Try first, outside the project: a throwaway directory or a container, with no "
+                      "tokens or keys in the environment; read install scripts and hooks before running them. Minutes, "
+                      "not hours: stop at the first wall (an install that fails, a key we do not have, output far from "
+                      "what good looks like) and note where.\n"
+                      "2. Record every trial, the failures too, with the lines below.\n"
+                      "3. Choose one main reference, the one whose trial worked and whose output comes closest to what "
+                      "good looks like, and follow it as a whole; at most one alternate. Fill its gaps from other repos "
+                      "only with a reason each: what is missing, where it comes from, why. Set `backbone:` (and "
+                      "`alternate:`) in the question file and write the choice under Trials and choice.\n"
+                      "4. Bring it in by the project's own rules and record each repo you took from (Adopt and record).",
+        "trial": "<what ran, what came out, how long>", "takes": "<use|adapt|learn|later|skip>",
+        "choice": "## Trials and choice", "notrec": "## Not recommended (leave these out)",
+        "searched": "## What was searched",
+        "coverage": "{searches} searches in {scans} scan(s) (scans/{ref}/), {repos} repos kept.",
+        "relaxed": "Star threshold {limit}, relaxed where a direction had under 5 repos at {limit}+: {text}.",
+        "noscan": "No scan recorded (an imported report, or an answer written by hand).",
     },
     "zh": {
         "title": "给开发 agent 的简报：{ask}", "from": "来自 github-scout 问题 `{ref}`（{path}），{date}。",
@@ -293,8 +322,8 @@ T = {
         "gaps": "## 补什么", "trials": "## 试跑记录",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",
-        "repos": "## 参考仓库", "head": "| 仓库 | 角色 | 取舍 | 星数 | 结果 | 看到哪一步 | 审查时的版本 | 我们拿什么 |",
-        "roles": {"backbone": "主干", "alternate": "备选", "gap": "补缺口"}, "none": "没有",
+        "repos": "## 参考仓库", "head": "| 仓库 | 角色 | 取舍 | 星数 | 可验证的效果 | 看到哪一步 | 审查时的版本 | 我们拿什么 |",
+        "roles": {"backbone": "主干", "alternate": "备选", "gap": "补缺口", "try": "先试"}, "none": "没有",
         "skipped": "## 没采用（不要加进来）",
         "empty": "（答案里还没有这一节）", "noanswer": "{ref} 还没有答案：先写问题文件里的答案",
         "adopt": "## 落地和登记",
@@ -307,6 +336,25 @@ T = {
         "mode": "<方式>", "whole": "<depend|skill|tool>", "gap": "<补主干的哪个缺口>",
         "into": "<我们的路径>", "src": "<他们的文件>", "repo": "<owner/repo>",
         "nocard": "# 还没有卡片：先运行 github-scout note {repo} --q {ref}",
+        "rtitle": "GitHub scout 报告：{ask}",
+        "rrule": "这份报告只给建议，本身不改任何东西。github-scout 负责找、筛、写报告；试跑和选定由开发 agent 来做，"
+                 "而且只在用户要时做：先用 github-scout-dig skill，再用 github-scout-adopt。",
+        "summary": "## 一段话结论", "candidates": "## 候选", "try": "## 先试这几个",
+        "howto": "## 给开发 agent：试跑、选定、落地",
+        "howto_text": "1. 在项目外试「先试这几个」里的每个仓库：用临时目录或容器，环境里不放 token 和密钥；运行前先读安装脚本"
+                      "和 hook。几分钟，不是几小时：碰到第一堵墙（装不上、要我们没有的密钥、出来的东西离目标太远）就停，"
+                      "记下停在哪。\n"
+                      "2. 每次试跑都记下来，失败的也记，用下面的命令。\n"
+                      "3. 选一个主干：试跑跑通、产出最接近「好的结果长什么样」的那个，整套照做；最多一个备选。别的仓库只用来"
+                      "补主干的缺口，每处写清缺什么、从哪补、为什么。在问题文件里写 `backbone:`（和 `alternate:`），"
+                      "选定的理由写在「试跑和选定」。\n"
+                      "4. 按项目自己的规矩落地，拿过东西的每个仓库都登记（见「落地和登记」）。",
+        "trial": "<跑了什么、出来什么、花了多久>", "takes": "<use|adapt|learn|later|skip>",
+        "choice": "## 试跑和选定", "notrec": "## 不推荐（不要加进来）",
+        "searched": "## 搜过哪些",
+        "coverage": "{scans} 次扫描共 {searches} 次检索（scans/{ref}/），保留 {repos} 个仓库。",
+        "relaxed": "星数门槛 {limit}；{limit} 星以上不到 5 个仓库的方向放宽了：{text}。",
+        "noscan": "没有扫描记录（导入的报告，或者手写的答案）。",
     },
 }
 
@@ -316,30 +364,49 @@ def _flat(v, limit: int = 220) -> str:
     return str(v or "").replace("|", "/").replace("\n", " ")[:limit]
 
 
+def _coverage(store: Store, q: dict, t: dict) -> list[str]:
+    """What the question's scans searched, and the directions whose star threshold was relaxed."""
+    try:
+        scan = merged(store, q["project"], q["id"])
+    except StoreError:
+        return [t["noscan"]]
+    lines = [t["coverage"].format(searches=len(scan["searches"]), scans=scan.get("scans", 1),
+                                  ref=f"{q['project']}/{q['id']}", repos=len(scan["candidates"]))]
+    if relaxed_text(scan):
+        lines += ["", t["relaxed"].format(limit=min_stars(), text=relaxed_text(scan))]
+    return lines
+
+
 def brief(store: Store, ref: str, out: Path | None = None) -> Path:
     doc = store.question(ref)
     q = doc.data
     t = T[store.lang]
     raw = {k: section(doc.body, v) for k, v in SECTIONS.items()}
     parts = {k: v or "" for k, v in raw.items()}
-    if not (parts["summary"] or parts["backbone"] or parts["ideas"] or parts["next"]):
+    if not any(parts[k] for k in ("summary", "candidates", "try", "backbone", "ideas", "next")):
         raise StoreError(t["noanswer"].format(ref=ref))
+    report = raw["try"] is not None or raw["backbone"] is None and raw["ideas"] is None   # else an older answer
     project = store.project(q["project"])
     code = (project.data.get("code") if project else "") or ""
-    lines = [f"# {t['title'].format(ask=q.get('ask', ''))}", "",
-             t["from"].format(ref=f"{q['project']}/{q['id']}", path=doc.path, date=today()), "", t["rule"], "",
+    ref = f"{q['project']}/{q['id']}"
+    lines = [f"# {t['rtitle' if report else 'title'].format(ask=q.get('ask', ''))}", "",
+             t["from"].format(ref=ref, path=doc.path, date=today()), "", t["rrule" if report else "rule"], "",
              t["goal"], "", t["code"].format(code=code) if code else t["nocode"], "", parts["where"] or t["empty"], ""]
     if parts["good"]:
         lines += [t["good"], "", parts["good"], ""]
-    if parts["summary"]:
+    if report:                               # what exists, what to try first and how; trying and choosing come after
+        lines += [t["summary"], "", parts["summary"] or t["empty"], ""]
+        for key in ("candidates", "try"):
+            lines += [t[key], "", parts[key] or t["empty"], ""]
+    elif parts["summary"]:
         lines += [parts["summary"], ""]
-    if raw["backbone"] is not None:          # one backbone, its gaps, the trials, then the steps
+    if not report and raw["backbone"] is not None:     # 2026-10-18: one backbone, its gaps, the trials, then the steps
         lines += [t["backbone"], "", t["follow"], "", parts["backbone"] or t["empty"], ""]
         for key in ("gaps", "trials", "compare"):
             if parts[key]:
                 lines += [t[key], "", parts[key], ""]
         lines += [t["steps"], "", parts["next"] or t["empty"], ""]
-    else:                                    # an answer from before the backbone: as it was
+    elif not report:                         # an answer from before the backbone: as it was
         lines += [t["steps"], "", parts["next"] or t["empty"], "", t["why"], "", parts["ideas"] or t["empty"], ""]
         for key in ("practice", "compare"):
             if parts[key]:
@@ -356,7 +423,7 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
 
     def role(slug: str) -> str:
         return t["roles"]["backbone"] if slug == backbone else t["roles"]["alternate"] if slug == alternate \
-            else t["roles"]["gap"] if backbone else "-"
+            else t["roles"]["try"] if report else t["roles"]["gap"] if backbone else "-"
 
     if sources:
         lines += [t["repos"], "", t["head"], "|---|---|---|---|---|---|---|---|"]
@@ -369,14 +436,21 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
             stars = "-" if d.get("stars") is None else str(d["stars"]) + (f" ({_flat(use['low_stars'], 80)})"
                                                                          if use.get("low_stars") else "")
             res = [str(x).replace("|", "%7C") for x in as_list(d.get("results"))]
-            shown = " ".join(f"[{i}]({u})" for i, u in enumerate(res[:4], 1)) + (f" +{len(res) - 4}" if len(res) > 4 else "")
+            shown = f"{best_tier(res, card.id)}: " + " ".join(f"[{i}]({u})" for i, u in enumerate(res[:4], 1)) \
+                + (f" +{len(res) - 4}" if len(res) > 4 else "")
             if not res:
                 shown = f"{t['none']}: {_flat(use['no_results'], 80)}" if use.get("no_results") else "-"
             lines.append(f"| [{card.id}](https://github.com/{card.id}) | {role(slug)} | {use.get('take', '-')} | {stars} | "
                          f"{shown} | {d.get('level', '-')} | {d.get('commit', '-')} | {_flat(use.get('note') or d.get('summary'))} |")
         lines.append("")
+    if report:                               # the coding agent's part: try, record, choose
+        lines += [t["howto"], "", t["howto_text"], "", "```bash"]
+        lines += [f"github-scout note {(cards[s].id if cards.get(s) else s)} --q {ref} --take {t['takes']} "
+                  f"--trial \"{t['trial']}\"" for s in adopt or [t["repo"]]]
+        lines += ["```", ""]
+        if parts["choice"]:
+            lines += [t["choice"], "", parts["choice"], ""]
     # Stage 6 happens in the project: one line per repo to bring in, for the coding agent to fill in and run.
-    ref = f"{q['project']}/{q['id']}"
     lines += [t["adopt"], "", t["adopt_how"], "", "```bash"]
     for slug in adopt or [""]:
         card = cards.get(slug)
@@ -387,7 +461,11 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
                 f"--into {into} --from {t['src']}" + (f" --note \"{t['gap']}\"" if backbone and slug != backbone else ""))
         lines.append(line + (f"   {t['nocard'].format(repo=slug, ref=ref)}" if slug and not card else ""))
     lines += ["```", ""]
-    if parts["skipped"]:                     # the appendix: what was weighed and left out
+    if report:                               # what was weighed and left out, and how far the search went
+        if parts["notrec"]:
+            lines += [t["notrec"], "", parts["notrec"], ""]
+        lines += [t["searched"], "", *([parts["searched"], ""] if parts["searched"] else []), *_coverage(store, q, t), ""]
+    elif parts["skipped"]:                   # the appendix: what was weighed and left out
         lines += [t["skipped"], "", parts["skipped"], ""]
     path = out or store.root / "projects" / q["project"] / "briefs" / f"{q['id']}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
