@@ -4,6 +4,43 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- Report first (owner, 2026-10-19). github-scout finds, filters and reports; trying the
+  candidates and choosing the one to follow are the project's coding agent's work, after the
+  report and only when the user asks.
+  - Stages: 1 plan, 2 search, 3 triage, 4 brief (the report), then the coding agent's 5 dig (try
+    the two or three, choose one main reference, fill its gaps with a reason each) and 6 adopt.
+    The skill names stay, so installs keep working; their descriptions, stage numbers and text
+    changed. The cloud file leaves out dig as it leaves out adopt: a chat ends with the report.
+  - The report (`brief`, and section 4 of the cloud report): the goal and what good looks like;
+    one paragraph on what exists, the two or three most promising and why, what is likely left to
+    build; a candidate table (repo, kind, stars, last push, verifiable effect, what it does for our
+    goal, how it relates to our project); Try first, with how to try each and what to look for;
+    what the coding agent does next, with one `note --trial` line and one `adopt` line per repo;
+    Not recommended; what was searched, with the scans' coverage and every relaxed threshold.
+  - The question template's answer has those sections and Trials and choice, for the coding
+    agent. `picked:` is the try-first list; `backbone:` and `alternate:` are optional, set by the
+    coding agent. Answers written on 2026-10-18 (Backbone, Gaps to fill) and before still brief
+    as they did. `check` no longer asks a report for a backbone or trials; it holds the repos to
+    try to the effect and star gates, and asks a backbone the coding agent set to have been tried.
+- Stars per direction (owner, 2026-10-19). For each entity or mechanism group, the maintained
+  repos at 50+ stars whose own words name it are counted; under 5, that group's rows are shown
+  down to 20 stars, and under 5 again down to 10, never lower. The scan header says which
+  (`relaxed (...): stroke order to 20 stars (only 3 at 50+)`), rows carry `relaxed: <group>`, and
+  the saved scan records `relaxed` and each row's `floor`. `pick`, `note` and `import` take such
+  rows without `--low-stars` and record the relaxation as the reason; under the floor still needs
+  one. Only floors under the threshold apply (`GITHUB_SCOUT_MIN_STARS=5` relaxes nothing).
+- Verifiable effect instead of results (owner, 2026-10-19). Most projects show their results
+  outside the repo, and `look` counted only video links and words like demo, and skipped README
+  screenshots. Now it grades: strong (the homepage or a README demo link answers one short
+  request, an npm package has 100+ downloads last month, the scan recorded 100+ skills.sh
+  installs), mid (images, GIFs and videos in the README, badges, logos and icons left out), weak
+  (only text). The requests carry no token. `note --results` takes any link; `use`, `adapt` and
+  `learn` need a mid or strong one (posts on X, Bilibili, YouTube, blogs, Xiaohongshu count as
+  mid; the repo's own text pages are weak) or `--no-results "why"`. `show`, `brief` and the site
+  say "verifiable effect"; the flags keep their names. Cards get a "Verifiable effect and trial"
+  section; trials still go into "Results and trial" on older cards. `look --json` gives `effect`
+  in place of `result_links`.
+
 - Fixes from a review on 2026-10-19, each reproduced first.
   - `updates` compares against the repo's current default branch, and says when it moved
     (`default branch master -> main`); before, a renamed branch broke the compare for good and

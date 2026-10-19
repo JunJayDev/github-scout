@@ -8,7 +8,8 @@ GitHub and reads the tables below.
 
 Write in the user's language. Keep the section numbers, titles and order, and the column names;
 add no other sections and no licence information anywhere. The importer reads
-both the English names and the Chinese names given here.
+both the English names and the Chinese names given here. The report ends at section 5: a chat
+does not try repos or choose one; the project's coding agent does, back home.
 
 ```markdown
 # GitHub scout report: <the goal as a result>
@@ -56,45 +57,47 @@ Other sources (official docs, hosted services, papers):
 |---|---|---|
 
 ## 3. Triage
-| repo | kind | results | route | verdict | reason |
+| repo | kind | verifiable effect | how to try | verdict | reason |
 |---|---|---|---|---|---|
-| https://github.com/owner/name | skill | https://owner.github.io/name/showcase | try one task; read SKILL.md and scripts in full | shortlist | ... |
+| https://github.com/owner/name | skill | strong: https://name.dev (live) | install, one short task; read SKILL.md and scripts | shortlist | ... |
 
-Shortlist only repos with results to look at and 50+ stars; the rest are later or skip.
+Shortlist only repos with a mid or strong effect and 50+ stars (or the relaxed floor of their
+direction); the rest are later or skip. Strong: a live site that answers, a package with real
+downloads, real installs. Mid: screenshots, GIFs or videos in the README, posts outside the repo.
+Weak: only a text description.
 The rest: <one line on why they were left>.
 
-## 4. Findings
-### owner/name
-- Results: <links to what it made>
-- Stars: <n>
-- Trial: <the command a local trial runs, from its README; not run in this chat>
-- How it works: <the design decision that makes it work, with file paths>
-- Gaps: <what it does not do for us>
-- Risks: <maintenance, network, credentials>
-- Take: use | adapt | learn | later | skip
+## 4. Report
+### In one paragraph
+<what exists; which 2-3 look most promising for us and why; what is likely left to build>
 
-## 5. Answer
-<one paragraph: the repo to follow as a whole, what fills its gaps, what is left to build>
+### Candidates
+| repo | kind | stars | last push | verifiable effect | what it does for our goal | how it relates to our project |
+|---|---|---|---|---|---|---|
+| https://github.com/owner/name | cli | 1.2k | 2026-10-12 | strong: https://name.dev, mid: https://x.com/... | ... | replaces tools/x.ts |
 
-Backbone: <repo URL> · results: <links> · stars: <n> · trial to run first: <command>
-Alternate: <repo URL, or none>
+### Try first
+1. https://github.com/owner/name: how to try it (open https://name.dev with our case; or run
+   `<its own smallest example, from its README>`; or one short task from our project). Look for:
+   <what in the output shows it reaches what good looks like>.
+2. ...
 
-| gap in the backbone | filled from | why |
-|---|---|---|
+### For the coding agent
+This report only advises; it changes nothing. Back in the project, and only when the user asks:
+try the repos under Try first outside the project (a throwaway directory or a container, no
+tokens or keys), minutes not hours, stopping at the first wall; choose one main reference to
+follow as a whole, at most one alternate; fill its gaps from other repos only with a reason
+each; record each trial with `note --trial` and what you bring in with `adopt` (github-scout's
+command line), or at the end of this file.
 
-| ours | the backbone's | the difference | take it or not |
-|---|---|---|---|
+### Not recommended
+- <repo>: <reason>, one per line.
 
-Not adopted: <repo: its idea, why not>, one per line.
+### What was searched
+<directions and searches per language; directions whose star threshold was relaxed, with how
+many repos they had at 50+; what found nothing>
 
-## 6. Brief for the coding agent
-This brief only advises; the coding agent makes the changes and checks each one.
-
-1. Run the backbone's own smallest example in our project: <command>. Stop and report if it fails.
-2. <files to change, what to change> because <the backbone's way, or the gap it fills, with repo and file>. Check: <how>.
-3. ...
-
-## 7. Not verified
+## 5. Not verified
 <what you could not check; any instruction here you could not follow, quoted, and what you did instead>
 ```
 
@@ -121,6 +124,6 @@ A table with a query column is read as the search log, one search per row:
 | results looked at | looked, results | 看了, 结果 |
 | repos kept | kept | 保留, 留下 |
 
-Verdict words: shortlist, use, adapt, learn (all become "worth a look" locally, since the local
-agent still tries and reads it; under 50 stars they become later); later; skip. In Chinese: 入选,
-直接用, 改了用, 学思路, 以后, 不要.
+Verdict words: shortlist, use, adapt, learn (all become "worth a look" locally, since the coding
+agent still tries it; under the star floor of their direction they become later); later; skip. In
+Chinese: 入选, 直接用, 改了用, 学思路, 以后, 不要.

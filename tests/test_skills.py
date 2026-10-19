@@ -37,11 +37,11 @@ class SkillFormatTests(unittest.TestCase):
         r = subprocess.run([sys.executable, str(ROOT / "tools" / "build-cloud.py"), "--check"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    def test_cloud_file_leaves_adopting_to_the_local_agent(self):
+    def test_cloud_file_leaves_trying_and_adopting_to_the_local_agent(self):
         text = (ROOT / "cloud" / "github-scout.md").read_text(encoding="utf-8")
-        self.assertNotIn("github-scout-adopt", text)                 # stage 6 changes the project: never a chat's
-        self.assertNotIn("github-scout adopt", text)
-        self.assertEqual(text.count("coding agent adopts the brief"), 1)
+        for name in ("github-scout-adopt", "github-scout adopt", "github-scout-dig", "GitHub scout: dig"):
+            self.assertNotIn(name, text)                             # stages 5 and 6 run code: never a chat's
+        self.assertEqual(text.count("the project's coding agent tries the repos under Try first"), 1)
         import importlib.util
         spec = importlib.util.spec_from_file_location("build_cloud", ROOT / "tools" / "build-cloud.py")
         build = importlib.util.module_from_spec(spec)

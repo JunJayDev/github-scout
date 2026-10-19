@@ -50,9 +50,9 @@ mechanisms: ["programmatic video|代码做视频", "html to video"]
 forms: [skill, library]
 problems: ["agent video editing", "AI 视频 剪辑"]
 topics: []
-backbone: heygen-com/hyperframes   # the one repo the answer follows as a whole
-alternate: null                    # at most one fallback, tried as well
-picked: [heygen-com/hyperframes]   # repos the answer relies on: the backbone, then what fills its gaps
+picked: [heygen-com/hyperframes, remotion-dev/remotion]   # the report's two or three to try first
+backbone: null                     # optional: the one repo to follow as a whole, set by the coding agent after trying
+alternate: null                    # optional: at most one fallback, tried as well
 scanned: 2026-10-15
 ```
 
@@ -68,14 +68,17 @@ and give the others what is left. Topics and the MCP registry take Latin-script 
 
 Body sections (template in the registry's language): where we are (what we have, what is not
 good enough), what good looks like (2–3 finished results to match, or checks anyone can run),
-the answer (one paragraph; backbone; gaps to fill; trial runs; a table against what we have;
-next steps; not adopted), and what was searched. `brief` still reads answers written before
-2026-10-18 (ideas worth taking; practices and components), and `check` leaves them alone.
+the answer, which is the report (in one paragraph; candidates; try first; not recommended; and
+trials and choice, which the coding agent fills after trying), and what was searched. `brief`
+still reads answers from 2026-10-18 (backbone; gaps to fill; trial runs; against what we have;
+next steps; not adopted) and from before (ideas worth taking; practices and components), and
+writes them as it did.
 
-`check` holds an answer that names a `backbone` to the gates: the backbone and the alternate
-were tried (`level: trial`), and each of them and every picked repo has `results` or a
-`no_results` reason, and the star threshold or a `low_stars` reason. An answered question
-with an empty Backbone section and no `backbone` gets a warning.
+`check` holds every picked repo to the gates: a verifiable effect (a mid or strong link in
+`results`, or a `no_results` reason) and the star threshold (or a `low_stars` reason, which a
+relaxed direction writes itself). A report is not asked for a backbone or for trials. When the
+coding agent sets `backbone` (and `alternate`), each must also have been tried (`level: trial`).
+An answered question with an empty Try first section and no `picked` gets a warning.
 
 ## Card
 
@@ -92,7 +95,7 @@ branch: main
 commit: b9213a15d63d     # the commit that was reviewed
 reviewed: 2026-10-14
 level: trial             # meta | look | read | trial
-results: ["https://opencli.info/"]   # what it made, to look at: films, galleries, sample outputs, benchmarks, users
+results: ["https://opencli.info/"]   # its verifiable effect: a live site, package or store pages, media, posts
 watch: [src/daemon.ts, "clis/reddit/**"]
 aliases: [opencli]
 uses:
@@ -115,15 +118,26 @@ adopted:                 # what came into our projects (github-scout adopt, stag
     note: "comment ids kept"
 ```
 
-The body starts with the idea (how it does the job), then results and trial (what it made, and
-one dated line per trial run: what we ran, what came out), quality, what we take, risks or
-safety, and what to read first. `note --trial` writes the trial line; a card from before that
-section gets it after its first section.
+The body starts with the idea (how it does the job), then verifiable effect and trial (what it
+does that anyone can check, and one dated line per trial run: what ran, what came out), quality,
+what we take, risks or safety, and what to read first. `note --trial` writes the trial line, into
+"Results and trial" on cards from before 2026-10-19; a card without either section gets it after
+its first section.
 
-`results` holds links, http or https. `note` refuses `use`, `adapt` and `learn` for a repo
-without `results` (unless `--no-results` gives a reason) or under the star threshold, 50 or
-`GITHUB_SCOUT_MIN_STARS` (unless `--low-stars` does); the reason goes on the take and into the
-ledger. Cards without `results` stay valid.
+`results` holds links, http or https, each graded without fetching it:
+
+| tier | links |
+|---|---|
+| strong | any site outside GitHub (a live site, a package or store page); `look` checks that the homepage and README demo links answer, and also counts npm downloads and the installs a scan recorded |
+| mid | images, GIFs and videos (by extension, or GitHub's attachment hosts); posts on X, Bilibili, YouTube, blogs, Xiaohongshu and similar hosts; another GitHub repository |
+| weak | pages of the repo itself on GitHub that are not media: its README and other text |
+
+`note` refuses `use`, `adapt` and `learn` for a repo whose best tier is weak (unless
+`--no-results` gives a reason; installs of 100 or more recorded by a scan count as strong) or
+under its star floor (unless `--low-stars` does); the reason goes on the take and into the
+ledger. The floor is the threshold, 50 or `GITHUB_SCOUT_MIN_STARS`, or the relaxed floor of the
+repo's direction in the question's scans, in which case `note` writes the relaxation as the
+`low_stars` reason itself. Cards without `results` stay valid.
 
 `adopted` holds one entry per project, question and set of our paths: recording the same again
 updates it (fields not given keep their value; after a drop it starts afresh), and `adopt --drop`
@@ -147,9 +161,10 @@ string are written escaped (`\u2028`), so text pasted from a web page cannot bre
 Verdicts: `peeked`, `short`, `list`, `later`, `skip`, `card`. A `skip` comes back once the
 repo's stars reach twice the recorded count (and at least 200 more). An adoption is a `card`
 entry whose reason starts with `adopted:` or `dropped adoption:`. A `short` under the star
-threshold, and a `card` that takes such a repo as a reference, carry `low_stars` (the reason);
-a reference without results carries `no_results`. `import` records a shortlist under the
-threshold as `later`.
+threshold, and a `card` that takes such a repo as a reference, carry `low_stars` (the reason,
+`relaxed: <direction> had under 5 repos at 50+ stars (floor 20)` when its direction was relaxed);
+a reference without a verifiable effect carries `no_results`. `import` records a shortlist under
+the floor as `later`.
 
 ## Scan
 
@@ -157,14 +172,24 @@ threshold as `later`.
 {"id": "20261015-004320", "date": "2026-10-15", "project": "ops", "question": "browser-ops",
  "lenses": "EPMCQTRHKSDNUG", "dropped": 12,
  "searches": [{"lens": "P", "kind": "repos", "query": "reddit xiaohongshu in:readme pushed:>2026-04-15", "hits": 30}],
- "candidates": [{"repo": "a/b", "desc": "…", "stars": 1, "created": "…", "pushed": "…",
+ "candidates": [{"repo": "a/b", "desc": "…", "stars": 31, "created": "…", "pushed": "…",
                  "lang": "Go", "topics": [], "archived": false, "fork": false, "lenses": ["E", "P"],
-                 "installs": 4200, "fit": 2, "score": 9.1}]}
+                 "installs": 4200, "fit": 2, "score": 9.1, "floor": 20, "relaxed": "xiaohongshu"}],
+ "relaxed": [{"group": "xiaohongshu", "floor": 20, "counts": {"50": 3, "20": 6}}]}
 ```
+
+`relaxed` lists the directions whose star threshold was lowered: an entity or mechanism group
+(named by its first term) with fewer than 5 maintained repos at the threshold in their own words
+(name, description, topics; archived repos, lures, farmed installs and lists not counted). Its
+rows are shown down to 20 stars, then 10 when 20 still leaves fewer than 5, never lower;
+`counts` gives the repos at each level tried. Each row of such a group carries `floor` (the
+lowest floor among its groups) and `relaxed` (that group). Scans from before have neither.
 
 The id is the second the scan ran (`YYYYMMDD-HHMMSS`); a second scan of the question in the same
 second gets `-2`, `-3` ... (`20261015-004320-2`), sorted after it. `dropped` counts repos with no
-push in 12 months; they are not saved. Only the best 400 candidates are kept. `fit` and `score` are recomputed from the question's vocabulary on every view.
+push in 12 months; they are not saved. Only the best 400 candidates are kept. `fit`, `score`,
+`relaxed` and `floor` are recomputed from the question's vocabulary and all its scans on every
+view, so `pick`, `note`, `look` and `brief` see the same relaxation the table shows.
 
 ## From format 1
 

@@ -1,13 +1,16 @@
 # Working on github-scout
 
 - Seven skills in `skills/`: `github-scout` (the whole flow, the command line in `scripts/`, the
-  references) and one per stage: `-plan`, `-search`, `-triage`, `-dig`, `-brief`, `-adopt`. Each
-  stage skill must work alone, with and without the command line. Stages 1 to 5 never change the
-  user's project; `-adopt` is done by the project's coding agent, in the project's repository.
+  references) and one per stage: 1 `-plan`, 2 `-search`, 3 `-triage`, 4 `-brief`, 5 `-dig`,
+  6 `-adopt`. Each stage skill must work alone, with and without the command line. github-scout
+  runs 1 to 4 and ends with a report; it never tries repos, chooses one or changes the user's
+  project. `-dig` (try and choose) and `-adopt` are done by the project's coding agent, in the
+  project's repository, when the user asks. Only `-adopt` changes the project.
 - `cloud/github-scout.md` is generated from the skills: after editing a skill run
-  `python tools/build-cloud.py`. CI fails when it is out of date. A chat never adopts: the build
-  leaves out every block that names `github-scout-adopt` or the `adopt` command, and the brief
-  stage says in one plain sentence who adopts.
+  `python tools/build-cloud.py`. CI fails when it is out of date. A chat never tries, chooses or
+  adopts: the build leaves out `-dig` and every block that names `github-scout-dig`,
+  `github-scout-adopt` or the `adopt` command, and the brief stage says in one plain sentence who
+  does.
 - The command line is Python 3.9+, standard library only. Tests run offline against
   `tests/fake.py`: `python -m unittest discover -s tests`. Lint: `ruff check .`.
 - Descriptions stay short: these skills are called on purpose, not picked up mid-task.

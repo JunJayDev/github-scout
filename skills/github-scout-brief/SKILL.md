@@ -1,81 +1,82 @@
 ---
 name: github-scout-brief
-description: Choose one repository to follow as a whole, name what fills its gaps, and hand off a brief without changing the project.
+description: Write the report for your coding agent: what exists, the two or three to try first and how, without changing the project.
 license: MIT
 ---
 
 # GitHub scout: brief
 
-Stage 5 of `github-scout`. Turn the trials and findings into one plan for our project, and hand
-it to the agent that will change the code. Do not change the project yourself.
+Stage 4 of `github-scout`, and its last. Turn the shortlist into a report for the agent that
+will change the code: what exists, which two or three to try first and how, what is likely left
+to build. Do not try them, choose one or change the project yourself: the coding agent tries and
+chooses after the report, when the user asks.
 
 ## Input
 
-The trials and findings from `github-scout-dig`, and our project: its code when there is a local
+The shortlist from `github-scout-triage`, and our project: its code when there is a local
 repository, otherwise what the user said exists.
 
 ## Steps
 
-1. **Name the backbone:** the one repo whose way we follow as a whole, from dig's trials, and at
-   most one alternate. Say why it passed: its results (links), its stars, our trial. If none
-   passed, say so and which searches show it; then the answer is to build, and why.
-2. **List the gaps:** what the backbone does not do for us. For each: what is missing, where it
-   is filled from (another repo and file, or our own code), and why that source.
-3. **Compare** the backbone with our code. Read the part of our code each step touches. Write a
-   table:
-
-   | we have | the backbone does | the difference | take it or not |
-   |---|---|---|---|
-
-4. **Answer in one paragraph:** which repo to follow and why, what fills its gaps, what is left
-   to build.
-5. **Write the steps for the coding agent, in order.** The first one runs the backbone's own
-   smallest example in our project. Each step gives:
-   - the files in our project it touches and what to change;
-   - why: the backbone's way, or the gap it fills, with repo and file;
-   - how to check it worked.
-
-   Keep only what our stage needs.
-6. **Not adopted:** ideas from other repos that do not fill a named gap go to this appendix,
-   one line each with the reason, so the coding agent leaves them out.
-7. **Without a local project,** write the steps as a build plan: the backbone first, then each
-   gap, each with its source.
+1. **Look at our side.** Read the part of our code each candidate would touch, so the report can
+   say how it relates to our project: replaces a module, plugs into one, or needs one built.
+2. **Pick two or three to try first:** the ones whose verifiable effect comes closest to what
+   good looks like, then more stars and more projects using them, then the best fit with our
+   project. Prefer one that could carry the whole goal. If none qualifies, say so and which
+   searches show it; then the answer is to build, and why.
+3. **Say how to try each one,** the cheapest way that shows whether it reaches what good looks
+   like: open its live site; or run its own smallest example (the command from its README); or one
+   short task from our project. Then what to look for in the output, against what good looks
+   like.
+4. **Answer in one paragraph:** what exists, which two or three look most promising for us and
+   why, what is likely left to build.
+5. **List the candidates** in a table: repo, kind, stars, last push, verifiable effect (tier and
+   links), what it does for our goal, how it relates to our project.
+6. **Not recommended:** the rest you looked at closely, one line each with the reason, so the
+   coding agent leaves them out.
+7. **What was searched:** the directions, the coverage, and every direction whose star threshold
+   was relaxed (from the scan header).
 
 ## With the command line
 
-Write the answer into the question file printed by `github-scout show <q>`, in these sections:
-- In one paragraph;
-- Backbone: which repo and why it passed (results, stars, trial);
-- Gaps to fill: gap, source, reason;
-- Trial runs;
-- Against what we have;
-- Next steps in our project;
-- Not adopted.
-
-In its frontmatter set `status: answered`, `backbone:` (the repo we follow), `alternate:` (when
-there is one) and `picked:` (the backbone, then the repos that fill its gaps). Then:
+Note each repo to try first, with its effect and what it would do for us:
 
 ```bash
-github-scout check            # warns when the backbone was not tried, has no results or too few stars
-github-scout brief <q>        # writes the hand-off from the answer and the cards
+github-scout note owner/repo --q <q> --take use|adapt|learn --results <links to its effect> \
+  --note "<what it does for our goal>" --where "<where it would land in our project>"
 ```
 
-Give the user the brief's path, to hand to the coding agent. The project is not touched.
+`note` refuses `use`, `adapt` and `learn` for a repo with only a weak effect (`--results` with a
+live site, media or posts, or `--no-results "<why>"`) or under the star floor of its direction
+(`--low-stars "<why>"`). The take is your expectation; the coding agent settles it after a trial.
 
-The brief ends with one `github-scout adopt` line per repo to bring in, which the coding agent
-fills in as it brings the brief into the project (`github-scout-adopt`, stage 6), then the Not
-adopted appendix.
+Then write the answer into the question file printed by `github-scout show <q>`, in these
+sections: In one paragraph; Candidates; Try first; Not recommended; and anything about the web or
+X pass under Searched. Leave Trials and choice to the coding agent. In its frontmatter set
+`status: answered` and `picked:` (the repos to try first). Leave `backbone:` and `alternate:`
+empty: the coding agent sets them after trying.
+
+```bash
+github-scout check            # warns when a repo to try lacks a verifiable effect or enough stars
+github-scout brief <q>        # writes the report: the answer, the cards' facts, the coverage of the scans
+```
+
+Give the user the report's path, to hand to the coding agent. The report tells it how to try,
+choose and record: one `github-scout note --trial` line and one adopt line per repo to try. The
+project is not touched.
 
 ## Without the command line (cloud chat)
 
-Write sections 5 and 6 of the report: the answer (backbone, gaps, the trials to run locally),
-then the brief for the coding agent. Offer the whole report as one file to download. To take it
-over locally:
+Write section 4 of the report (`../github-scout/references/report-format.md`): the paragraph,
+the candidate table, Try first, the part for the coding agent, Not recommended and what was
+searched. Then section 5, what you could not verify. Offer the whole report as one file to
+download. To take it over locally:
 
 ```bash
 github-scout import report.md --q <project>/<question>
 ```
 
-Back home, the project's own coding agent adopts the brief; a chat never changes the project.
+Back home, the project's coding agent tries the repos under Try first, chooses one to follow and
+brings it in; a chat never runs code or changes the project.
 
 A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.

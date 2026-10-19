@@ -1,6 +1,6 @@
 ---
 name: github-scout-search
-description: Search GitHub along planned directions in English and Chinese; drop lures, farmed installs, dead repos and those under 50 stars.
+description: Search GitHub along planned directions in English and Chinese; drop lures, farmed installs, dead repos and those with too few stars.
 license: MIT
 ---
 
@@ -22,14 +22,17 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
   They are bait, often malware. Never download them.
 - **Exclude farmed installs:** a skill directory count far beyond the repo's stars (for example
   two million installs on a repo with three stars, often a copy of a famous pack).
-- **Under 50 stars is no reference.** Leave such repos out of the ranking and the candidates,
-  and count them. Awesome lists are exempt: they are only for finding. An exception needs a
-  reason, such as an official organisation's repo released this week.
+- **Under 50 stars is no reference, unless the direction is thin.** Leave such repos out of the
+  ranking and the candidates, and count them. A direction (one entity or mechanism group) with
+  fewer than 5 maintained repos at 50+ keeps its own repos down to 20 stars; still fewer than 5,
+  down to 10; never lower. Say which directions were relaxed and why. Awesome lists are exempt:
+  they are only for finding. Any other exception needs a reason, such as an official
+  organisation's repo released this week.
 - **Read the repo's own page** before you list it. Record its stars and last commit as shown there.
 - A repo describes what it makes, not every use people found for it. So also look at what is
   new and growing fast in the form you need, even when no search word matches it. New and
-  fast-growing is how you find; it does not pick. Picking (triage, dig) goes by results, stars,
-  a trial and fit.
+  fast-growing is how you find; it does not pick. Picking (triage) goes by verifiable effect,
+  stars and fit; the coding agent's trial settles it later.
 
 ## With the command line
 
@@ -47,10 +50,13 @@ github-scout scan <project>/<question>                  # about 140 searches, 5 
   - a rising list: repos new in the last two months and growing fast in the question's forms,
     found without words.
 - **Ranking, for finding:** relevance first, then young and moving. It is not a verdict.
-- **Left out and counted in the header:** lures, farmed installs, and repos under 50 stars
-  (`--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway). The header
-  names the first few under 50 stars that fit four or more vocabulary groups: for a question
-  about who else does this, read them.
+- **Left out and counted in the header:** lures, farmed installs, and repos under the star
+  floor (`--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway). The floor
+  is 50, relaxed per direction: the `relaxed` line names each direction with fewer than 5 repos
+  at 50+, the floor it got (20, then 10) and how many it had (`stroke order to 20 stars (only 3 at
+  50+)`); its rows carry `relaxed: <direction>` and need no `--low-stars`. The header names the
+  first few still hidden that fit four or more vocabulary groups: for a question about who else
+  does this, read them.
 - **Widen with what the API cannot see:**
   - Do one pass of web search per direction, in English and Chinese: `site:github.com <entity> <mechanism>`.
   - Include Chinese communities (掘金, 知乎, 少数派, V2EX) and any links the user shared.
@@ -126,8 +132,10 @@ words never match the goal.
 
 **4. Facts for each candidate you keep:** stars and last commit as the repo page, a search
 result or the connector shows them. Under 50 stars, leave it out and name it under the table as
-excluded. If none shows the stars, write "unknown" and move on: the local import fills in stars
-and dates, drops repos with no push in 12 months, and keeps a shortlist under 50 stars as later.
+excluded, unless its direction has fewer than 5 candidates at 50+: then keep that direction's
+repos down to 20 stars (then 10, never lower) and write the relaxation under the table. If none
+shows the stars, write "unknown" and move on: the local import fills in stars and dates, drops
+repos with no push in 12 months, and keeps a shortlist under the floor as later.
 
 - A search snippet that does not mention something is no proof the repo lacks it. When it
   matters, read the README.
@@ -148,7 +156,7 @@ and dates, drops repos with no push in 12 months, and keeps a shortlist under 50
   help, last commit, stars, found by (the log number or the list). No verdict column: verdicts
   belong to triage, and the importer ignores them here.
 - Under the table: repos you saw but did not read (names only); directions that found nothing;
-  what you excluded and why.
+  directions relaxed below 50 stars, with how many they had at 50+; what you excluded and why.
 
 The local agent can then run the lenses a chat cannot reach (GitHub's API, the rising list,
 skills.sh counts) on the same directions with `github-scout scan`; rows without `W` in its table

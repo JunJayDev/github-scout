@@ -8,8 +8,9 @@ design notes are in the repository's top-level README.
 
 - Python 3.9+ (standard library only).
 - A GitHub token: `GITHUB_TOKEN` or `GH_TOKEN`, or a logged-in `gh` CLI. Code search needs one.
-- Network access to `api.github.com`, `codeload.github.com`, `skills.sh`, `registry.npmjs.org`
-  and `registry.modelcontextprotocol.io`.
+- Network access to `api.github.com`, `codeload.github.com`, `skills.sh`, `registry.npmjs.org`,
+  `api.npmjs.org` and `registry.modelcontextprotocol.io`. `look` also sends one short request,
+  without the token, to a repo's homepage and the demo links in its README.
 
 None of this is needed in a cloud chat: there the skills run on web search alone (see
 `references/report-format.md`).
@@ -40,9 +41,9 @@ Registries, variables and config files from before the rename (`reuse-first.json
 | `GITHUB_SCOUT_PROJECT` | project used when a question is written without `<project>/` |
 | `GITHUB_SCOUT_CONFIG` | alternative config file |
 | `GITHUB_SCOUT_AGENT` | name recorded as `by` in the ledger (default `agent`) |
-| `GITHUB_SCOUT_MIN_STARS` | stars a repo needs to be a reference (default 50); under it, `pick` and `note` ask for a reason |
+| `GITHUB_SCOUT_MIN_STARS` | stars a repo needs to be a reference (default 50); a direction with fewer than 5 such repos is relaxed to 20, then 10 (only floors under the threshold apply); under the floor, `pick` and `note` ask for a reason |
 | `GITHUB_TOKEN`, `GH_TOKEN` | GitHub token |
-| `GITHUB_SCOUT_GITHUB_API`, `GITHUB_SCOUT_NPM_API`, `GITHUB_SCOUT_SKILLS_API`, `GITHUB_SCOUT_MCP_API` | API base URLs (GitHub Enterprise, mirrors, tests) |
+| `GITHUB_SCOUT_GITHUB_API`, `GITHUB_SCOUT_NPM_API`, `GITHUB_SCOUT_NPM_DOWNLOADS_API`, `GITHUB_SCOUT_SKILLS_API`, `GITHUB_SCOUT_MCP_API` | API base URLs (GitHub Enterprise, mirrors, tests) |
 | `AGENT_SKILLS_STATE_DIR` | where `scripts/report-problem.sh` records known defects |
 
 ## CLI

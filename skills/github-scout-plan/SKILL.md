@@ -24,9 +24,9 @@ which project?" and wait.
    tool" but "make our product videos cut like an editor's, with an agent doing the work".
 3. **Say what good looks like:** two or three finished results we want to match (a film, a page,
    an output, with links), or checks anyone can run on an output ("renders in under a minute",
-   "every cut lands on a beat"). Triage and dig judge each candidate's results against these;
-   without them, any repo looks good on paper. Ask the user for examples they like; propose your
-   own when they have none.
+   "every cut lands on a beat"). Triage judges each candidate's verifiable effect against these,
+   and the coding agent's trial checks them later; without them, any repo looks good on paper.
+   Ask the user for examples they like; propose your own when they have none.
 4. **Set the stage.** It decides what is worth borrowing. Split the question if parts sit at
    different stages.
 

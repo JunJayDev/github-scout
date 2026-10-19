@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build cloud/github-scout.md: every skill but adopt, as one file for chats without a command line.
+"""Build cloud/github-scout.md: stages 1 to 4 (plan, search, triage, brief), as one file for chats without a command line.
 
 The skills are the source; this file is generated from them, so the two never disagree.
 `--check` exits 1 when the committed file is out of date (CI runs it).
@@ -18,7 +18,6 @@ PARTS = [
     "skills/github-scout-plan/SKILL.md",
     "skills/github-scout-search/SKILL.md",
     "skills/github-scout-triage/SKILL.md",
-    "skills/github-scout-dig/SKILL.md",
     "skills/github-scout-brief/SKILL.md",
     "skills/github-scout/references/report-format.md",
     "skills/github-scout/references/evaluation.md",
@@ -40,7 +39,8 @@ skip the commands.
 - If their project is on GitHub and a GitHub connector is connected, or they attached it (a zip
   or files), read it first: it is "our project" in stage 1. Otherwise use what they say exists
   today.
-- Run the five stages without stopping, unless the user asked to confirm the directions first.
+- Run the four stages without stopping, unless the user asked to confirm the directions first.
+  They end with the report: what exists, the two or three to try first and how.
 - You have web search and maybe a GitHub connector, but no browser. Stage 2 starts by checking
   what they can do; search with every lens through them, and log every search in the report, so a
   missed repo can be traced to the search that should have found it. A search engine misses many
@@ -50,10 +50,10 @@ skip the commands.
   and offer it for download.
 - List only repositories you have seen (their page, the connector, or a search result naming
   them). Never invent a repository, a star count or a date.
-- **Trials run locally.** You cannot install or run code here. Where a stage says to try a repo,
-  look at what it made instead (videos, galleries, sample outputs) and write the command a local
-  trial should run. Choose the backbone by its results and stars; the local agent tries it before
-  anyone follows it.
+- **You do not try repos or choose one.** Judge each by its verifiable effect (a live site,
+  package downloads, screenshots, videos, posts outside the repo) and its stars, and write under
+  Try first how the coding agent should try each. Back in the project, and only when the user
+  asks, that agent tries them, chooses one to follow and brings it in.
 - Without a project, the stage is "idea".
 - If the user attaches a candidate table from a local `github-scout scan`, those are the
   candidates: skip the search and start at triage (stage 3).
@@ -63,10 +63,10 @@ skip the commands.
 Generated from the skills in this repository by tools/build-cloud.py; edit the skills, not this file.
 """
 
-# Stage 6 (github-scout-adopt) changes the project, so only the project's own coding agent runs it,
-# never a chat. Blocks that name it (a paragraph, a list item, a table row) are left out of this
-# file; the brief stage says in one plain sentence who adopts.
-LOCAL_ONLY = re.compile(r"github-scout[- ]adopt|`adopt ")
+# Stages 5 and 6 (github-scout-dig, github-scout-adopt) run code and change the project, so only the
+# project's own coding agent runs them, never a chat. Blocks that name them (a paragraph, a list item, a
+# table row) are left out of this file; the brief stage says in one plain sentence who does.
+LOCAL_ONLY = re.compile(r"github-scout[- ](?:adopt|dig)|`adopt ")
 BLOCK_START = re.compile(r"#|\||\s*(?:[-*+]|\d+\.)\s")
 
 

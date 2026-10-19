@@ -1,7 +1,9 @@
 # Workflow, with a worked example
 
-Sections 1 to 6 follow the stages: plan (1), search (2, 3), triage and dig (4), brief (5),
-adopt (6). The order matters: results and a trial decide, before anyone reads code.
+Sections 1 to 5 follow github-scout's stages: plan (1), search (2, 3), triage (4), the report
+(5). Sections 6 and 7 are the coding agent's, after the report and when the user asks: trying and
+choosing, then adopting. The order matters: an effect anyone can check decides what is tried, and
+a trial decides what is followed, before anyone reads code.
 
 The example is a real case. An operations project needed to read and post on Reddit, X and
 Xiaohongshu through a logged-in browser, with no model in the loop. Agents searched for
@@ -38,7 +40,7 @@ problems: ["social media automation", "自媒体 自动化", "website to cli"]
 Why each part works:
 
 - **What good looks like** is the yardstick for every later stage: triage keeps the repos whose
-  results come near it, and the trial checks it on our machine.
+  verifiable effect comes near it, and the coding agent's trial checks it on our machine.
 - **Entity pairs** find multi-platform tools: a tool that supports both Reddit and Xiaohongshu
   names both in its README; a tutorial about one platform does not. `"reddit xiaohongshu"
   in:readme` put the target first.
@@ -77,11 +79,16 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
 
 - `score` orders the table for finding; it is not a verdict. Relevance counts most, then life:
   a 282-star repo created this month that matches three vocabulary groups ranks above a famous
-  old one. Picking comes later, on results, stars, a trial and fit.
+  old one. Picking comes later, on verifiable effect, stars and fit.
 - Rows under 50 stars are left out of the table and counted in the header: they are no
-  references. `--all` shows them; `pick <q> owner/repo --low-stars "why"` takes one anyway. The
-  header names the first few that match four or more vocabulary groups: for a question about who
-  else does this (competitors, the whole field) they are what you came for.
+  references. A niche direction may not have five repos that big, so each entity and mechanism
+  group is counted: under 5 maintained repos at 50+ in its own words, its rows are shown down to
+  20 stars, then 10, never lower. The `relaxed` line names them (`xiaohongshu to 20 stars (only 3
+  at 50+)`) and such rows carry `relaxed: <group>`; `pick` and `note` take them without a reason
+  and record the relaxation. `--all` shows the rest; `pick <q> owner/repo --low-stars "why"` takes
+  one anyway. The header names the first few still hidden that match four or more vocabulary
+  groups: for a question about who else does this (competitors, the whole field) they are what
+  you came for.
 - `fit` is the number of vocabulary groups in the repo's own name, description and topics.
 - Lens letters show why a row is there; several letters mean several independent routes found it.
 - The header line says how many repos were dropped (no push in 12 months) or hidden (6 months).
@@ -96,9 +103,9 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
   one of the question's forms in their name, description or topics are listed (a question for
   skills and CLIs does not list a graphics driver); `--all` shows the rest.
 
-`look` the promising rows first: about 1.3k tokens each, with the README links that look like
-results. Open those and pick 3 to 8 that show results close to what good looks like. A repo
-with nothing to look at is `later`, however clever its README.
+`look` the promising rows first: about 1.3k tokens each, with the verifiable effect graded.
+Open what it lists and pick 3 to 8 whose effect comes close to what good looks like. A repo
+with only a text description is `later`, however clever its README.
 
 ## 3. Widening the search
 
@@ -119,51 +126,80 @@ pbpaste | github-scout scan ops/browser-ops --add - --note "X: xiaohongshu githu
 github-scout scan ops/browser-ops --expand someone/awesome-browser-agents
 ```
 
-## 4. Looking, trying, reading
+## 4. Looking
 
-- `look` shows activity next to the facts: commits in 30 days, releases in 90, the top
-  contributor's share. A one-person repo pushing daily is normal now; a team repo gone quiet is
-  a warning. It also lists README links that look like results; open them first.
-- Try the best two or three before reading their code: install, run the smallest example or one
-  short real task, compare with what good looks like. For OpenCLI that was one read command on
-  Reddit through our logged-in Chrome. Record each run, the failures too:
-  `github-scout note jackwener/OpenCLI --q ops/browser-ops --take use --results <links> --trial "<what ran, what came out>"`.
-  Stop at the first wall; a trial is minutes, not a day.
-- Then read the code of the one you follow. `look --source` maps the code in tokens, so you read
-  `clis/reddit/*.js` and skip the other 100 adapters. Read to follow it and to find its gaps:
-  OpenCLI drives the browser through an extension in the user's own profile, so it inherits every
-  login and never needs the debugging port, but its `reddit read` drops comment ids.
+`look` shows activity next to the facts: commits in 30 days, releases in 90, the top
+contributor's share. A one-person repo pushing daily is normal now; a team repo gone quiet is a
+warning. Then the verifiable effect, graded:
 
-## 5. The answer
+```
+verifiable effect: strong · live site (homepage) https://opencli.info/ · npm @jackwener/opencli: 87.4k downloads last month https://www.npmjs.com/package/@jackwener/opencli
+```
 
-Write it in the question file. A good one, for a project at `prototype`:
+(OpenCLI on 2026-10-19.) A repo with media in its README gets a second line, for example
+`mid: 3 images in the README: <links>`; a homepage or demo link that did not answer is listed
+under `did not answer`.
 
-> **In one paragraph.** Follow OpenCLI for reads on Reddit and Xiaohongshu (pinned v1.8.8). Its
-> `reddit read` drops comment ids: fill that with our own comment adapter on its plugin API.
-> Keep posting where it is; nothing found posts without a model and survives rate limits.
+- **strong:** the homepage or a demo link in the README answered one short request (no token is
+  sent); npm counted real downloads last month; the scan recorded real installs on skills.sh.
+- **mid:** images, GIFs and videos in the README, without badges, logos and icons.
+- **weak:** none of these. Search for posts outside the repo (its name on X, Bilibili, YouTube,
+  blogs) before you give up on it: most projects show their results there.
+
+Open what it lists, then record what you found: `github-scout note jackwener/OpenCLI --q
+ops/browser-ops --take use --results https://opencli.info/ --note "one JSON command per site"`.
+`note` refuses `use`, `adapt` and `learn` with only text pages from the repo itself.
+
+## 5. The report
+
+Write it in the question file. github-scout does not try the repos or choose one: it says what
+exists and what to try first. A good one, for a project at `prototype`:
+
+> **In one paragraph.** OpenCLI drives our own logged-in Chrome through an extension and returns
+> JSON for Reddit, X and Xiaohongshu reads; xiaohongshu-mcp does one site well. Try OpenCLI first,
+> xiaohongshu-mcp second. Posting without a model is likely left to build: nothing found posts
+> and survives rate limits.
 >
-> **Backbone.** jackwener/OpenCLI: 30k stars; its read commands return JSON on the sites we
-> need; our trial read one subreddit through our logged-in Chrome. Alternate: none.
+> **Candidates.** | jackwener/OpenCLI | cli | 30k | 2026-10-17 | strong: opencli.info, npm 87k a
+> month | one command per site, JSON | replaces tools/reddit/chrome.ts | ...
 >
-> **Gaps to fill.** | comment ids | our adapter on its plugin API, ported from `clis/reddit/read.js` | its reader drops them |
+> **Try first.** 1. OpenCLI: install it, run `opencli reddit hot` through our logged-in Chrome;
+> look for JSON with post and comment ids, no model in the loop. 2. xiaohongshu-mcp: ...
 >
-> **Against what we have.** | model-driven page reading, 580k tokens a run | one JSON request per subreddit | ... | take |
->
-> **Not adopted.** The social-media bots the first searches found: old, and nothing they made
-> comes near what good looks like.
+> **Not recommended.** The social-media bots the first searches found: old, and their effect is
+> text only.
 
-Set `backbone: jackwener/OpenCLI` and `picked: [jackwener/OpenCLI]` in the frontmatter. That
-tells the next agent what to follow, what not to rebuild, and where the gap is. Then
-`github-scout brief ops/browser-ops` packs it, with each source's role, stars, results, trial
-level and reviewed commit, into a file for the coding agent. It ends with one `github-scout
-adopt` line per repo to bring in, then the Not adopted appendix. The project itself is not
-changed.
+Set `picked: [jackwener/OpenCLI, xpzouying/xiaohongshu-mcp]` and `status: answered` in the
+frontmatter, and leave `backbone:` empty. Then `github-scout brief ops/browser-ops` packs it into
+the report for the coding agent: the answer, each repo's take, stars, verifiable effect and
+reviewed commit, how to try and choose, one `note --trial` line and one adopt line per repo, Not
+recommended, and what was searched (the scans' coverage, every relaxed star threshold). The
+project itself is not changed.
 
-## 6. Adopting
+## 6. Trying and choosing (the coding agent)
 
-Stages 1 to 5 never touch the project. When the user asks, the project's coding agent brings the
-brief in (`github-scout-adopt`), inside the project's repository and by its rules, one commit
-per repo, each step checked the way the brief says. One mode per repo:
+When the user asks, the project's coding agent takes the report (`github-scout-dig`):
+
+- It tries each repo under Try first the way the report says, outside the project: a throwaway
+  directory or a container, no tokens or keys. For OpenCLI that was one read command on Reddit
+  through our logged-in Chrome. Each run is recorded, the failures too:
+  `github-scout note jackwener/OpenCLI --q ops/browser-ops --take use --trial "<what ran, what came out>"`.
+  It stops at the first wall; a trial is minutes, not a day.
+- It chooses one main reference, the one whose trial worked and whose output comes closest to
+  what good looks like, and at most one alternate; it sets `backbone: jackwener/OpenCLI` in the
+  question file.
+- Then it reads that repo's code to follow it and find its gaps. `look --source` maps the code in
+  tokens, so it reads `clis/reddit/*.js` and skips the other 100 adapters. OpenCLI drives the
+  browser through an extension in the user's own profile, so it inherits every login and never
+  needs the debugging port, but its `reddit read` drops comment ids: a gap, filled by our own
+  comment adapter on its plugin API. It writes the trials, the choice and each gap with its
+  source and reason under Trials and choice.
+
+## 7. Adopting
+
+Stages 1 to 5 never touch the project. When the user asks, the coding agent brings its choice in
+(`github-scout-adopt`), inside the project's repository and by its rules, one commit per repo,
+each step checked against what good looks like and the project's tests. One mode per repo:
 
 | mode | for | traced by |
 |---|---|---|
@@ -174,10 +210,10 @@ per repo, each step checked the way the brief says. One mode per repo:
 | tool | their CLI or app called as is | a pinned version |
 | data | datasets, fonts, prompts, assets | repo, commit and source path beside them |
 
-The backbone comes in whole (`depend`, `skill` or `tool`); `port`, `vendor` and `data` take one
-piece for a named gap, and say which in `--note`. The answer above gives two adoptions: run
-OpenCLI as is for reads (the backbone), and port its Reddit reader into our own comment adapter
-(the gap: comment ids). After each commit:
+The main reference comes in whole (`depend`, `skill` or `tool`); `port`, `vendor` and `data`
+take one piece for a named gap, and say which in `--note`. The choice above gives two adoptions:
+run OpenCLI as is for reads (the main reference), and port its Reddit reader into our own comment
+adapter (the gap: comment ids). After each commit:
 
 ```bash
 github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode tool --into tools/opencli/run.sh --note "pinned v1.8.8"
@@ -188,10 +224,10 @@ github-scout adopt jackwener/OpenCLI --q ops/browser-ops --mode port \
 Each writes an `adopted` entry on the card: our paths, their paths, their commit (the reviewed
 one unless `--at`) and ours (HEAD unless `--ours`). Their paths must exist at their commit. The
 same `--q` and `--into` again update the entry (`--from`, `--at` and `--note` left out keep what was
-recorded); `--drop` marks it dropped and keeps it. A brief item the agent did not take gets
-`github-scout note` with the reason, so the next search knows why.
+recorded); `--drop` marks it dropped and keeps it. A repo from the report the agent did not
+take gets `github-scout note` with the reason, so the next search knows why.
 
-## 7. Upkeep
+## 8. Upkeep
 
 - `updates` lists adopted repos first. For each `--from` path it counts the upstream commits that
   touched it since the commit we took it at, and names the newest:
