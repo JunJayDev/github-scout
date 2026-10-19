@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .github import Client, GitHubError
 from .discover import DROP, HIDE, SLOW, months_since
-from .store import Store, adoptions, as_list, min_stars, today
+from .store import Store, adoptions, as_list, min_stars, repo_ref, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -359,11 +359,12 @@ def upstream_changes(client: Client, slug: str, branch: str, a: dict, dates: dic
 
 def outdated(store: Store, client: Client, refs: list[str] | None = None, project: str | None = None) -> list[dict]:
     rows = []
+    wanted = {repo_ref(x).lower() for x in refs or []}
     for card in store.cards():
         if card.error:
             continue
         d = card.data
-        if refs and card.id.lower() not in {x.lower() for x in refs} and not set(map(str.lower, map(str, as_list(d.get("aliases"))))) & {x.lower() for x in refs}:
+        if wanted and card.id.lower() not in wanted and not {str(a).lower() for a in as_list(d.get("aliases"))} & wanted:
             continue
         adopted = adoptions(d, project)
         if project and not adopted and not any(isinstance(u, dict) and u.get("project") == project for u in as_list(d.get("uses"))):

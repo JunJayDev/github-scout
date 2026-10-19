@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .store import (
     DEFAULT_LANGS, KINDS, MODES, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, adoptions, as_list,
-    card_takes, min_stars, strongest, today, write_doc,
+    card_takes, min_stars, repo_ref, strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -459,9 +459,10 @@ def find(store: Store, terms: list[str], limit: int = 20) -> dict:
             continue
         h = hits(" ".join(str(e.get(k, "")) for k in ("repo", "reason", "question", "project", "desc")).lower())
         if h:
-            prev = seen.get(e["repo"].lower())
+            key = str(e["repo"]).lower()
+            prev = seen.get(key)
             if not prev or (e.get("date") or "") >= (prev["entry"].get("date") or ""):
-                seen[e["repo"].lower()] = {"hits": h, "entry": e}
+                seen[key] = {"hits": h, "entry": e}
     carded = {c.id.lower() for _, c in cards}
     ledger = sorted((v for k, v in seen.items() if k not in carded), key=lambda v: -v["hits"])
     top = max([h for h, _ in cards] + [h for h, _ in questions] + [v["hits"] for v in ledger] + [0])
@@ -536,6 +537,7 @@ def show_question(store: Store, ref: str) -> str:
 
 
 def show_card(store: Store, ref: str) -> str:
+    ref = repo_ref(ref)
     card = store.card(ref)
     hist = store.history(card.id if card else ref)
     out = []

@@ -1414,6 +1414,81 @@ class RecallTests(Base):
         self.assertNotIn("d/tiny", out)
 
 
+class ReviewFixTests(Base):
+    """Fixes from a code review on 2026-10-19, each reproduced first."""
+
+    slug = "o/tool"
+
+    def tool_card(self, take="learn", commit="a" * 12, branch="main"):
+        registry.new_card(self.store, {"repo": self.slug, "desc": "x", "stars": 500, "branch": branch, "commit": commit},
+                          "software", "cli", [{"project": "ops", "question": "browser-ops", "take": take, "note": "n"}],
+                          [], "read")
+
+    def test_ledger_keeps_entries_with_unicode_line_breaks(self):
+        reason = "dead demo\u2028see issue 4\u2029and\x85more"
+        code, _, err = self.run_cli("note", "z/nothing", "--q", "ops/browser-ops", "--take", "skip", "--note", reason)
+        self.assertEqual(code, 0, err)
+        [e] = self.store.ledger()
+        self.assertEqual(e["reason"], reason)
+        self.assertEqual(len((self.root / "ledger.jsonl").read_text(encoding="utf-8").splitlines()), 1)
+        self.assertEqual(self.store.check()[0], [])
+        old = json.dumps({"repo": "a/b", "verdict": "skip", "reason": "x\u2028y"}, ensure_ascii=False) + "\n"
+        (self.root / "ledger.jsonl").write_text(old, encoding="utf-8")         # written raw by an earlier version
+        self.assertEqual(self.store.ledger(), [{"repo": "a/b", "verdict": "skip", "reason": "x\u2028y"}])
+
+    def test_ledger_survives_a_missing_newline_and_lines_that_are_not_objects(self):
+        p = self.root / "ledger.jsonl"
+        p.write_text('{"repo": "a/one", "verdict": "skip"}', encoding="utf-8")     # an editor dropped the final newline
+        self.store.append_ledger([{"repo": "b/two", "verdict": "skip"}])
+        self.assertEqual([e["repo"] for e in self.store.ledger()], ["a/one", "b/two"])
+        with p.open("a", encoding="utf-8") as f:
+            f.write('["a"]\n5\n{"repo": 5, "verdict": "skip"}\n')
+        errors = self.store.check()[0]
+        self.assertEqual(errors[-3:], ["ledger.jsonl:3: not a JSON object", "ledger.jsonl:4: not a JSON object",
+                                       "ledger.jsonl:5: needs repo and a verdict in peeked, short, list, later, skip, card"])
+        for argv in (["check"], ["show", "a/one"], ["find", "one"], ["site"], ["show", "ops/browser-ops"]):
+            code, out, err = self.run_cli(*argv)                                   # no traceback
+            self.assertIn(code, (0, 1), argv)
+
+    def test_two_scans_in_one_second_keep_both(self):
+        for s in ("a/reddit-one", "b/reddit-two"):
+            self.api.add(repo(s, 500, "reddit cli", pushed=ago(0.2)))
+        with unittest.mock.patch("github_scout.discover.now_stamp", return_value="20261019-120000"):
+            for s in ("a/reddit-one", "b/reddit-two"):
+                code, _, err = self.run_cli("scan", "ops/browser-ops", "--add", f"github.com/{s}", "--quiet")
+                self.assertEqual(code, 0, err)
+        d = self.root / "scans" / "ops" / "browser-ops"
+        self.assertEqual([p.name for p in self.store.scans("ops", "browser-ops")],
+                         ["20261019-120000.json", "20261019-120000-2.json"])
+        self.assertEqual(json.loads((d / "20261019-120000-2.json").read_text(encoding="utf-8"))["id"], "20261019-120000-2")
+        _, out, _ = self.run_cli("scan", "ops/browser-ops", "--show")
+        self.assertIn("a/reddit-one", out)
+        self.assertIn("b/reddit-two", out)
+        for name in ("20261019-120000-10", "20261019-115959"):
+            (d / f"{name}.json").write_text("{}", encoding="utf-8")
+        self.assertEqual([p.stem for p in self.store.scans("ops", "browser-ops")],
+                         ["20261019-115959", "20261019-120000", "20261019-120000-2", "20261019-120000-10"])
+
+    def test_a_card_given_as_a_url_is_found(self):
+        self.api.add(repo(self.slug, 500, "reddit cli", pushed=ago(0.1)))
+        self.api.paths[f"repos/{self.slug}/commits/main"] = {"sha": "b" * 40}
+        self.tool_card()
+        url = "https://github.com/o/tool"
+        code, out, err = self.run_cli("note", url, "--q", "ops/browser-ops", "--take", "skip", "--note", "not for us")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.store.card(self.slug).data["uses"][0]["take"], "skip")
+        self.assertEqual(self.store.ledger()[-1]["verdict"], "card")
+        self.assertIn("card: ", self.run_cli("show", url)[1])
+        self.assertIn("o/tool", self.run_cli("updates", url + "/tree/main")[1].splitlines()[0])
+        with cwd(Path(self.tmp.name)):
+            code, _, err = self.run_cli("adopt", url, "--q", "ops/browser-ops", "--mode", "tool", "--into", "run.sh",
+                                        "--ours", "1234abc")
+        self.assertEqual(code, 0, err)
+        code, _, err = self.run_cli("updates", "--done", url)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.store.card(self.slug).data["commit"], "b" * 12)
+
+
 class ExamineTests(unittest.TestCase):
     def test_guess_form_and_kind(self):
         g = examine.guess_kind

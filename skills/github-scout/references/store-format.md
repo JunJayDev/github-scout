@@ -133,7 +133,8 @@ entry without `from` gets only the repo-level report. Cards without `adopted` ar
 ## Ledger
 
 One JSON object per line, append-only; the latest entry per (repo, project/question) is the
-current verdict.
+current verdict. Readers split lines on `\n` alone, and U+2028, U+2029 and U+0085 inside a
+string are written escaped (`\u2028`), so text pasted from a web page cannot break an entry.
 
 ```json
 {"date": "2026-10-15", "repo": "a/b", "project": "ops", "question": "browser-ops",
@@ -159,8 +160,9 @@ threshold as `later`.
                  "installs": 4200, "fit": 2, "score": 9.1}]}
 ```
 
-`dropped` counts repos with no push in 12 months; they are not saved. Only the best 400
-candidates are kept. `fit` and `score` are recomputed from the question's vocabulary on every view.
+The id is the second the scan ran (`YYYYMMDD-HHMMSS`); a second scan of the question in the same
+second gets `-2`, `-3` ... (`20261015-004320-2`), sorted after it. `dropped` counts repos with no
+push in 12 months; they are not saved. Only the best 400 candidates are kept. `fit` and `score` are recomputed from the question's vocabulary on every view.
 
 ## From format 1
 

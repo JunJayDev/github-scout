@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .github import github_slug
 from .yamlish import FormatError, join_frontmatter, split_frontmatter
 
 MARKER = "github-scout.json"
@@ -80,6 +81,10 @@ URL = re.compile(r"^https?://[^\s<>\"']+$")
 KANA = re.compile(r"[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]")
 HANGUL = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7af]")
 HAN = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+# A scan's id is the second it ran; a second scan in the same second gets -2, -3 ...
+SCAN_ID = re.compile(r"(\d{8}-\d{6})(?:-(\d+))?")
+# Characters str.splitlines() breaks on that json.dumps(ensure_ascii=False) leaves raw inside a string.
+LINE_BREAKS = {"\u2028": "\\u2028", "\u2029": "\\u2029", "\x85": "\\u0085"}
 
 
 class StoreError(RuntimeError):
@@ -125,6 +130,20 @@ def reference_gaps(card: dict, use: dict, limit: int, trial: bool = False) -> li
 
 def now_stamp() -> str:
     return _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def repo_ref(text: str) -> str:
+    """A repo as the registry names it: a github.com URL becomes owner/repo; anything else (an alias) is left as is."""
+    return (github_slug(text) or text) if "/" in text else text
+
+
+def ledger_line(entry: dict) -> str:
+    """One ledger entry as one line, Chinese kept readable; U+2028 and its kind escaped, so a reader that splits
+    on them cannot cut the entry in two."""
+    line = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+    for ch, esc in LINE_BREAKS.items():
+        line = line.replace(ch, esc)
+    return line
 
 
 def card_filename(slug: str) -> str:
@@ -368,6 +387,7 @@ class Store:
         return self._cards
 
     def card(self, ref: str) -> Doc | None:
+        ref = repo_ref(ref)
         ref_l = ref.lower()
         if "/" in ref:
             path = self.root / "repos" / card_filename(ref)
@@ -439,27 +459,34 @@ class Store:
         if not p.is_file():
             return []
         out = []
-        for line in p.read_text(encoding="utf-8").splitlines():
+        for line in p.read_text(encoding="utf-8").split("\n"):   # not splitlines(): U+2028 in old entries is text
             line = line.strip()
             if line:
                 try:
-                    out.append(json.loads(line))
+                    e = json.loads(line)
                 except json.JSONDecodeError:
-                    out.append({"_bad": line})
+                    e = None
+                out.append(e if isinstance(e, dict) else {"_bad": line})
         return out
 
     def append_ledger(self, entries: list[dict]) -> None:
         if not entries:
             return
-        with (self.root / "ledger.jsonl").open("a", encoding="utf-8") as f:
-            f.write("".join(json.dumps(e, ensure_ascii=False, sort_keys=True) + "\n" for e in entries))
+        p = self.root / "ledger.jsonl"
+        lead = ""
+        if p.is_file() and p.stat().st_size:                   # a hand edit may have dropped the final newline
+            with p.open("rb") as f:
+                f.seek(-1, os.SEEK_END)
+                lead = "" if f.read(1) == b"\n" else "\n"
+        with p.open("a", encoding="utf-8") as f:
+            f.write(lead + "".join(ledger_line(e) + "\n" for e in entries))
 
     def verdicts(self) -> dict[tuple[str, str], dict]:
         """Latest ledger entry per (repo, project/question)."""
         latest: dict[tuple[str, str], dict] = {}
         for e in self.ledger():
             if "repo" in e:
-                latest[(e["repo"].lower(), f"{e.get('project', '')}/{e.get('question', '')}")] = e
+                latest[(str(e["repo"]).lower(), f"{e.get('project', '')}/{e.get('question', '')}")] = e
         return latest
 
     def history(self, slug: str) -> list[dict]:
@@ -471,15 +498,27 @@ class Store:
         return self.root / "scans" / project / qid
 
     def scans(self, project: str, qid: str) -> list[Path]:
-        d = self.scan_dir(project, qid)   # only scan files (named by their id); other files may sit beside them
-        return sorted(p for p in d.glob("*.json") if re.fullmatch(r"\d{8}-\d{6}", p.stem)) if d.is_dir() else []
+        """Scan files, oldest first (named by their id); other files may sit beside them."""
+        d = self.scan_dir(project, qid)
+        if not d.is_dir():
+            return []
+        found = [(m, p) for m, p in ((SCAN_ID.fullmatch(p.stem), p) for p in d.glob("*.json")) if m]
+        return [p for m, p in sorted(found, key=lambda mp: (mp[0].group(1), int(mp[0].group(2) or 1)))]
 
     def save_scan(self, scan: dict) -> Path:
+        """Write a new scan file. When a scan with the same id exists (two in one second), the id gets -2, -3 ..."""
         d = self.scan_dir(scan["project"], scan["question"])
         d.mkdir(parents=True, exist_ok=True)
-        p = d / f"{scan['id']}.json"
-        p.write_text(json.dumps(scan, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        return p
+        base, n = scan["id"], 1
+        while True:
+            p = d / f"{scan['id']}.json"
+            try:
+                with p.open("x", encoding="utf-8") as f:
+                    f.write(json.dumps(scan, ensure_ascii=False, indent=1) + "\n")
+                return p
+            except FileExistsError:
+                n += 1
+                scan["id"] = f"{base}-{n}"
 
     def people(self) -> list[str]:
         p = self.root / "people.txt"
@@ -657,8 +696,8 @@ class Store:
                         errors.append(f"{r}: adopted {key} must be YYYY-MM-DD")
         for n, e in enumerate(self.ledger(), 1):
             if "_bad" in e:
-                errors.append(f"ledger.jsonl:{n}: not JSON")
-            elif not e.get("repo") or e.get("verdict") not in VERDICTS:
+                errors.append(f"ledger.jsonl:{n}: not a JSON object")
+            elif not isinstance(e.get("repo"), str) or not e["repo"] or e.get("verdict") not in VERDICTS:
                 errors.append(f"ledger.jsonl:{n}: needs repo and a verdict in {', '.join(VERDICTS)}")
         return errors, warns
 

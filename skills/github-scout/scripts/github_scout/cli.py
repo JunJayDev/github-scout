@@ -659,8 +659,7 @@ def cmd_check(args):
     if not errors:
         write_index(store)
     print(f"{len(errors)} error(s), {len(warns)} warning(s)" + ("" if errors else "; INDEX.md updated"))
-    if errors:
-        sys.exit(1)
+    return 1 if errors else 0
 
 
 # ---------------------------------------------------------------------------
@@ -825,7 +824,7 @@ def main(argv: list[str] | None = None) -> int:
     if getattr(args, "store", None) is None:
         args.store = args.global_store
     try:
-        args.fn(args)
+        return args.fn(args) or 0                    # a command returns its exit code, or nothing for 0
     except (StoreError, LookupError) as exc:
         print(f"github-scout: {exc}", file=sys.stderr)
         return 1
@@ -838,7 +837,6 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except KeyboardInterrupt:
         return 130
-    return 0
 
 
 if __name__ == "__main__":
