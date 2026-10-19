@@ -106,6 +106,13 @@ VIDEO = re.compile(r"\.(mp4|webm|mov|m4v)(?:[?#]|$)|github\.com/user-attachments
                    r"(?:^|//)(?:www\.)?(youtube\.com/watch|youtu\.be/|bilibili\.com/video|b23\.tv/|vimeo\.com/\d|loom\.com/share)",
                    re.I)
 GITHUB_HOSTS = re.compile(r"^https?://(?:[^/]*\.)?(github\.com|githubusercontent\.com)/", re.I)
+POST = re.compile(r"^https?://(?:[^/]*\.)?(x\.com|twitter\.com|weibo\.com|xiaohongshu\.com|xhslink\.com|douyin\.com|"
+                  r"tiktok\.com|zhihu\.com|juejin\.cn|mp\.weixin\.qq\.com|reddit\.com|news\.ycombinator\.com|"
+                  r"linkedin\.com|medium\.com|dev\.to|substack\.com|threads\.net|instagram\.com)/", re.I)   # social, not a site
+POST_ITEM = re.compile(r"/status/\d|/statuses/|weibo\.com/\d+/\w|/explore/\w|/discovery/item/|/video/\d|/p/\w|"
+                       r"/answer/\d|zhuanlan\.zhihu\.com/p/|/post/\w|mp\.weixin\.qq\.com/s|/comments/\w|item\?id=\d|"
+                       r"/posts/\w|/feed/update/|/reel/\w|medium\.com/[^/]+/[^/?#]+|dev\.to/[^/]+/[^/?#]+", re.I)
+# one post that can show it working; a profile or home page (the author's accounts) shows nothing
 SITES_PROBED, MEDIA_SHOWN, NPM_REAL = 3, 4, 100   # live sites checked per repo; media links printed; npm downloads a
                                                   # month that count as real use
 
@@ -142,6 +149,10 @@ def readme_effect(readme: str, slug: str, branch: str) -> tuple[list[dict], list
             media.append({"what": kind, "url": url})
 
     def add_site(text: str, url: str) -> None:
+        if POST.match(url):                                     # social: a post is mid, never a live site
+            if POST_ITEM.search(url) and url not in {m["url"] for m in media}:
+                media.append({"what": "post", "url": url})
+            return
         if (url.startswith(("http://", "https://")) and not GITHUB_HOSTS.match(url) and not NOT_EFFECT.search(url)
                 and not IMAGE.search(url) and (SITE_WORDS.search(text) or SITE_WORDS.search(url.split("?")[0]))
                 and url not in sites):
@@ -206,9 +217,9 @@ def render_effect(e: dict) -> list[str]:
     lines = [f"verifiable effect: {e['tier']}" + "".join(f" · {x['what']}" + (f" {x['url']}" if x["url"] else "")
                                                          for x in e["strong"])]
     if e["mid"]:
-        kinds = {k: sum(m["what"] == k for m in e["mid"]) for k in ("image", "video")}
+        kinds = {k: sum(m["what"] == k for m in e["mid"]) for k in ("post", "image", "video")}
         what = ", ".join(f"{n} {k}{'s' if n > 1 else ''}" for k, n in kinds.items() if n)
-        shown = e["mid"][:MEDIA_SHOWN]
+        shown = sorted(e["mid"], key=lambda m: m["what"] != "post")[:MEDIA_SHOWN]   # posts first: they show it in use
         lines.append(f"  mid: {what} in the README: " + " ".join(m["url"] for m in shown)
                      + (f" (+{len(e['mid']) - len(shown)})" if len(e["mid"]) > len(shown) else ""))
     if e["silent"]:
