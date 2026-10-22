@@ -148,8 +148,6 @@ skills sit next to this folder and use the same command.
 Formats: `store-format.md`. A worked example: `workflow.md`. How to judge
 skills and software: `evaluation.md`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
-
 ---
 
 ## GitHub scout: plan
@@ -233,8 +231,6 @@ search, unless the user asked to confirm the directions first.
 ### Next
 
 `github-scout-search`.
-
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -405,8 +401,6 @@ search log, and 10 to 30 candidates you opened, plus other sources.
 
 `github-scout-triage`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
-
 ---
 
 ## GitHub scout: triage
@@ -489,8 +483,6 @@ This is the only table whose verdicts the local import records.
 
 `github-scout-brief`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
-
 ---
 
 ## GitHub scout: brief
@@ -567,8 +559,6 @@ github-scout import report.md --q <project>/<question>
 
 Back home, the project's coding agent tries the repos under Try first, chooses one to follow and
 brings it in; a chat never runs code or changes the project.
-
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 

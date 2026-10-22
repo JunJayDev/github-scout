@@ -4,6 +4,27 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- `quick` (owner, 2026-10-22). A one-off lookup for the moment before you build, install or pick something: no
+  registry, no plan to confirm, one ranked table in one to three minutes, run by a cheap model if you like. It
+  runs the lenses E, P, M, Q, T, H and one per `--form` (skill: skills.sh; mcp: the MCP registry; cli and library: npm),
+  never code search unless `--lenses` says so (10 a minute), with the scan's filters. Several agents share one
+  GitHub budget through `~/.cache/github-scout`. `look` now works without a registry when it records nothing.
+  Why: a hand search of seven queries missed the first-ranked candidate (a 19.6k-star skill) that `quick` put on top;
+  the full flow took too long for small questions, so agents did not use it. `evals/run.py --lenses` measures a
+  lens set against the recall cases.
+  - Recall: on the five recall cases, with their large vocabularies (97 to 123 searches) and the default limits
+    (80 GitHub calls, 150 s), `quick` keeps 9 of 10 repos in about three minutes a case; the last recorded full
+    scan kept all 10. The one it missed, `user-w-ui/search-before-build`, needs more searches than the limits
+    allow. A typical lookup has far fewer words and finishes sooner. Each limit trades recall for time: five
+    passes with other lens orders each kept 8 of 10, a different two missing.
+  - Limits that keep it quick: `--budget` counts GitHub calls only (skills.sh, npm and the MCP registry searches
+    do not stop at it); `--seconds` (default 150) stops starting searches; a registry that does not answer is asked
+    once, and non-GitHub hosts wait 20 s, not 60 (the MCP registry did not answer from the test machine).
+  - Scan: `run(order=, seconds=)`; `Client.github_calls`.
+- Skills: `description` values with a colon are quoted (adopt, brief, dig were not valid YAML); each skill has
+  `metadata.improve-repo` and an "Improve this skill" section: with write access, branch, test and pull request;
+  without it, report and offer a patch. The cloud file leaves the section out.
+
 - Report first (owner, 2026-10-19). github-scout finds, filters and reports; trying the
   candidates and choosing the one to follow are the project's coding agent's work, after the
   report and only when the user asks.

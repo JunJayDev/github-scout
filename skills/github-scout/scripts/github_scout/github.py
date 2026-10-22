@@ -65,14 +65,16 @@ class Client:
         self.transport = transport or self._urlopen
         self.verbose = verbose
         self.stamp_dir = stamp_dir
-        self.calls = 0
+        self.calls = 0           # every request, to any host
+        self.github_calls = 0    # those to api.github.com: the budget of a scan counts these only
         self._last = {"search": 0.0, "code": 0.0}
 
     # -- transport -------------------------------------------------------
     def _urlopen(self, method: str, url: str, headers: dict, body: bytes | None):
         req = urllib.request.Request(url, data=body, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            # GitHub may be slow under load; skills.sh, npm and the MCP registry answer in a second or are down
+            with urllib.request.urlopen(req, timeout=60 if url.startswith(API) else 20) as resp:
                 return resp.status, dict(resp.headers), resp.read()
         except urllib.error.HTTPError as exc:
             return exc.code, dict(exc.headers or {}), exc.read()
@@ -95,6 +97,8 @@ class Client:
             h["Content-Type"] = "application/json"
         for attempt in range(retries + 1):
             self.calls += 1
+            if url.startswith(API):
+                self.github_calls += 1
             try:
                 status, rh, raw = self.transport(method, url, h, data)
             except http.client.HTTPException as exc:      # a reply cut short (IncompleteRead) or garbled

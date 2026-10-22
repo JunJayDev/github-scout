@@ -1,7 +1,10 @@
 ---
 name: github-scout
-description: Find what GitHub already solved for a goal in your project, filter it, and report the two or three your coding agent should try.
+description: Before you build, install or pick a tool, skill or library, find what GitHub already solved, with a quick lookup or the full flow that ends in a report.
 license: MIT
+metadata:
+  improve-repo: JunJayDev/github-scout
+  improve-path: skills/github-scout
 ---
 
 # GitHub scout
@@ -34,6 +37,14 @@ the directions.
 Run it inside the project's repository when there is one: the agent then reads our own code to
 see what we already have. Without a local project it still runs; the user then says in a few
 lines what exists today.
+
+## Quick lookup (`github-scout quick`)
+
+For a small question, run `github-scout quick` instead of the stages: before you build something,
+install a tool or skill, or pick a library. It needs no registry, takes one to three minutes and
+prints one ranked table with the scan's filters (lures, farmed installs, dead repos, too few
+stars). A cheap model can run it. Steps and what to hand back: `references/quick.md`. When the
+answer shapes the project, run the stages below.
 
 ## Stages
 
@@ -115,6 +126,7 @@ skills sit next to this folder and use the same command.
 | `find WORDS…` | 1 | has anyone looked at this already? |
 | `ask [P/]Q "goal" --stage S` | 1 | start a question; creates the registry and the project when missing |
 | `scan P/Q --plan` / `scan P/Q` | 1 / 2 | show the searches / run them and print the ranked table, with any relaxed directions |
+| `quick "need" -e … -m … -p … [--form F]` | 1 to 3 | a one-off lookup: no registry, one short table |
 | `scan P/Q --add FILE\|URL` / `--expand LIST` | 2 | add links found elsewhere / expand an awesome list |
 | `pick P/Q 1 4 h2 --rest "why"` | 3 | verdicts on table rows; under the star floor needs `--low-stars "why"` |
 | `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and the verifiable effect (tier and links) / download one commit and map the code |
@@ -127,4 +139,14 @@ skills sit next to this folder and use the same command.
 Formats: `references/store-format.md`. A worked example: `references/workflow.md`. How to judge
 skills and software: `references/evaluation.md`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+## Improve this skill
+
+This skill is open source (`metadata.improve-repo` in its header). When a run goes wrong because of the skill itself, not the user's input or the environment (a wrong or missing step, a command that fails, output that misleads, a case it should cover), fix it at the source instead of working around it.
+
+Run `gh repo view <improve-repo> --json viewerPermission`. With WRITE, MAINTAIN or ADMIN:
+
+1. Work in a clone of the repository, never in the installed copy, on a branch `improve/<short-slug>`.
+2. Change the skill or its code, add a test (or an eval case) that fails without the change, and run the repository's checks.
+3. Commit, push the branch and open a pull request: what you ran, what went wrong, the evidence, what changed. Do not merge it. Keep personal paths, tokens and account names out of the diff and the text.
+
+With less permission, or without `gh`: tell the user what you found and offer the fix as a patch; open no pull request or issue unasked. If you cannot fix it now, record it: `scripts/report-problem.sh "<summary>"`.

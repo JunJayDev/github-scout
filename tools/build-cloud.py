@@ -64,9 +64,9 @@ Generated from the skills in this repository by tools/build-cloud.py; edit the s
 """
 
 # Stages 5 and 6 (github-scout-dig, github-scout-adopt) run code and change the project, so only the
-# project's own coding agent runs them, never a chat. Blocks that name them (a paragraph, a list item, a
-# table row) are left out of this file; the brief stage says in one plain sentence who does.
-LOCAL_ONLY = re.compile(r"github-scout[- ](?:adopt|dig)|`adopt ")
+# project's own coding agent runs them, never a chat. `quick` needs the command line. Blocks that name them (a
+# paragraph, a list item, a table row) are left out of this file; the brief stage says in one plain sentence who does.
+LOCAL_ONLY = re.compile(r"github-scout[- ](?:adopt|dig)|`adopt |github-scout quick|`quick ")
 BLOCK_START = re.compile(r"#|\||\s*(?:[-*+]|\d+\.)\s")
 
 
@@ -108,6 +108,7 @@ def drop_local_only(lines: list[str]) -> list[str]:
 def body(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)   # drop frontmatter
+    text = re.sub(r"\n## Improve this skill\n.*?(?=\n## |\Z)", "\n", text, flags=re.S)   # a chat cannot open a pull request
     text = text.replace("../github-scout/references/", "").replace("references/", "")
     out, fenced = [], False
     for line in drop_local_only(text.strip().splitlines()):     # nest headings one level down,
