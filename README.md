@@ -45,6 +45,18 @@ Open your agent inside your project repository and state the outcome you want:
 2. **Get the report.** Once confirmed, it runs the searches, keeps candidates with a verifiable effect and enough stars, and writes a report: the candidates, the two or three to try first with how to try each, and what was searched. Your project is not changed.
 3. **Try, choose, adopt.** When you are ready, ask your coding agent to act on the report. It tries the two or three (minutes each, outside your project), records each trial, and chooses one to follow. It then commits changes one source repository at a time and runs `github-scout adopt` to record which of your files came from which upstream files and commits. Run `github-scout updates` at any time to check whether upstream changed the files you took.
 
+### Quick lookup (before you build, install or pick something)
+
+For a small question there is no plan to confirm and no registry. Give the need and a few words in English and Chinese:
+
+```bash
+github-scout quick "an agent skill that makes a repo quotable by AI search" \
+  -e "geo|generative engine optimization|aeo" -e "seo" \
+  -m "ai search visibility|citability" -p "geo skill for claude code" -p "让项目被 ai 搜索推荐" --form skill
+```
+
+It takes one to three minutes, runs the same filters as a scan (lures, farmed installs, dead repos, repos under the star floor), and prints one ranked table. Then `github-scout look <owner/repo>` on the top two or three. A cheap model can run all of it; use the full flow when the answer shapes your project. Recall is lower than a full scan; see [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md).
+
 ### Run without installing (Web chat)
 
 In ChatGPT or Claude on the web, upload [`cloud/github-scout.md`](cloud/github-scout.md) and describe your goal (attach a zip of your project if possible). It runs on web search alone without pausing unless you ask, and finishes with a single Markdown report.

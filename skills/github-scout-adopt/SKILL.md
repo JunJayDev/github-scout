@@ -1,7 +1,10 @@
 ---
 name: github-scout-adopt
-description: For the coding agent: bring the chosen repo into your project as a whole, and what fills its gaps, by its rules; record where.
+description: "For the coding agent: bring the chosen repo into your project as a whole, and what fills its gaps, by its rules; record where."
 license: MIT
+metadata:
+  improve-repo: JunJayDev/github-scout
+  improve-path: skills/github-scout-adopt
 ---
 
 # GitHub scout: adopt
@@ -71,4 +74,14 @@ agent takes it in with `github-scout import`, tries and chooses (`github-scout-d
 this stage. Without the command line, it records what it adopted (repo, commit, their files, our
 files) at the end of the report file, under "Adopted".
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+## Improve this skill
+
+This skill is open source (`metadata.improve-repo` in its header). When a run goes wrong because of the skill itself, not the user's input or the environment (a wrong or missing step, a command that fails, output that misleads, a case it should cover), fix it at the source instead of working around it.
+
+Run `gh repo view <improve-repo> --json viewerPermission`. With WRITE, MAINTAIN or ADMIN:
+
+1. Work in a clone of the repository, never in the installed copy, on a branch `improve/<short-slug>`.
+2. Change the skill or its code, add a test (or an eval case) that fails without the change, and run the repository's checks.
+3. Commit, push the branch and open a pull request: what you ran, what went wrong, the evidence, what changed. Do not merge it. Keep personal paths, tokens and account names out of the diff and the text.
+
+With less permission, or without `gh`: tell the user what you found and offer the fix as a patch; open no pull request or issue unasked. If you cannot fix it now, record it: `scripts/report-problem.sh "<summary>"`.

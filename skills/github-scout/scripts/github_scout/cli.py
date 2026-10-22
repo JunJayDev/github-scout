@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
+import time
 import urllib.request
 from pathlib import Path
 
 from . import __version__
 from .discover import (
-    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, floor_of, is_farmed, is_open, is_stale, merged, plan, plan_warnings,
-    relaxed_reason, render, rising, row, scan_row, slugs_in_text, visible, why_hidden,
+    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, excluded, floor_of, is_farmed, is_low, is_lure, is_open,
+    is_stale, merged, plan, plan_warnings, relaxed_reason, render, rescore, rising, row, scan_row, slugs_in_text, visible,
+    why_hidden,
 )
+from .discover import HIDE as HIDE_MONTHS
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
@@ -22,8 +29,8 @@ from .registry import (
     render_find, set_adoption, set_use, show_card, show_question, stage_help, write_index,
 )
 from .store import (
-    KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, best_tier, env, lang_gaps,
-    locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
+    HAN, KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, best_tier, env,
+    lang_gaps, locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
 )
 
 EPILOG = """stages (one skill each; github-scout runs 1 to 4 and ends with a report; the project is not changed):
@@ -47,7 +54,8 @@ def _store(args, create_lang: str | None = None) -> Store:
 
 
 def make_client(args, store: Store | None = None) -> Client:
-    return Client(verbose=not args.quiet, stamp_dir=(store.root / "cache") if store else None)
+    stamp = getattr(args, "stamp_dir", None) or ((store.root / "cache") if store else None)
+    return Client(verbose=not args.quiet, stamp_dir=stamp)
 
 
 def _slug(text: str) -> str:
@@ -341,6 +349,101 @@ def cmd_scan(args):
            f"(numbers refer to this table)", table)
 
 
+QUICK_LENSES = "EPMQTH"                     # entities, pairs, mechanisms, problems, topics, rising: about 25 to 70 searches
+QUICK_FORM_LENSES = {"skill": "S", "mcp": "D", "cli": "N", "library": "N"}   # the lens a question's form adds
+QUICK_ORDER = "SDNHEPMQ"        # a small budget or a time limit ends the scan. The form's registries go first: they are
+                                # other hosts, answer in a second, and a dead one is asked once (20 s). Then the rising
+                                # list (6 to 9 searches, finds what no word matches), then names, pairs, mechanisms and
+                                # problems; the 16 to 24 topic searches (T) and code search (K) last
+
+
+def quick_lenses(forms, lenses: str | None = None) -> str:
+    """The lenses `quick` runs: the given letters, else the base lenses plus one per form. Code search (K) is left out
+    unless asked for: GitHub allows 10 of those a minute."""
+    chosen = lenses or QUICK_LENSES + "".join(QUICK_FORM_LENSES.get(f, "") for f in forms or [])
+    return "".join(dict.fromkeys(chosen))
+
+
+def _scratch_registry() -> Store:
+    """A throwaway registry for commands that record nothing, removed when the process ends."""
+    root = Path(tempfile.mkdtemp(prefix="github-scout-quick-"))
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    return Store.init(root / "r", "scratch")
+
+
+def cmd_quick(args):
+    vocab = {"entities": args.entity or [], "mechanisms": args.mechanism or [], "problems": args.problem or [],
+             "forms": args.form or []}
+    words = " ".join(w for k in ("entities", "mechanisms", "problems") for w in vocab[k])
+    if not words:
+        raise StoreError("quick needs search words: -e (names of things, a|b for synonyms), -m (how a solution works) "
+                         "or -p (a short problem phrase); write each in English and in Chinese")
+    cjk = bool(HAN.search(words))
+    quiet_warnings = args.quiet
+    if not cjk and not quiet_warnings:
+        print("warn  no Chinese words: add -p \"<中文短语>\" or -e \"term|中文\" to also find Chinese-language projects",
+              file=sys.stderr)
+    lenses = quick_lenses(vocab["forms"], args.lenses)
+    args.quiet = not args.verbose                             # each search prints only with --verbose
+    args.stamp_dir = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "github-scout"   # agents running
+    client = make_client(args)                                                                            # at once share one budget
+    if not client.token and "K" in lenses:
+        lenses = lenses.replace("K", "")
+        if not quiet_warnings:
+            print("warn  no GitHub token: SKILL.md code search skipped (GITHUB_TOKEN or `gh auth login`)", file=sys.stderr)
+    keep = Path(args.keep).expanduser() if args.keep else None
+    if keep:
+        store = Store.init(keep, "quick")
+    else:
+        store = _scratch_registry()
+    new_project(store, "quick", "Quick", "one-off lookups")
+    new_question(store, "quick/q", args.question, args.stage, ["en", "zh"] if cjk else ["en"])
+    doc = store.question("quick/q")
+    doc.data.update({k: v for k, v in vocab.items() if v})
+    store.save_question(doc)
+    began = time.monotonic()
+    scan = Scan(store, client, doc.data, progress=False).run(lenses, args.budget, args.per_query, QUICK_ORDER, args.seconds)
+    store.save_scan(scan)
+    table = annotate(store, rescore(scan, doc.data))
+    seconds = time.monotonic() - began
+    rows, rise = visible(table), rising(table)
+    errors = [f"{s['lens']} {s['query'][:50]}: {s['error'][:70]}" for s in table["searches"] if s.get("error")]
+    limit = min_stars()
+    cands = table["candidates"]
+    low = sum(1 for c in cands if is_low(c, limit) and is_open(c) and not is_stale(c) and not excluded(c))
+    stale = sum(1 for c in cands if is_stale(c))
+    bad = sum(1 for c in cands if is_lure(c) or is_farmed(c))
+    if args.json:
+        pick = ("repo", "stars", "pushed", "created", "desc", "score", "fit", "lenses", "topics")
+        print(json.dumps({"question": args.question, "lenses": lenses, "searches": len(table["searches"]),
+                          "github_calls": client.github_calls, "seconds": round(seconds),
+                          "rows": [{k: c.get(k) for k in pick} for c in rows[:args.top]],
+                          "rising": [{k: c.get(k) for k in pick} for c in rise[:args.rising]],
+                          "hidden": {"under_stars": low, "stale": stale, "lures_or_farmed": bad}, "errors": errors},
+                         ensure_ascii=False, indent=1))
+        return
+    out = [f"quick: {args.question}",
+           f"{len(table['searches'])} searches ({lenses}) · {client.github_calls} GitHub calls · {seconds:.0f}s · "
+           f"{len(rows)} repos pass the filters (50+ stars, pushed in the last 6 months, no lures)",
+           "  #  score  stars created   pushed  repo  description  [lenses] fit = question groups in its own words"]
+    out += [row(i, c) for i, c in enumerate(rows[:args.top], 1)]
+    if len(rows) > args.top:
+        out.append(f"... {len(rows) - args.top} more (--top N)")
+    if rise and args.rising:
+        out.append("rising (new, growing fast, no match in their own words; judge each by what it makes):")
+        out += [row(f"h{i}.", c) for i, c in enumerate(rise[:args.rising], 1)]
+    out.append(f"hidden: {low} under {limit} stars, {stale} not pushed in {HIDE_MONTHS} months, {bad} lures or farmed installs")
+    timed = sum(1 for s in table["searches"] if s.get("error") == "skipped: time")
+    if timed:
+        out.append(f"time limit: {timed} searches were not run ({args.seconds:.0f}s; --seconds N raises it, 0 removes it)")
+    if errors:
+        out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]))
+    out.append("next: github-scout look <owner/repo> ... (facts, README, verifiable effect) for the top 2-3; "
+               "if the choice shapes the project, run the full flow: github-scout ask"
+               + (f"   (kept in {keep})" if keep else ""))
+    print("\n".join(out))
+
+
 def cmd_pick(args):
     store = _store(args)
     project, qid = store.split_ref(args.ref)
@@ -420,7 +523,12 @@ def cmd_pick(args):
 
 
 def cmd_look(args):
-    store = _store(args)
+    try:
+        store = _store(args)
+    except StoreError:
+        if args.q:
+            raise
+        store = _scratch_registry()   # no registry and nothing to record: look anyway
     client = make_client(args, store)
     texts, results, entries = [], [], []
     for r in args.repos:
@@ -789,6 +897,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--per-query", type=int, default=30)
     p.add_argument("--top", type=int, default=40)
     p.add_argument("--all", action="store_true", help="also show decided and stale rows; with --expand keep every link")
+
+    p = add("quick", cmd_quick, "one-off lookup in about a minute: is there something that already does this? Searches "
+            "with the words you give, prints a short ranked table, writes no registry", (common, js))
+    p.add_argument("question", help="one sentence: the result you want, not the tool you imagine")
+    p.add_argument("-e", "--entity", action="append", metavar="A|B", help="a name or thing, synonyms after | "
+                   "(repeat; give English and Chinese: \"xiaohongshu|小红书\")")
+    p.add_argument("-m", "--mechanism", action="append", metavar="A|B", help="how a solution works, in README words (repeat)")
+    p.add_argument("-p", "--problem", action="append", metavar="PHRASE", help="a short phrase a user of this would write, "
+                   "one per language (repeat)")
+    p.add_argument("--form", action="append", choices=["skill", "mcp", "cli", "library", "app", "extension"],
+                   help="what you want it to be; skill, mcp, cli and library add that kind of search (repeat)")
+    p.add_argument("--stage", choices=STAGES, default="idea", help="where your own work stands (default idea)")
+    p.add_argument("--lenses", help=f"lens letters from {LENSES} (default {QUICK_LENSES} plus the form's)")
+    p.add_argument("--budget", type=int, default=80, help="max GitHub API calls (default 80); skills.sh, npm and the MCP registry searches do not stop at it")
+    p.add_argument("--seconds", type=float, default=150, help="stop starting searches after this long (default 150, 0 = no limit)")
+    p.add_argument("--per-query", type=int, default=30)
+    p.add_argument("--top", type=int, default=10)
+    p.add_argument("--rising", type=int, default=5, help="rising rows to show (default 5, 0 hides them)")
+    p.add_argument("--keep", metavar="DIR", help="keep the scan in a new registry here (default: thrown away)")
+    p.add_argument("--verbose", action="store_true", help="print every search as it runs")
 
     p = add("pick", cmd_pick, "record verdicts on scan rows: numbers from the table, or owner/repo")
     p.add_argument("ref")

@@ -1712,5 +1712,131 @@ class ReportFirstTests(Base):
         self.api.paths["repos/a/b/readme"] = "# b\nA tool. ![logo](logo.png)\n"
         self.assertIn("verifiable effect: weak, only a text description", self.run_cli("look", "a/b")[1])
 
+
+class QuickTests(Base):
+    """`quick`: a one-off lookup with no registry, and `look` without one."""
+
+    def quick(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["quick", *argv])      # no --store: quick must not need a registry
+        return code, out.getvalue(), err.getvalue()
+
+    def seed(self):
+        alive = f" pushed:>{discover.window(discover.HIDE)}"
+        xhs = self.api.add(repo("xpzouying/xiaohongshu-mcp", 16000, "MCP for xiaohongshu.com", created=ago(14), pushed=ago(0.5)))
+        small = self.api.add(repo("someone/xhs-tiny", 3, "xiaohongshu helper", created=ago(3), pushed=ago(0.5)))
+        self.api.search["xiaohongshu" + alive] = [xhs, small]
+        self.api.skills["xiaohongshu"] = [("someone/xhs-skill", 900)]
+        self.api.add(repo("someone/xhs-skill", 400, "xiaohongshu skill", created=ago(5), pushed=ago(1)))
+        self.api.code["xiaohongshu filename:SKILL.md"] = ["someone/xhs-skill"]
+        self.scratch = Store.init(Path(self.tmp.name) / "scratch", "scratch")
+        self._scratch = cli._scratch_registry
+        cli._scratch_registry = lambda: self.scratch
+        self.addCleanup(setattr, cli, "_scratch_registry", self._scratch)
+
+    def test_quick_prints_a_short_table_and_leaves_the_registry_alone(self):
+        self.seed()
+        before = sorted(p.name for p in (self.root / "scans").iterdir())
+        code, out, err = self.quick("read a Xiaohongshu feed", "-e", "xiaohongshu|小红书", "-m", "mcp server", "--quiet")
+        self.assertEqual(code, 0, err)
+        self.assertIn("quick: read a Xiaohongshu feed", out)
+        self.assertIn("xpzouying/xiaohongshu-mcp", out)
+        self.assertNotIn("someone/xhs-tiny", out.split("hidden:")[0])        # under 50 stars stays out of the table
+        self.assertIn("hidden: 1 under 50 stars", out)
+        self.assertEqual(sorted(p.name for p in (self.root / "scans").iterdir()), before)    # the real registry is untouched
+        self.assertEqual(len(list((Path(self.scratch.root) / "scans").iterdir())), 1)         # the scan lived in the scratch one
+
+    def test_quick_json_has_the_rows(self):
+        self.seed()
+        code, out, _ = self.quick("read a Xiaohongshu feed", "-e", "xiaohongshu|小红书", "--json", "--quiet")
+        self.assertEqual(code, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["rows"][0]["repo"], "xpzouying/xiaohongshu-mcp")
+        self.assertEqual(data["hidden"]["under_stars"], 1)
+
+    def test_quick_needs_words_and_asks_for_chinese(self):
+        code, _, err = self.quick("read a feed")
+        self.assertEqual(code, 1)
+        self.assertIn("quick needs search words", err)
+        self.seed()
+        code, _, err = self.quick("read a feed", "-e", "xiaohongshu")
+        self.assertEqual(code, 0)
+        self.assertIn("no Chinese words", err)
+        self.assertNotIn("no Chinese words", self.quick("read a feed", "-e", "xiaohongshu|小红书")[2])
+
+    def test_quick_adds_one_lens_per_form_and_never_code_search_alone(self):
+        self.assertEqual(cli.quick_lenses(None), "EPMQTH")
+        self.assertEqual(cli.quick_lenses(["skill"]), "EPMQTHS")
+        self.assertEqual(cli.quick_lenses(["mcp", "cli", "library"]), "EPMQTHDN")
+        self.assertEqual(cli.quick_lenses(["skill"], "EP"), "EP")
+        self.assertNotIn("K", cli.quick_lenses(["skill", "mcp", "cli", "library", "app"]))
+
+    def test_quick_with_a_form_reads_skills_sh(self):
+        self.seed()
+        code, out, err = self.quick("read a Xiaohongshu feed", "-e", "xiaohongshu|小红书", "--form", "skill", "--quiet")
+        self.assertEqual(code, 0, err)
+        self.assertIn("(EPMQTHS)", out)
+        self.assertIn("someone/xhs-skill", out)
+
+    def test_a_small_budget_runs_the_rising_list_before_topics(self):
+        self.seed()
+        q = {"project": "quick", "id": "q", "ask": "x", "entities": ["xiaohongshu"], "forms": ["skill"]}
+        sc = discover.Scan(None, client(self.api), q, progress=False)
+        scan = sc.run("EPTH", budget=3, order="EPMQHSDN")
+        ran = [s["lens"] for s in scan["searches"] if not s.get("error")]
+        self.assertIn("H", [s["lens"] for s in scan["searches"][:3]])        # H is searched before any topic search
+        self.assertEqual(ran, sorted(ran, key="EPMQHSDNT".index))
+        self.assertTrue(any(s.get("error") == "skipped: budget" and s["lens"] == "T" for s in scan["searches"]))
+
+    def test_registries_do_not_use_the_github_budget(self):
+        self.seed()
+        q = {"project": "quick", "id": "q", "ask": "x", "entities": ["xiaohongshu", "reddit", "twitter"], "forms": ["skill"]}
+        sc = discover.Scan(None, client(self.api), q, progress=False)
+        scan = sc.run("ES", budget=1, order="EPMQHSDN")
+        by = {}
+        for s in scan["searches"]:
+            by.setdefault(s["lens"], []).append(s.get("error"))
+        self.assertIn("skipped: budget", by["E"])                      # GitHub searches stop at the budget ...
+        self.assertTrue(by["S"] and all(e is None for e in by["S"]))    # ... skills.sh does not
+        self.assertGreater(sc.client.calls, sc.client.github_calls)       # skills.sh was called, and not counted
+
+    def test_a_registry_that_does_not_answer_is_asked_once(self):
+        self.seed()
+        self.api.down.add("registry.modelcontextprotocol.io")
+        q = {"project": "quick", "id": "q", "ask": "x", "entities": ["xiaohongshu", "reddit", "twitter"], "forms": ["mcp"]}
+        scan = discover.Scan(None, client(self.api), q, progress=False).run("ED")
+        d = [s.get("error") for s in scan["searches"] if s["lens"] == "D"]
+        self.assertGreater(len(d), 1)
+        self.assertTrue(d[0].startswith("network:"))
+        self.assertTrue(all(e == "skipped: host not answering" for e in d[1:]))
+        self.assertEqual(len([c for c in self.api.calls if "registry.modelcontextprotocol.io" in c]), 1)
+
+    def test_a_time_limit_skips_the_searches_not_yet_started(self):
+        self.seed()
+        q = {"project": "quick", "id": "q", "ask": "x", "entities": ["xiaohongshu"]}
+        scan = discover.Scan(None, client(self.api), q, progress=False).run("EP", seconds=1e-9)
+        self.assertTrue(scan["searches"])
+        self.assertTrue(all(s.get("error") == "skipped: time" for s in scan["searches"]))
+        self.assertEqual(self.api.calls, [])
+        code, out, _ = self.quick("read a feed", "-e", "xiaohongshu|小红书", "--seconds", "0.000000001", "--quiet")
+        self.assertEqual(code, 0)
+        self.assertIn("time limit:", out)
+
+    def test_look_works_without_a_registry_when_it_records_nothing(self):
+        self.api.add(repo("a/b", 300, "Tool", pushed=ago(0.1)))
+        self.api.paths["repos/a/b/readme"] = "# b\nA tool.\n"
+        old = cli._store
+        cli._store = lambda args, create_lang=None: (_ for _ in ()).throw(StoreError("no registry"))
+        self.addCleanup(setattr, cli, "_store", old)
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["look", "a/b"])
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertIn("a/b", out.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(cli.main(["look", "a/b", "--q", "ops/browser-ops"]), 1)       # recording needs the registry
+
+
 if __name__ == "__main__":
     unittest.main()

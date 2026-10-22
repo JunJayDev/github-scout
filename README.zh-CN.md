@@ -45,6 +45,18 @@ npx skills add JunJayDev/github-scout -g
 2. **生成报告。** 确认后，Agent 执行检索，保留效果可验证且星数达标的仓库，写出报告：候选列表、最值得先试的两三个及各自的试法、检索覆盖范围。你的项目不会被改动。
 3. **试跑、选定与落地。** 准备接入时，让编码 Agent 按报告继续。它在项目外试跑这两三个候选（每个几分钟），记录每次试跑，选定一个整体跟进；然后按每个上游仓库一次提交的方式修改代码，并运行 `github-scout adopt` 记录本地文件对应的上游文件及双端 commit。后续随时运行 `github-scout updates`，即可查看上游是否修改了你所引用的文件。
 
+### 轻量查询（动手做、安装、选型之前）
+
+小问题不用确认计划，也不用登记库。给出需求和几组中英文词：
+
+```bash
+github-scout quick "让项目被 AI 搜索引用和推荐的 agent skill" \
+  -e "geo|generative engine optimization|aeo" -e "seo|搜索优化" \
+  -m "ai search visibility|citability" -p "geo skill for claude code" -p "让项目被 ai 搜索推荐" --form skill
+```
+
+一到三分钟，过滤规则和完整扫描一样（诱饵、刷量、停更、星数不够的仓库），输出一张排好序的表。再对前两三个跑 `github-scout look <owner/repo>`。整件事可以交给便宜的模型；答案会影响整个项目时，走完整流程。召回率低于完整扫描，见 [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md)。
+
 ### 免安装模式（网页端对话）
 
 在 ChatGPT 或 Claude 网页版中，上传 [`cloud/github-scout.md`](cloud/github-scout.md) 并写明你的目标（建议同时附上项目压缩包）。它仅靠网页搜索即可运行，除非你要求，否则中途不会停顿，最终输出一份完整的 Markdown 报告。
