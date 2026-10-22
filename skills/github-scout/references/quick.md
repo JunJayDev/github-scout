@@ -27,8 +27,9 @@ Give it to your cheapest capable model and keep only its short answer in your ow
    and any search that failed. `installs` is the skills.sh install count; `?` after a repo's kind in `look`
    means a guess.
 4. **Look at the two or three rows that fit the need,** not blindly the first three: skip a word that
-   matches in another sense (`geo` is also geography; a README beautifier matches `readme`). Then `github-scout look <owner/repo> …` gives facts, activity, the
-   verifiable effect and the start of the README. No registry is needed.
+   matches in another sense (`geo` is also geography; a README beautifier matches `readme`).
+   `github-scout look <owner/repo> …` gives facts, activity, the verifiable effect and the start of
+   the README. No registry is needed.
 5. **Answer** with those two or three: stars, last push, one line on what each does for the need,
    and the one risk that matters. Say what the lookup did not cover.
 
