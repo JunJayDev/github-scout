@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "github-scout"
 version = "0.2.0"
-description = "Agent skill for Claude Code and Codex: before your agent builds something, find what GitHub already solved, keep the projects whose effect you can verify, and report the 2–3 to try first."
+description = "GitHub research for coding agents: find proven open-source projects to try before your agent builds from scratch."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

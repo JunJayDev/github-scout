@@ -2,7 +2,7 @@
 
 # github-scout
 
-Agent skills and a CLI that find what GitHub already solved for a goal in your project, keep the projects whose effect you can verify, and report to your coding agent the two or three worth trying.
+GitHub research for coding agents: find proven open-source projects to try before your agent builds from scratch. Agent skills and a CLI for Claude Code and Codex.
 
 [![CI](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -140,6 +140,10 @@ Pre-build search skills such as ECC's `search-first` (the most installed on skil
 - storing every verdict in a persistent registry so repositories are not evaluated twice;
 - writing a codebase-aware report that tells your coding agent what to try first and how;
 - recording file-level and commit-level provenance with `github-scout adopt` and tracking upstream changes via `github-scout updates`.
+
+## Related
+
+Part of a series on media literacy for agents. [x-scout](https://github.com/JunJayDev/x-scout) does the same for X: it reads posts without login, checks every search hit against X, and judges value apart from reach.
 
 ## Contributing
 

@@ -6,7 +6,7 @@
     {
       "name": "github-scout",
       "source": "./",
-      "description": "Agent skill for Claude Code and Codex: before your agent builds something, find what GitHub already solved, keep the projects whose effect you can verify, and report the 2–3 to try first."
+      "description": "GitHub research for coding agents: find proven open-source projects to try before your agent builds from scratch."
     }
   ]
 }

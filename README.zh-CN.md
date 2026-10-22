@@ -2,7 +2,7 @@
 
 # github-scout
 
-面向编码 Agent 的开源调研 Skill 与命令行工具：在写代码前检索 GitHub 上的现有方案，保留效果可验证的项目，并向编码 Agent 报告最值得先试的两三个。
+面向编码 Agent 的 GitHub 调研工具：在 Agent 从零开写之前，找到值得先试的成熟开源项目。提供 Claude Code 和 Codex 用的 skill 与命令行工具。
 
 [![CI](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -140,6 +140,10 @@ scans/<项目>/<问题>/<时间戳>.json        每次检索执行的查询与�
 - 用持久化登记库记住每一次筛选结论，看过的仓库绝不看第二遍；
 - 结合本地代码结构写出报告，告诉编码 Agent 先试什么、怎么试；
 - 通过 `github-scout adopt` 记录文件级与提交级来源，并由 `github-scout updates` 持续跟踪上游对应文件的变更。
+
+## 同系列
+
+属于「agent 媒介素养」系列。[x-scout](https://github.com/JunJayDev/x-scout) 用同样的思路处理 X：不登录读帖，搜索结果逐条回 X 核对，把价值和传播分开判断。
 
 ## 参与贡献
 
