@@ -1,7 +1,10 @@
 ---
 name: github-scout-dig
-description: For the coding agent: try the report's two or three repos, stop early on dead ends, choose one to follow, fill gaps with reasons.
+description: "For the coding agent: try the report's two or three repos, stop early on dead ends, choose one to follow, fill gaps with reasons."
 license: MIT
+metadata:
+  improve-repo: JunJayDev/github-scout
+  improve-path: skills/github-scout-dig
 ---
 
 # GitHub scout: dig
@@ -13,7 +16,7 @@ repo that does not run for us is not followed, however good its idea.
 ## Input
 
 The report from `github-scout brief <q>`: what good looks like, the two or three under Try first
-with how to try each and what to look for, and the facts on each (stars, verifiable effect, the
+with how to try each and what to look for, and the facts on each (stars, project evidence, independent feedback, the
 reviewed commit). The project's own AGENTS.md or CLAUDE.md and its conventions win over the
 report.
 
@@ -73,4 +76,14 @@ source and reason.
 
 `github-scout-adopt`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
+## Improve this skill
+
+This skill is open source (`metadata.improve-repo` in its header). When a run goes wrong because of the skill itself, not the user's input or the environment (a wrong or missing step, a command that fails, output that misleads, a case it should cover), fix it at the source instead of working around it.
+
+Run `gh repo view <improve-repo> --json viewerPermission`. With WRITE, MAINTAIN or ADMIN:
+
+1. Work in a clone of the repository, never in the installed copy, on a branch `improve/<short-slug>`.
+2. Change the skill or its code, add a test (or an eval case) that fails without the change, and run the repository's checks.
+3. Commit, push the branch and open a pull request: what you ran, what went wrong, the evidence, what changed. Do not merge it. Keep personal paths, tokens and account names out of the diff and the text.
+
+With less permission, or without `gh`: tell the user what you found and offer the fix as a patch; open no pull request or issue unasked. If you cannot fix it now, record it: `scripts/report-problem.sh "<summary>"`.

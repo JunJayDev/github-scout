@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 
 from .discover import merged, relaxed_text, slugs_in_text
-from .store import BACKBONE_TITLES, SLUG, TRY_TITLES, Store, StoreError, as_list, best_tier, min_stars, section, today
+from .store import BACKBONE_TITLES, SLUG, TRY_TITLES, Store, StoreError, as_list, min_stars, section, today
 
 # Column names a report may use, in English and Chinese.
 COLUMNS = {
@@ -271,7 +271,7 @@ T = {
         "gaps": "## Gaps to fill", "trials": "## Trial runs",
         "steps": "## What to change, in order", "why": "## Why: the ideas behind it",
         "practice": "## Practices and components", "compare": "## Against what we have",
-        "repos": "## Sources", "head": "| repo | role | take | stars | verifiable effect | level | reviewed at | what we take |",
+        "repos": "## Sources", "head": "| repo | role | take | stars | evidence links | level | reviewed at | what we take |",
         "roles": {"backbone": "backbone", "alternate": "alternate", "gap": "fills a gap", "try": "try first"}, "none": "none",
         "skipped": "## Not adopted (leave these out)",
         "empty": "(the answer has no such section yet)", "noanswer": "{ref} has no answer yet: write its answer section first",
@@ -322,7 +322,7 @@ T = {
         "gaps": "## 补什么", "trials": "## 试跑记录",
         "steps": "## 要改什么（按顺序）", "why": "## 依据：值得借的思路",
         "practice": "## 做法和组件", "compare": "## 和我们已有的对照",
-        "repos": "## 参考仓库", "head": "| 仓库 | 角色 | 取舍 | 星数 | 可验证的效果 | 看到哪一步 | 审查时的版本 | 我们拿什么 |",
+        "repos": "## 参考仓库", "head": "| 仓库 | 角色 | 取舍 | 星数 | 参考链接 | 看到哪一步 | 审查时的版本 | 我们拿什么 |",
         "roles": {"backbone": "主干", "alternate": "备选", "gap": "补缺口", "try": "先试"}, "none": "没有",
         "skipped": "## 没采用（不要加进来）",
         "empty": "（答案里还没有这一节）", "noanswer": "{ref} 还没有答案：先写问题文件里的答案",
@@ -436,7 +436,7 @@ def brief(store: Store, ref: str, out: Path | None = None) -> Path:
             stars = "-" if d.get("stars") is None else str(d["stars"]) + (f" ({_flat(use['low_stars'], 80)})"
                                                                          if use.get("low_stars") else "")
             res = [str(x).replace("|", "%7C") for x in as_list(d.get("results"))]
-            shown = f"{best_tier(res, card.id)}: " + " ".join(f"[{i}]({u})" for i, u in enumerate(res[:4], 1)) \
+            shown = " ".join(f"[{i}]({u})" for i, u in enumerate(res[:4], 1)) \
                 + (f" +{len(res) - 4}" if len(res) > 4 else "")
             if not res:
                 shown = f"{t['none']}: {_flat(use['no_results'], 80)}" if use.get("no_results") else "-"

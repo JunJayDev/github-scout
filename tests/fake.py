@@ -56,6 +56,7 @@ class FakeAPI:
         self.sites: dict[str, int] = {}         # a site outside GitHub -> the status it answers with (else 404)
         self.downloads: dict[str, int] = {}     # npm package -> downloads last month
         self.calls: list[str] = []
+        self.down: set[str] = set()             # hosts that do not answer (a timeout)
         self.token_hosts: set[str] = set()      # hosts a token was sent to
 
     def add(self, r: dict):
@@ -65,6 +66,8 @@ class FakeAPI:
     def __call__(self, method, url, headers, body):
         self.calls.append(f"{method} {url}")
         u = urlparse(url)
+        if u.netloc in self.down:
+            raise TimeoutError("timed out")
         if "Authorization" in headers:
             self.token_hosts.add(u.netloc)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}

@@ -4,6 +4,57 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- The lookup before building runs in a subagent and asks people first (owner, 2026-10-25). The main agent
+  sends a short brief (need, Musts, project, form, known names) and keeps only a verdict of about fifteen lines;
+  it never runs the commands or reads the steps. The subagent lists what it already knows, searches the web,
+  awesome lists and the registries (skills.sh, MCP registry, npm, PyPI, Hugging Face) for what people use, runs
+  `github-scout quick` as the GitHub sweep for new repos, reads its table as leads by meaning, checks the
+  candidates with `look`, searches independent feedback on the two or three it names, and answers use, adapt,
+  borrow an idea, or nothing fits. The subagent runs on Sonnet by default (the trial below ran on it), and on
+  `gpt-6.1-sol` in Codex.
+  `references/quick.md` is now `references/lookup.md`.
+  Why: in about twenty lookups across projects (2026-10-22 to 24) that ran `quick` in the main session, agents
+  never adopted a repo they or the user did not already know, and at least six built their own. Keyword rows
+  were mostly neighbours (a 76.8k-star job-search agent for "Bilibili covers"), the rising rows were the same
+  five repos whatever the need, nearly every run hit the 150 s limit, and the table, `look` and the doc put
+  13 to 16 KB into the main context. The good answers came from the model's own knowledge (wtpsplit, Konsta
+  UI, missed by the table), web research, Hugging Face datasets and an awesome list read by hand.
+  - Trial (2026-10-25): a subagent given only the brief and `lookup.md`, on a need where the table had missed
+    (split unpunctuated speech transcripts into sentences, Chinese and English, on a Mac), answered in 7.7
+    minutes with three candidates that pass the Musts: SaT (wtpsplit), which the project was already wiring in,
+    from step 1; sherpa-onnx's CT-Transformer punctuation and FireRedPunc from the web, X and Hugging Face. Its
+    two GitHub sweeps gave none of them. Its notes on the doc (a project already using a candidate, a Hugging
+    Face command, an answer shape that fits 15 lines, runtime words in `-m`) are in `lookup.md`.
+  - `quick`: defaults 150 GitHub calls, 300 s and 20 rows (were 80, 150 s, 10): a subagent can wait, and the
+    topic searches that ran last were the ones cut. Lenses and ranking unchanged. Its last line says the rows
+    are leads and points to the lookup. Recall (`evals/run.py --lenses quick --budget 150 --seconds 300`,
+    2026-10-25): 10 of 10 repos in 5 cases, 4.6 to 6.1 minutes a scan (was 9 of 10 at 80 calls and 150 s;
+    `user-w-ui/search-before-build` now comes back). Kept is not seen: that repo sits at row 254 and
+    `alchaincyf/tramstop-skill` at row 276, past the 20 rows shown, which is why the lookup leans on the web.
+  - `tools/build-cloud.py`: a heading that names a local-only command drops its whole section, code blocks
+    included.
+
+- `quick` (owner, 2026-10-22). A one-off lookup for the moment before you build, install or pick something: no
+  registry, no plan to confirm, one ranked table in one to three minutes, run by a cheap model if you like. It
+  runs the lenses E, P, M, Q, T, H and one per `--form` (skill: skills.sh; mcp: the MCP registry; cli and library: npm),
+  never code search unless `--lenses` says so (10 a minute), with the scan's filters. Several agents share one
+  GitHub budget through `~/.cache/github-scout`. `look` now works without a registry when it records nothing.
+  Why: a hand search of seven queries missed the first-ranked candidate (a 19.6k-star skill) that `quick` put on top;
+  the full flow took too long for small questions, so agents did not use it. `evals/run.py --lenses` measures a
+  lens set against the recall cases.
+  - Recall: on the five recall cases, with their large vocabularies (97 to 123 searches) and the default limits
+    (80 GitHub calls, 150 s), `quick` keeps 9 of 10 repos in about three minutes a case; the last recorded full
+    scan kept all 10. The one it missed, `user-w-ui/search-before-build`, needs more searches than the limits
+    allow. A typical lookup has far fewer words and finishes sooner. Each limit trades recall for time: five
+    passes with other lens orders each kept 8 of 10, a different two missing.
+  - Limits that keep it quick: `--budget` counts GitHub calls only (skills.sh, npm and the MCP registry searches
+    do not stop at it); `--seconds` (default 150) stops starting searches; a registry that does not answer is asked
+    once, and non-GitHub hosts wait 20 s, not 60 (the MCP registry did not answer from the test machine).
+  - Scan: `run(order=, seconds=)`; `Client.github_calls`.
+- Skills: `description` values with a colon are quoted (adopt, brief, dig were not valid YAML); each skill has
+  `metadata.improve-repo` and an "Improve this skill" section: with write access, branch, test and pull request;
+  without it, report and offer a patch. The cloud file leaves the section out.
+
 - Report first (owner, 2026-10-19). github-scout finds, filters and reports; trying the
   candidates and choosing the one to follow are the project's coding agent's work, after the
   report and only when the user asks.

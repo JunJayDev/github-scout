@@ -25,8 +25,11 @@ skip the commands.
   and offer it for download.
 - List only repositories you have seen (their page, the connector, or a search result naming
   them). Never invent a repository, a star count or a date.
-- **You do not try repos or choose one.** Judge each by its verifiable effect (a live site,
-  package downloads, screenshots, videos, posts outside the repo) and its stars, and write under
+- **You do not try repos or choose one.** Check project claims lightly and keep the star and
+  maintenance filters. Before recommending the top two or three, independently search real use,
+  reviews, recommendations, outputs and problems outside their repos. Distinguish independent
+  sources from author promotion and reposts. Record links or "no independent usage feedback
+  found"; unavailable search is "not checked". Neither alone disqualifies a repo. Write under
   Try first how the coding agent should try each. Back in the project, and only when the user
   asks, that agent tries them, chooses one to follow and brings it in.
 - Without a project, the stage is "idea".
@@ -42,14 +45,15 @@ Generated from the skills in this repository by tools/build-cloud.py; edit the s
 ## GitHub scout
 
 Before building something, look at what others have built. This skill takes a goal from the
-user's project, searches GitHub in English and Chinese, keeps the repositories whose effect
-anyone can check, and writes a report for the coding agent: what exists, which two or three look
+user's project, searches GitHub in English and Chinese, checks project claims lightly, independently searches feedback on the top two or three,
+and writes a report for the coding agent: what exists, which two or three look
 most promising for us and how to try each, and what is likely left to build. It never changes
 the project, and it does not try repositories or choose one.
 
-Effect comes first. A repo is a reference only when it shows what it does in a way anyone can
-check (a live site, a package people download, screenshots, videos, posts outside the repo) and
-has 50 stars or more, or the relaxed floor of its direction. An idea from each of a dozen repos
+Review the README, examples and any demo briefly for obvious mismatches. Before recommending
+the top two or three, search outside the repo for independent use, reviews and outputs; record
+what you found or that no independent feedback was found. Missing feedback is not a rejection.
+A reference needs 50 stars or more, or the relaxed floor of its direction. An idea from each of a dozen repos
 does not add up to a working whole: the coding agent follows one.
 
 ### What the user must give
@@ -73,8 +77,8 @@ report.
 |---|---|---|---|
 | 1 plan | `github-scout-plan` | reads our project, restates the goal, says what good looks like, picks the stage, writes search directions in English and Chinese | the question with its directions |
 | 2 search | `github-scout-search` | searches along every direction; drops lures, farmed installs, dead repos and those with too few stars | ranked candidates |
-| 3 triage | `github-scout-triage` | keeps the candidates with a verifiable effect and enough stars; says how each would be tried | a shortlist |
-| 4 brief | `github-scout-brief` | compares with our project; writes what exists, the two or three to try first and how, what is left to build | the report for the coding agent |
+| 3 triage | `github-scout-triage` | checks project claims lightly and keeps relevant candidates with enough stars; says how each would be tried | a shortlist |
+| 4 brief | `github-scout-brief` | checks independent feedback on the top two or three; compares with our project and writes the report | the report for the coding agent |
 
 ### Where it runs, and when to stop
 
@@ -95,10 +99,15 @@ report.
   that names them. Never invent names, stars or dates.
 - Search every direction in English and in Chinese, with the words each community uses, and in
   any other language the user's audience needs.
-- Judge the verifiable effect before code. **Strong:** a live site that answers, a package with
-  real downloads, real installs. **Mid:** screenshots, GIFs or videos in the README, posts outside
-  the repo (X, Bilibili, YouTube, blogs, Xiaohongshu). **Weak:** only a text description. A weak
-  repo is `later` or `skip`, however good its idea.
+- Check project claims lightly: read the README, examples, screenshots or demo, and note obvious
+  mismatches. A reachable page only means accessible; links and download counts do not prove
+  quality. Do not grade evidence or reject a repo just for lacking a demo or external feedback.
+- Before recommending the top two or three, make one focused independent search per repo, in
+  English and Chinese. Look for real use, recommendations, concrete outputs and problems. Open
+  relevant sources and distinguish them from author promotion or repeated copies of it. Record
+  a short finding with source links, or "no independent usage feedback found". If search is
+  unavailable, say "not checked". Use x-scout for X when available; otherwise note the X access
+  limit and use other sources. Full steps: `github-scout-brief`.
 - Stars: 50 by default. A direction (one entity or mechanism group) with fewer than 5 such repos
   shows its own repos down to 20 stars, then 10, never lower; the scan header says which
   directions were relaxed. Under the floor a repo is no reference unless you write why (an
@@ -139,16 +148,14 @@ skills sit next to this folder and use the same command.
 | `scan P/Q --plan` / `scan P/Q` | 1 / 2 | show the searches / run them and print the ranked table, with any relaxed directions |
 | `scan P/Q --add FILE\|URL` / `--expand LIST` | 2 | add links found elsewhere / expand an awesome list |
 | `pick P/Q 1 4 h2 --rest "why"` | 3 | verdicts on table rows; under the star floor needs `--low-stars "why"` |
-| `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and the verifiable effect (tier and links) / download one commit and map the code |
-| `note a/b --q P/Q --take T --results URL…` | 3, 4 | the repo's card: its verifiable effect, what it would do for us; `--trial "…"` records a trial (5) |
+| `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and project evidence (facts and links) / download one commit and map the code |
+| `note a/b --q P/Q --take T --results URL…` | 3, 4 | the repo's card: project evidence, independent feedback and what it would do for us; `--trial "…"` records a trial (5) |
 | `brief P/Q` | 4 | write the report for the coding agent |
 | `import REPORT --q P/Q` | any | take over a report from a cloud chat; every link is checked |
 | `show`, `updates`, `site`, `check` | later | read a question or card; upstream changes; a web page; validate |
 
 Formats: `store-format.md`. A worked example: `workflow.md`. How to judge
 skills and software: `evaluation.md`.
-
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -172,7 +179,7 @@ which project?" and wait.
    tool" but "make our product videos cut like an editor's, with an agent doing the work".
 3. **Say what good looks like:** two or three finished results we want to match (a film, a page,
    an output, with links), or checks anyone can run on an output ("renders in under a minute",
-   "every cut lands on a beat"). Triage judges each candidate's verifiable effect against these,
+   "every cut lands on a beat"). Triage judges each candidate's stated capabilities and examples against these,
    and the coding agent's trial checks them later; without them, any repo looks good on paper.
    Ask the user for examples they like; propose your own when they have none.
 4. **Set the stage.** It decides what is worth borrowing. Split the question if parts sit at
@@ -234,8 +241,6 @@ search, unless the user asked to confirm the directions first.
 
 `github-scout-search`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
-
 ---
 
 ## GitHub scout: search
@@ -265,7 +270,7 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
 - **Read the repo's own page** before you list it. Record its stars and last commit as shown there.
 - A repo describes what it makes, not every use people found for it. So also look at what is
   new and growing fast in the form you need, even when no search word matches it. New and
-  fast-growing is how you find; it does not pick. Picking (triage) goes by verifiable effect,
+  fast-growing is how you find; it does not pick. Picking (triage) goes by fit, project evidence,
   stars and fit; the coding agent's trial settles it later.
 
 ### With the command line
@@ -405,15 +410,12 @@ search log, and 10 to 30 candidates you opened, plus other sources.
 
 `github-scout-triage`.
 
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
-
 ---
 
 ## GitHub scout: triage
 
-Stage 3 of `github-scout`. Quality first: a repo goes on the shortlist only when anyone can check
-what it does and it has enough stars. Then tag it, because different kinds are tried and read in
-different ways.
+Stage 3 of `github-scout`. Check what the projects claim, cheaply, and shortlist the ones that
+fit the goal. Independent feedback is checked for the final two or three in `github-scout-brief`.
 
 ### Input
 
@@ -421,15 +423,12 @@ The candidates from `github-scout-search`.
 
 ### Check each candidate
 
-- **Verifiable effect.** Most repos show what they do outside the repo, so look there first, and
-  hold what you find against what good looks like in the question:
-  - **strong:** a live site that answers (the repo's homepage, a demo, app or playground link), a
-    published package with real downloads or an app in a store, real installs (skills.sh);
-  - **mid:** screenshots, GIFs or videos in the README (not badges, logos or icons), posts outside
-    the repo that show it working (X, Bilibili, YouTube, blogs, Xiaohongshu), projects that use it;
-  - **weak:** only a text description, however long the README.
-
-  Weak: `later` (say what would change it) or `skip`, never the shortlist.
+- **Project claims, lightly checked.** Read the README and its examples, screenshots or demo to
+  understand what the project does and spot obvious mismatches with our goal. Do not reproduce
+  benchmarks or exhaustively verify each claim. A page answering only means it is accessible;
+  download counts and links are clues, not proof of quality. Missing demos or external feedback
+  are uncertainties to note, not automatic reasons to reject a repo. Actual output is tried by
+  the coding agent after the report.
 - **Stars:** 50, or the relaxed floor of its direction (20, then 10, when the direction has fewer
   than 5 repos at 50+; the scan header names them). Under the floor, no reference: an exception
   needs a written reason, such as an official organisation's repo released this week.
@@ -449,47 +448,42 @@ The candidates from `github-scout-search`.
 | official docs, hosted service | read the pages that answer a direction; note limits, cost and lock-in; list as another source |
 
 Pick 3 to 8 for the shortlist: repos that could carry the whole goal first, then repos that fill
-a piece. Only repos with a mid or strong effect and enough stars go on it. New and fast-growing
-helped find them; it does not pick them: their effect, stars and fit do.
+a piece. Keep the star and maintenance filters. New and fast-growing helped find them; shortlist by
+fit and what the project appears to deliver. There is no evidence-strength score.
 
 ### With the command line
 
 ```bash
-github-scout look --q <q> owner/repo other/repo                      # facts, activity, kind, verifiable effect; ~1.3k tokens each
+github-scout look --q <q> owner/repo other/repo                      # facts, activity, kind, project evidence; ~1.3k tokens each
 github-scout pick <q> 1 4 7 h2 --rest "<why the rest do not help>"   # numbers from the table, h<#> from the rising list
 github-scout pick <q> owner/repo --low-stars "<why it is an exception>"   # a repo under the star floor
 ```
 
-`look` prints the verifiable effect: its tier, then what to open. It checks with one short
-request whether the homepage and the README's demo links answer, asks npm for a package's
-downloads last month, counts the installs the scan recorded (with `--q`), and lists the images,
-GIFs and videos in the README without badges, logos or icons. Open them before you pick. Posts
-outside the repo it cannot find: search for them (`<repo name>` on X, Bilibili, YouTube) when
-the tier is weak.
+`look` prints project evidence without grading it: reachable sites, package download counts and
+README media links. Review the useful items briefly. These are not independent reviews, even
+when the README links outside GitHub; the brief stage searches for those separately.
 
 Every row you were shown and did not pick is recorded as skipped with your reason. Numbers refer
 to the table printed last (`scan --show --all` numbers hidden rows too). `pick` takes a row shown
 by a relaxed direction as is, and records why; a repo under its floor needs `--low-stars`. Use
-`--later` for promising but not now (a weak effect, too few stars), `--list` for lists to expand.
+`--later` for promising but not now (a poor fit today, too few stars), `--list` for lists to expand.
 After picking, run `github-scout scan <q> --lenses UG`: it follows the owners' stars and the links
 in the picked READMEs, which find nothing before you pick.
 
 ### Without the command line (cloud chat)
 
 Write section 3 of the report:
-- a table of the shortlist: repo URL, kind, verifiable effect (tier and a link to it, or "weak"),
+- a table of the shortlist: repo URL, kind, project evidence (a short observation and link, if available),
   how it would be tried, verdict (shortlist, later, skip), reason;
 - one line on why the rest were left.
 
-A weak repo, or one under the star floor, is `later` or `skip`, not `shortlist`.
+Keep the star and maintenance filters. Missing project evidence alone does not force `later` or `skip`.
 
 This is the only table whose verdicts the local import records.
 
 ### Next
 
 `github-scout-brief`.
-
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -509,18 +503,30 @@ repository, otherwise what the user said exists.
 
 1. **Look at our side.** Read the part of our code each candidate would touch, so the report can
    say how it relates to our project: replaces a module, plugs into one, or needs one built.
-2. **Pick two or three to try first:** the ones whose verifiable effect comes closest to what
-   good looks like, then more stars and more projects using them, then the best fit with our
-   project. Prefer one that could carry the whole goal. If none qualifies, say so and which
-   searches show it; then the answer is to build, and why.
+2. **Pick two or three to try first:** the ones whose stated capabilities and examples fit what
+   good looks like and our project, with enough stars. Prefer one that could carry the whole
+   goal. If none qualifies, say so and which searches show it; then the answer is to build, and why.
+   **Before recommending each, run one focused independent search outside its repository.**
+   Search the exact project name or `owner/repo` with terms for usage, review, recommendation,
+   output or problems in English and Chinese. Open the relevant hits and check they refer to
+   this repository, not a namesake. Look for real usage experiences, third-party recommendations,
+   concrete outputs and negative feedback. The author's promotion, reposts of the same announcement
+   and directory listings alone do not count as independent usage. Use x-scout for X when
+   available; otherwise record the X access limit and use other sources.
+   Keep this bounded to the two or three recommendations; do not audit every candidate or chase
+   a quota of positive reviews. Record what was searched, a short finding with source links and
+   material problems. If nothing independent was found, write "no independent usage feedback
+   found"; if tools were unavailable, write "not checked" and why. Neither alone disqualifies a
+   repo. Reconsider a recommendation when feedback reveals an actual mismatch; check any
+   replacement in the same way. Actual output is verified in the later trial.
 3. **Say how to try each one,** the cheapest way that shows whether it reaches what good looks
    like: open its live site; or run its own smallest example (the command from its README); or one
    short task from our project. Then what to look for in the output, against what good looks
    like.
 4. **Answer in one paragraph:** what exists, which two or three look most promising for us and
    why, what is likely left to build.
-5. **List the candidates** in a table: repo, kind, stars, last push, verifiable effect (tier and
-   links), what it does for our goal, how it relates to our project.
+5. **List the candidates** in a table: repo, kind, stars, last push, project evidence (a brief observation and
+   links, if available), what it does for our goal, how it relates to our project.
 6. **Not recommended:** the rest you looked at closely, one line each with the reason, so the
    coding agent leaves them out.
 7. **What was searched:** the directions, the coverage, and every direction whose star threshold
@@ -528,25 +534,28 @@ repository, otherwise what the user said exists.
 
 ### With the command line
 
-Note each repo to try first, with its effect and what it would do for us:
+Note each repo to try first, with what it would do for us. Optionally add project evidence or
+independent feedback links with `--results`; summarize the feedback in `--note`:
 
 ```bash
-github-scout note owner/repo --q <q> --take use|adapt|learn --results <links to its effect> \
-  --note "<what it does for our goal>" --where "<where it would land in our project>"
+github-scout note owner/repo --q <q> --take use|adapt|learn --results <project evidence or independent feedback links> \
+  --note "<what it does for our goal; independent feedback or none found>" --where "<where it would land in our project>"
 ```
 
-`note` refuses `use`, `adapt` and `learn` for a repo with only a weak effect (`--results` with a
-live site, media or posts, or `--no-results "<why>"`) or under the star floor of its direction
-(`--low-stars "<why>"`). The take is your expectation; the coding agent settles it after a trial.
+`note` keeps the star floor (`--low-stars "<why>"` for an exception). Links are optional and
+carry no automatic quality grade; no evidence exception is needed. The take is your expectation;
+the coding agent settles it after a trial.
 
 Then write the answer into the question file printed by `github-scout show <q>`, in these
 sections: In one paragraph; Candidates; Try first; Not recommended; and anything about the web or
-X pass under Searched. Leave Trials and choice to the coding agent. In its frontmatter set
+X pass under Searched. Under Try first, put the independent feedback and source links beside each
+recommendation, including "no independent usage feedback found" or "not checked" when applicable.
+Record the independent queries and access limits under Searched. Leave Trials and choice to the coding agent. In its frontmatter set
 `status: answered` and `picked:` (the repos to try first). Leave `backbone:` and `alternate:`
 empty: the coding agent sets them after trying.
 
 ```bash
-github-scout check            # warns when a repo to try lacks a verifiable effect or enough stars
+github-scout check            # warns when a repo to try lacks enough stars
 github-scout brief <q>        # writes the report: the answer, the cards' facts, the coverage of the scans
 ```
 
@@ -557,7 +566,7 @@ project is not touched.
 ### Without the command line (cloud chat)
 
 Write section 4 of the report (`report-format.md`): the paragraph,
-the candidate table, Try first, the part for the coding agent, Not recommended and what was
+the candidate table, Try first (including the independent feedback for each recommendation), the part for the coding agent, Not recommended and what was
 searched. Then section 5, what you could not verify. Offer the whole report as one file to
 download. To take it over locally:
 
@@ -567,8 +576,6 @@ github-scout import report.md --q <project>/<question>
 
 Back home, the project's coding agent tries the repos under Try first, chooses one to follow and
 brings it in; a chat never runs code or changes the project.
-
-A defect in this skill that stays unfixed: record it with `scripts/report-problem.sh "<summary>"`.
 
 ---
 
@@ -631,14 +638,14 @@ Other sources (official docs, hosted services, papers):
 |---|---|---|
 
 ## 3. Triage
-| repo | kind | verifiable effect | how to try | verdict | reason |
+| repo | kind | project evidence | how to try | verdict | reason |
 |---|---|---|---|---|---|
-| https://github.com/owner/name | skill | strong: https://name.dev (live) | install, one short task; read SKILL.md and scripts | shortlist | ... |
+| https://github.com/owner/name | skill | README examples; https://name.dev is accessible (output not tried) | install, one short task; read SKILL.md and scripts | shortlist | ... |
 
-Shortlist only repos with a mid or strong effect and 50+ stars (or the relaxed floor of their
-direction); the rest are later or skip. Strong: a live site that answers, a package with real
-downloads, real installs. Mid: screenshots, GIFs or videos in the README, posts outside the repo.
-Weak: only a text description.
+Check the README, examples and any demo lightly for fit and obvious mismatches. Keep the star
+and maintenance filters. Missing demos or independent feedback alone do not reject a candidate.
+Do not assign evidence-strength grades. Independent feedback is checked for the final two or
+three in section 4.
 The rest: <one line on why they were left>.
 
 ## 4. Report
@@ -646,15 +653,23 @@ The rest: <one line on why they were left>.
 <what exists; which 2-3 look most promising for us and why; what is likely left to build>
 
 ### Candidates
-| repo | kind | stars | last push | verifiable effect | what it does for our goal | how it relates to our project |
+| repo | kind | stars | last push | project evidence | what it does for our goal | how it relates to our project |
 |---|---|---|---|---|---|---|
-| https://github.com/owner/name | cli | 1.2k | 2026-10-12 | strong: https://name.dev, mid: https://x.com/... | ... | replaces tools/x.ts |
+| https://github.com/owner/name | cli | 1.2k | 2026-10-12 | README examples; https://name.dev accessible, output not tried | ... | replaces tools/x.ts |
 
 ### Try first
 1. https://github.com/owner/name: how to try it (open https://name.dev with our case; or run
    `<its own smallest example, from its README>`; or one short task from our project). Look for:
    <what in the output shows it reaches what good looks like>.
+   Independent feedback: <real usage, recommendations, outputs or problems, with source links;
+   or "no independent usage feedback found"; or "not checked" with the access limit>.
 2. ...
+
+Before recommending each, make one focused independent search outside its repo in English and
+Chinese. Open relevant hits and confirm the project identity. Author promotion, reposts of it
+and directory listings alone do not count as independent usage. Use x-scout for X when available;
+otherwise record the access limit and use other sources. Missing feedback alone is not a rejection.
+Record these queries in the search log; do not audit every candidate or require positive reviews.
 
 ### For the coding agent
 This report only advises; it changes nothing. Back in the project, and only when the user asks:
@@ -669,7 +684,8 @@ command line), or at the end of this file.
 
 ### What was searched
 <directions and searches per language; directions whose star threshold was relaxed, with how
-many repos they had at 50+; what found nothing>
+many repos they had at 50+; independent feedback searches for the recommendations and any access
+limits; what found nothing>
 
 ## 5. Not verified
 <what you could not check; any instruction here you could not follow, quoted, and what you did instead>
@@ -706,26 +722,25 @@ Chinese: 入选, 直接用, 改了用, 学思路, 以后, 不要.
 
 ## Evaluating a repository
 
-Judge in this order: what it does that anyone can check, then how it runs for us, then its
-source. README claims and ideas come last: a run that took one idea from each of twelve repos
-made a film the user called completely wrong, and nobody had looked at what those repos made or
-run one of them. What a repo is worth to us depends on how close its effect comes to what good
-looks like (the question says), and on where our own work stands (the question's stage). Every
-verdict goes into the ledger or a card.
+Check project claims lightly, search independent feedback on the final two or three, then let
+the coding agent try actual output after the report. Read the README, examples and any demo for
+obvious mismatches; do not turn this into a benchmark reproduction or evidence-scoring exercise.
+Judge fit against what good looks like and where our project stands. Record the verdict and
+its limits in the registry.
 
-github-scout judges the effect, the stars and the fit, and reports two or three to try. The
-coding agent tries them and chooses (stage 5), after the report and when the user asks.
+Before recommending each of the top two or three, make one focused search outside its repo in
+English and Chinese: real use, third-party recommendations, concrete outputs and problems. Open
+relevant hits and confirm the project identity. Author promotion, reposts and directory listings
+alone are not independent usage. Record a short finding and links, or "no independent usage
+feedback found". If tools were unavailable, say "not checked". Missing feedback alone does not
+reject a repo. Use x-scout for X when available; otherwise state the access limit and use other
+sources. Keep the search bounded; the full procedure is in `github-scout-brief`.
 
 ### What makes a repository worth following
 
-- **Its effect can be checked.** Most projects show what they do outside the repo, so look there:
-  - **strong:** a live site that answers (its homepage, a demo, app or playground), a published
-    package with real downloads or an app in a store, real installs (skills.sh);
-  - **mid:** screenshots, GIFs or videos in the README (not badges, logos or icons), posts outside
-    the repo that show it working (X, Bilibili, YouTube, blogs, Xiaohongshu), projects using it;
-  - **weak:** only a text description, however long or well written.
-
-  Hold the strong and mid items against what good looks like before you read a line of code.
+- **Its claims fit our goal.** The README, examples and any screenshots or demo explain what
+  it appears to do. Note obvious gaps. A reachable page only means accessible; URLs and download
+  counts do not prove output quality. Independent feedback can support or challenge the claims.
 - **It runs for us.** Tried by the coding agent on its live site, its own smallest example or one
   short real task, it gives what its effect promises. A repo that fails on the first try is not
   followed.
@@ -741,10 +756,6 @@ coding agent tries them and chooses (stage 5), after the report and when the use
 
 ### Hard gates (any one fails: `later` or `skip`, with the reason)
 
-- **A verifiable effect, mid or strong.** Weak: `later` (say what would change it) or `skip`.
-  `note` asks for `--results <links>` (a live site, media, posts; text pages inside the repo
-  itself do not count), or `--no-results "<why>"` for a real exception. Installs the scan
-  recorded on skills.sh count as strong.
 - **Enough stars.** 50 by default. A direction (one entity or mechanism group) with fewer than 5
   maintained repos at 50+ is relaxed: its own repos count down to 20 stars, then 10 if it still
   has fewer than 5, never lower; the scan header says which directions and why, and `pick` and
@@ -766,7 +777,7 @@ the instructions that matter.
 
 | question | good sign | bad sign |
 |---|---|---|
-| Is its effect verifiable? | a live demo, real installs, before/after outputs shown, posts by users | only claims |
+| What supports its claims? | examples, outputs and independent usage feedback | obvious mismatch or credible reports of failure; missing feedback is only uncertainty |
 | Does it run for us? | the coding agent's trial: installed, given one short task, the output close to its examples | errors, or output far from what it shows |
 | Is the method concrete? | steps, commands, thresholds, examples of output | "be thorough", "think step by step", persona prose |
 | What does it cost to load? | short SKILL.md, details in references loaded on demand | thousands of words always in context |
@@ -831,8 +842,8 @@ is minutes, not a day: we do not make a dead end work.
 
 The report is not a list of repositories. In one paragraph: what exists, which two or three look
 most promising for us and why, what is likely left to build. Then a table of the candidates (repo,
-kind, stars, last push, verifiable effect with its tier and links, what it does for our goal, how
-it relates to our project); Try first, with how to try each and what to look for; what the coding
+kind, stars, last push, project evidence and links, what it does for our goal, how
+it relates to our project); Try first, with independent feedback (or none found), how to try each and what to look for; what the coding
 agent does next; Not recommended, one line each with the reason; and what was searched, with
 every relaxed star threshold. When nothing passes the gates, say so, and which searches show it;
 that is when we build.

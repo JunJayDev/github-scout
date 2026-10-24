@@ -40,7 +40,7 @@ problems: ["social media automation", "自媒体 自动化", "website to cli"]
 Why each part works:
 
 - **What good looks like** is the yardstick for every later stage: triage keeps the repos whose
-  verifiable effect comes near it, and the coding agent's trial checks it on our machine.
+  stated capabilities and examples come near it, and the coding agent's trial checks it on our machine.
 - **Entity pairs** find multi-platform tools: a tool that supports both Reddit and Xiaohongshu
   names both in its README; a tutorial about one platform does not. `"reddit xiaohongshu"
   in:readme` put the target first.
@@ -79,7 +79,7 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
 
 - `score` orders the table for finding; it is not a verdict. Relevance counts most, then life:
   a 282-star repo created this month that matches three vocabulary groups ranks above a famous
-  old one. Picking comes later, on verifiable effect, stars and fit.
+  old one. Picking comes later, on fit, project evidence and stars.
 - Rows under 50 stars are left out of the table and counted in the header: they are no
   references. A niche direction may not have five repos that big, so each entity and mechanism
   group is counted: under 5 maintained repos at 50+ in its own words, its rows are shown down to
@@ -103,7 +103,7 @@ Chrome", "Remotion", "an MCP server", "SQLite FTS5", "whisper.cpp". Write those 
   one of the question's forms in their name, description or topics are listed (a question for
   skills and CLIs does not list a graphics driver); `--all` shows the rest.
 
-`look` the promising rows first: about 1.3k tokens each, with the verifiable effect graded.
+`look` the promising rows first: about 1.3k tokens each, with the project evidence listed without grading.
 Open what it lists and pick 3 to 8 whose effect comes close to what good looks like. A repo
 with only a text description is `later`, however clever its README.
 
@@ -130,25 +130,23 @@ github-scout scan ops/browser-ops --expand someone/awesome-browser-agents
 
 `look` shows activity next to the facts: commits in 30 days, releases in 90, the top
 contributor's share. A one-person repo pushing daily is normal now; a team repo gone quiet is a
-warning. Then the verifiable effect, graded:
+warning. Then project evidence, without a quality grade:
 
+```text
+project evidence (not a quality verdict): · reachable site (homepage) https://example.org/demo
+  project-provided links: 1 image in the README: https://github.com/owner/repo/blob/main/demo.png
 ```
-verifiable effect: strong · live site (homepage) https://opencli.info/ · npm @jackwener/opencli: 87.4k downloads last month https://www.npmjs.com/package/@jackwener/opencli
-```
 
-(OpenCLI on 2026-10-19.) A repo with media in its README gets a second line, for example
-`mid: 3 images in the README: <links>`; a homepage or demo link that did not answer is listed
-under `did not answer`.
+Review the README, examples and useful links briefly for obvious mismatches. Reachability only
+means accessible; actual output is tried after the report. Missing demo links do not block a
+reference. Record useful links with `note --results` when available; they remain ungraded.
 
-- **strong:** the homepage or a demo link in the README answered one short request (no token is
-  sent); npm counted real downloads last month; the scan recorded real installs on skills.sh.
-- **mid:** images, GIFs and videos in the README, without badges, logos and icons.
-- **weak:** none of these. Search for posts outside the repo (its name on X, Bilibili, YouTube,
-  blogs) before you give up on it: most projects show their results there.
-
-Open what it lists, then record what you found: `github-scout note jackwener/OpenCLI --q
-ops/browser-ops --take use --results https://opencli.info/ --note "one JSON command per site"`.
-`note` refuses `use`, `adapt` and `learn` with only text pages from the repo itself.
+Before recommending the top two or three, make one focused independent search per repo in
+English and Chinese. Open relevant sources about real use, recommendations, outputs and
+problems; confirm they refer to this project. Author promotion, reposts and directory listings
+alone do not count. Use x-scout for X when available; otherwise record the access limit and use
+other sources. Record a short finding with links, "no independent usage feedback found", or
+"not checked" if search was unavailable. Missing feedback alone does not reject a repo.
 
 ## 5. The report
 
@@ -160,18 +158,19 @@ exists and what to try first. A good one, for a project at `prototype`:
 > xiaohongshu-mcp second. Posting without a model is likely left to build: nothing found posts
 > and survives rate limits.
 >
-> **Candidates.** | jackwener/OpenCLI | cli | 30k | 2026-10-17 | strong: opencli.info, npm 87k a
+> **Candidates.** | jackwener/OpenCLI | cli | 30k | 2026-10-17 | project site: opencli.info, npm 87k a
 > month | one command per site, JSON | replaces tools/reddit/chrome.ts | ...
 >
 > **Try first.** 1. OpenCLI: install it, run `opencli reddit hot` through our logged-in Chrome;
-> look for JSON with post and comment ids, no model in the loop. 2. xiaohongshu-mcp: ...
+> look for JSON with post and comment ids, no model in the loop. Independent feedback: <finding
+> and source links, or none found; record queries under Searched>. 2. xiaohongshu-mcp: ...
 >
-> **Not recommended.** The social-media bots the first searches found: old, and their effect is
-> text only.
+> **Not recommended.** The social-media bots the first searches found: old, and they do not drive our
+> logged-in browser.
 
 Set `picked: [jackwener/OpenCLI, xpzouying/xiaohongshu-mcp]` and `status: answered` in the
 frontmatter, and leave `backbone:` empty. Then `github-scout brief ops/browser-ops` packs it into
-the report for the coding agent: the answer, each repo's take, stars, verifiable effect and
+the report for the coding agent: the answer, each repo's take, stars, evidence links and
 reviewed commit, how to try and choose, one `note --trial` line and one adopt line per repo, Not
 recommended, and what was searched (the scans' coverage, every relaxed star threshold). The
 project itself is not changed.

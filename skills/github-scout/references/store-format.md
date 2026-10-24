@@ -74,11 +74,12 @@ still reads answers from 2026-10-18 (backbone; gaps to fill; trial runs; against
 next steps; not adopted) and from before (ideas worth taking; practices and components), and
 writes them as it did.
 
-`check` holds every picked repo to the gates: a verifiable effect (a mid or strong link in
-`results`, or a `no_results` reason) and the star threshold (or a `low_stars` reason, which a
-relaxed direction writes itself). A report is not asked for a backbone or for trials. When the
-coding agent sets `backbone` (and `alternate`), each must also have been tried (`level: trial`).
-An answered question with an empty Try first section and no `picked` gets a warning.
+`check` holds every picked repo to the star threshold (or a `low_stars` reason, which a relaxed
+direction writes itself). Evidence links are optional and not automatically graded. The agent
+records independent feedback for the top two or three under Try first, and the queries under
+Searched; `brief` preserves those sections. A report is not asked for a backbone or for trials.
+When the coding agent sets `backbone` (and `alternate`), each must also have been tried
+(`level: trial`). An answered question with an empty Try first section and no `picked` gets a warning.
 
 ## Card
 
@@ -95,7 +96,7 @@ branch: main
 commit: b9213a15d63d     # the commit that was reviewed
 reviewed: 2026-10-14
 level: trial             # meta | look | read | trial
-results: ["https://opencli.info/"]   # its verifiable effect: a live site, package or store pages, media, posts
+results: ["https://opencli.info/"]   # optional project evidence or independent feedback links
 watch: [src/daemon.ts, "clis/reddit/**"]
 aliases: [opencli]
 uses:
@@ -105,7 +106,7 @@ uses:
     where: tools/opencli
     note: "Reddit reads through its fetch adapters"
     low_stars: "..."     # only under the star threshold: why it is a reference anyway
-    no_results: "..."    # only without results: why it counts anyway
+    no_results: "..."    # optional legacy context about missing evidence; no longer a gate
 adopted:                 # what came into our projects (github-scout adopt, stage 6)
   - project: ops
     question: browser-ops
@@ -124,20 +125,16 @@ what we take, risks or safety, and what to read first. `note --trial` writes the
 "Results and trial" on cards from before 2026-10-19; a card without either section gets it after
 its first section.
 
-`results` holds links, http or https, each graded without fetching it:
+`results` holds optional http or https links to project evidence or independent feedback. A
+URL's host, reachability or file extension does not establish quality; no tier is assigned.
+Use prose in the report's Try first section and `uses[].note` to distinguish project claims
+from independent feedback, with source links or "no independent usage feedback found". If a
+search was unavailable, say "not checked" rather than implying that nothing exists.
 
-| tier | links |
-|---|---|
-| strong | a package or store page (npm, PyPI, App Store, Chrome Web Store and similar); `look` also grades as strong a homepage or README demo link that answers, npm downloads and the installs a scan recorded |
-| mid | images, GIFs and videos (by extension, or GitHub's attachment hosts); posts on X, Bilibili, YouTube, blogs, Xiaohongshu; any other site not checked by `look` (it may be a blog as well as a live app); another GitHub repository |
-| weak | pages of the repo itself on GitHub that are not media: its README and other text |
-
-`note` refuses `use`, `adapt` and `learn` for a repo whose best tier is weak (unless
-`--no-results` gives a reason; installs of 100 or more recorded by a scan count as strong) or
-under its star floor (unless `--low-stars` does); the reason goes on the take and into the
-ledger. The floor is the threshold, 50 or `GITHUB_SCOUT_MIN_STARS`, or the relaxed floor of the
-repo's direction in the question's scans, in which case `note` writes the relaxation as the
-`low_stars` reason itself. Cards without `results` stay valid.
+`note` refuses `use`, `adapt` and `learn` under the star floor unless `--low-stars` gives a
+reason. The floor is 50 or `GITHUB_SCOUT_MIN_STARS`, or the relaxed floor of the repo's direction
+in the question's scans; `note` records that relaxation itself. Cards without `results` remain
+valid and can be recommended. Existing `no_results` notes are preserved for compatibility.
 
 `adopted` holds one entry per project, question and set of our paths: recording the same again
 updates it (fields not given keep their value; after a drop it starts afresh), and `adopt --drop`
@@ -163,7 +160,7 @@ repo's stars reach twice the recorded count (and at least 200 more). An adoption
 entry whose reason starts with `adopted:` or `dropped adoption:`. A `short` under the star
 threshold, and a `card` that takes such a repo as a reference, carry `low_stars` (the reason,
 `relaxed: <direction> had under 5 repos at 50+ stars (floor 20)` when its direction was relaxed);
-a reference without a verifiable effect carries `no_results`. `import` records a shortlist under
+older entries may carry `no_results` context about missing evidence. `import` records a shortlist under
 the floor as `later`.
 
 ## Scan

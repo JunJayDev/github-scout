@@ -50,8 +50,11 @@ skip the commands.
   and offer it for download.
 - List only repositories you have seen (their page, the connector, or a search result naming
   them). Never invent a repository, a star count or a date.
-- **You do not try repos or choose one.** Judge each by its verifiable effect (a live site,
-  package downloads, screenshots, videos, posts outside the repo) and its stars, and write under
+- **You do not try repos or choose one.** Check project claims lightly and keep the star and
+  maintenance filters. Before recommending the top two or three, independently search real use,
+  reviews, recommendations, outputs and problems outside their repos. Distinguish independent
+  sources from author promotion and reposts. Record links or "no independent usage feedback
+  found"; unavailable search is "not checked". Neither alone disqualifies a repo. Write under
   Try first how the coding agent should try each. Back in the project, and only when the user
   asks, that agent tries them, chooses one to follow and brings it in.
 - Without a project, the stage is "idea".
@@ -64,38 +67,67 @@ Generated from the skills in this repository by tools/build-cloud.py; edit the s
 """
 
 # Stages 5 and 6 (github-scout-dig, github-scout-adopt) run code and change the project, so only the
-# project's own coding agent runs them, never a chat. Blocks that name them (a paragraph, a list item, a
-# table row) are left out of this file; the brief stage says in one plain sentence who does.
-LOCAL_ONLY = re.compile(r"github-scout[- ](?:adopt|dig)|`adopt ")
+# project's own coding agent runs them, never a chat. `quick` and the lookup a subagent runs need the command line.
+# Blocks that name them (a paragraph, a list item, a table row) are left out of this file, and a heading that names
+# them takes its whole section with it, code blocks included; the brief stage says in one plain sentence who does.
+LOCAL_ONLY = re.compile(r"github-scout[- ](?:adopt|dig)|`adopt |github-scout quick|`quick ")
 BLOCK_START = re.compile(r"#|\||\s*(?:[-*+]|\d+\.)\s")
+
+
+def level(line: str) -> int:
+    return len(line) - len(line.lstrip("#"))
 
 
 def drop_local_only(lines: list[str]) -> list[str]:
     out: list[str] = []
     block: list[str] = []
     fenced = dropped = False
+    skip = 0                                                     # level of a dropped heading, while in its section
 
     def flush():
-        nonlocal dropped
+        nonlocal dropped, skip
         if block:
             dropped = bool(LOCAL_ONLY.search("\n".join(block)))
+            if dropped and block[0].startswith("#"):
+                skip = level(block[0])
             if not dropped:
                 out.extend(block)
             block.clear()
 
+    def skipping(line: str) -> bool:
+        """In a dropped section; the next heading at its level or above ends it and is not skipped."""
+        nonlocal fenced, dropped, skip
+        if not skip:
+            return False
+        if line.startswith("```"):
+            fenced = not fenced
+            return True
+        if fenced or not (line.startswith("#") and level(line) <= skip):
+            return True
+        skip, dropped = 0, False
+        return False
+
     for line in lines:
+        if skipping(line):
+            continue
         if line.startswith("```") or fenced:
             flush()
+            if skipping(line):
+                continue
             fenced ^= line.startswith("```")
             out.append(line)
             dropped = False
         elif not line.strip():
             flush()
+            if skipping(line):
+                continue
             if not (dropped and out and not out[-1].strip()):    # no double blank line where a block went
                 out.append(line)
             dropped = False
         elif BLOCK_START.match(line) or not block:
             flush()
+            if skipping(line):
+                continue
             block.append(line)
         else:
             block.append(line)                                   # continues a paragraph or a list item
@@ -108,6 +140,7 @@ def drop_local_only(lines: list[str]) -> list[str]:
 def body(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     text = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)   # drop frontmatter
+    text = re.sub(r"\n## Improve this skill\n.*?(?=\n## |\Z)", "\n", text, flags=re.S)   # a chat cannot open a pull request
     text = text.replace("../github-scout/references/", "").replace("references/", "")
     out, fenced = [], False
     for line in drop_local_only(text.strip().splitlines()):     # nest headings one level down,

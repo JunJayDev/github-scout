@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .store import (
     DEFAULT_LANGS, KINDS, MODES, PROJECT_ORDER, QUESTION_ORDER, STAGES, TAKES, Doc, Store, StoreError, adoptions, as_list,
-    best_tier, card_takes, link_tier, min_stars, repo_ref, strongest, today, write_doc,
+    card_takes, min_stars, repo_ref, strongest, today, write_doc,
 )
 
 # What is worth borrowing depends on where our own work stands.
@@ -40,17 +40,17 @@ Stage: {stage} ({stage_help})
 (2-3 finished results we want to match, as links, or checks anyone can run on an output. Every candidate is judged against these.)
 
 ## Answer
-(The deliverable is a report for the coding agent: what exists, and the two or three to try first and how. github-scout does not try or choose; the coding agent does, when the user asks. A repo qualifies with a verifiable effect (a live site, a package with downloads, screenshots, videos, posts outside the repo) and {stars}+ stars, or the relaxed floor of its direction.)
+(The deliverable is a report for the coding agent: what exists, and the two or three to try first and how. github-scout does not try or choose; the coding agent does, when the user asks. Keep {stars}+ stars or the relaxed floor and the maintenance filters. Review project claims lightly, and independently search usage feedback for the top 2-3 before recommending them.)
 
 ### In one paragraph
 (What exists; which 2-3 look most promising for us and why; what is likely left to build. Or "nothing qualifies, so we build it, because ...".)
 
 ### Candidates
-| repo | kind | stars | last push | verifiable effect | what it does for our goal | how it relates to our project |
+| repo | kind | stars | last push | evidence links | what it does for our goal | how it relates to our project |
 |---|---|---|---|---|---|---|
 
 ### Try first
-(The 2-3 to try, each: how to try it (open its live site, run its own smallest example, or one short task from our project) and what to look for against what good looks like. Their names go in picked:.)
+(The 2-3 to try, each: how to try it (open its live site, run its own smallest example, or one short task from our project) and what to look for against what good looks like. Include independent usage, recommendations, outputs or problems with source links, or "no independent usage feedback found"; if search was unavailable, say "not checked" and why. Their names go in picked:.)
 
 ### Not recommended
 (One line each, with the reason.)
@@ -59,7 +59,7 @@ Stage: {stage} ({stage_help})
 (Written by the coding agent after trying: what ran, what came out, how long; the one repo to follow as a whole (backbone:), at most one alternate, and what fills its gaps, each with a reason.)
 
 ## Searched
-(Scans are in scans/{project}/{id}/; the brief adds their coverage and any relaxed star threshold. Note the web and X pass here.
+(Scans are in scans/{project}/{id}/; the brief adds their coverage and any relaxed star threshold. Record independent feedback queries and access limits here, including web and X searches.
 Vocabulary, in the frontmatter: every entity and mechanism group needs a term in each language of `langs`,
 in the words those users actually write, not a translation: "xiaohongshu|小红书|xhs|红书",
 "humanizer|去AI味|活人感|人味", "product video|宣传片|产品视频".)
@@ -71,7 +71,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 (How it does the job, in a few lines. Where, by file.)
 
 ## Verifiable effect and trial
-(What it does that anyone can check: a live site, a package with downloads, screenshots, videos, posts; links under results:. The coding agent's trial: what ran, what came out, how long.)
+(Project evidence and independent feedback, distinguished in prose; optional links under results:. Links are not automatically verified or graded. The coding agent's trial: what ran, what came out, how long.)
 
 ## Method quality
 (Concrete steps or vague advice? What it costs to load?)
@@ -91,7 +91,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 (The key design decision, and how it differs from what we would have built. Where, by file.)
 
 ## Verifiable effect and trial
-(What it does that anyone can check: a live site, a package with downloads, screenshots, videos, posts; links under results:. The coding agent's trial: what ran, what came out, how long.)
+(Project evidence and independent feedback, distinguished in prose; optional links under results:. Links are not automatically verified or graded. The coding agent's trial: what ran, what came out, how long.)
 
 ## Quality
 (New and moving? Who uses it? Do maintainers answer issues?)
@@ -129,17 +129,17 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （2–3 个想做到的成品（给链接），或者任何人都能拿产出去核对的标准。每个候选都拿这个比。）
 
 ## 答案
-（交付物是给开发 agent 的报告：现在有什么、先试哪两三个、怎么试。github-scout 不试跑、不选定；用户要时由开发 agent 来做。有可验证的效果（在线网站、有下载量的包、截图、视频、仓库外的帖子）、{stars} 星以上（或所在方向放宽后的下限）的仓库才算数。）
+（交付物是给开发 agent 的报告：现在有什么、先试哪两三个、怎么试。github-scout 不试跑、不选定；用户要时由开发 agent 来做。保留 {stars} 星以上（或所在方向放宽后的下限）和维护状态筛选；轻查自述，推荐前独立检索前两三个项目的真实使用反馈。）
 
 ### 一段话结论
 （现在有什么；哪两三个对我们最有希望、为什么；大概还剩什么要自己做。或者「没有过关的，只能自己做，因为……」。）
 
 ### 候选
-| 仓库 | 类型 | 星数 | 最近推送 | 可验证的效果 | 对目标有什么用 | 和我们项目的关系 |
+| 仓库 | 类型 | 星数 | 最近推送 | 参考链接 | 对目标有什么用 | 和我们项目的关系 |
 |---|---|---|---|---|---|---|
 
 ### 先试这几个
-（两三个，每个写：怎么试（打开它的在线网站、跑它自带的最小示例，或者拿我们项目里的一个小任务试），对照「好的结果长什么样」看什么。仓库名写进 picked:。）
+（两三个，每个写：怎么试（打开它的在线网站、跑它自带的最小示例，或者拿我们项目里的一个小任务试），对照「好的结果长什么样」看什么。附独立使用、推荐、产出或问题的简短结论及来源；查不到写「未找到独立使用反馈」，工具不可用写「未核查」及原因。仓库名写进 picked:。）
 
 ### 不推荐
 （一行一条，写清原因。）
@@ -148,7 +148,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （开发 agent 试过之后写：跑了什么、出来什么、花了多久；整套照做的那一个（backbone:），最多一个备选，缺口从哪补、各自为什么。）
 
 ## 搜过哪些
-（扫描记录在 scans/{project}/{id}/；简报会补上检索覆盖和放宽过的星数门槛。网页和 X 那一轮写在这里。
+（扫描记录在 scans/{project}/{id}/；简报会补上检索覆盖和放宽过的星数门槛。独立反馈的检索词、网页和 X 来源、访问限制写在这里。
 词表写在开头的 frontmatter：每组实体和机制都要有 langs 里每种语言的词，写那种语言的用户真正在用的叫法，
 不是翻译：「xiaohongshu|小红书|xhs|红书」「humanizer|去AI味|活人感|人味」「product video|宣传片|产品视频」。）
 """,
@@ -159,7 +159,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （它怎么把事做成，几行说清。写在哪个文件。）
 
 ## 可验证的效果和试跑
-（谁都能核对的效果：在线可用的网站、有下载量的包、截图、视频、外部帖子；链接写进 results:。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
+（区分项目自述与独立反馈，链接可写进 results:，不自动核验或评级。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
 
 ## 方法质量
 （是具体步骤还是空泛建议？加载要多少 token？）
@@ -179,7 +179,7 @@ in the words those users actually write, not a translation: "xiaohongshu|小红�
 （关键的设计决定，和我们自己会怎么做有什么不同。写在哪个文件。）
 
 ## 可验证的效果和试跑
-（谁都能核对的效果：在线可用的网站、有下载量的包、截图、视频、外部帖子；链接写进 results:。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
+（区分项目自述与独立反馈，链接可写进 results:，不自动核验或评级。开发 agent 的试跑：跑了什么、出来什么、花了多久。）
 
 ## 质量
 （新不新、更新勤不勤、谁在用、维护者回不回 issue。）
@@ -427,7 +427,7 @@ def card_line(c: Doc) -> str:
     uses = [u for u in as_list(d.get("uses")) if isinstance(u, dict)]
     takes = [f"{u.get('project')}/{u.get('question') or '-'}:{u.get('take')}" for u in uses]
     facts = [", ".join(takes) or "no uses", f"{d['stars']} stars" if d.get("stars") is not None else "stars unknown",
-             f"effect {best_tier(as_list(d.get('results')), c.id)}" if as_list(d.get("results")) else "no effect recorded",
+             f"{len(as_list(d.get('results')))} evidence links" if as_list(d.get("results")) else "no evidence links recorded",
              f"level {d.get('level') or '-'}", f"reviewed {d.get('reviewed')} @ {str(d.get('commit') or '')[:7]}"]
     return (f"{c.id} [{d.get('kind')}{'/' + str(d['form']) if d.get('form') else ''}] {strongest(card_takes(d)) or 'unrelated'}"
             f" — {str(d.get('summary') or '')[:100]} ({'; '.join(facts)})")
@@ -544,8 +544,8 @@ def show_card(store: Store, ref: str) -> str:
     if card:
         out += [f"card: {card.path}", card.path.read_text(encoding="utf-8").strip()]
         results = [str(x) for x in as_list(card.data.get("results"))]
-        out += [f"verifiable effect: {best_tier(results, card.id)}"] + [f"  {link_tier(x, card.id):<6} {x}" for x in results] \
-            if results else ["verifiable effect: none recorded (note --results <a live site, screenshots, videos or posts>)"]
+        out += ["evidence links (not automatically verified):"] + [f"  {x}" for x in results] \
+            if results else ["evidence links: none recorded (optional: note --results <links>)"]
         adopted = adoptions(card.data, dropped=True)
         if adopted:
             out.append("adopted:")

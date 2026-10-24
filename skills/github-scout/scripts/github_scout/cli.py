@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
+import time
 import urllib.request
 from pathlib import Path
 
 from . import __version__
 from .discover import (
-    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, floor_of, is_farmed, is_open, is_stale, merged, plan, plan_warnings,
-    relaxed_reason, render, rising, row, scan_row, slugs_in_text, visible, why_hidden,
+    DEFAULT_LENSES, LENS_NAMES, LENSES, RISE_SHOW, Scan, annotate, excluded, floor_of, is_farmed, is_low, is_lure, is_open,
+    is_stale, merged, plan, plan_warnings, relaxed_reason, render, rescore, rising, row, scan_row, slugs_in_text, visible,
+    why_hidden,
 )
+from .discover import HIDE as HIDE_MONTHS
 from .examine import bump, diff, digest, fetch, outdated, peek, render_outdated, render_peek
 from .github import Client, GitHubError, github_slug
 from .handoff import VERDICT_OF_TAKE, brief, parse_directions, parse_report, parse_search_log, read_source, report_goal, words_from_log
@@ -22,16 +29,16 @@ from .registry import (
     render_find, set_adoption, set_use, show_card, show_question, stage_help, write_index,
 )
 from .store import (
-    KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, best_tier, env, lang_gaps,
-    locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
+    HAN, KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, env,
+    lang_gaps, locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
 )
 
 EPILOG = """stages (one skill each; github-scout runs 1 to 4 and ends with a report; the project is not changed):
   1 plan    find, ask, scan --plan       the goal, what good looks like, search directions
   2 search  scan, scan --add/--expand     every lens, merged and ranked; lures, farmed installs and repos under 50 stars
                                           left out (a direction with under 5 at 50+ shows its rows down to 20, then 10)
-  3 triage  pick, look, note              keep repos with a verifiable effect (mid or strong) and enough stars
-  4 brief   write the report, brief       what exists, the 2-3 to try first and how
+  3 triage  pick, look, note              check project claims lightly; keep relevant repos with enough stars
+  4 brief   write the report, brief       independent feedback on the top 2-3, what to try and how
 then the project's coding agent, when the user asks:
   5 dig     note --trial, look --source   try the 2-3, choose one to follow as a whole, fill its gaps with reasons
   6 adopt   adopt                         bring it into the project; updates then watches it
@@ -47,7 +54,8 @@ def _store(args, create_lang: str | None = None) -> Store:
 
 
 def make_client(args, store: Store | None = None) -> Client:
-    return Client(verbose=not args.quiet, stamp_dir=(store.root / "cache") if store else None)
+    stamp = getattr(args, "stamp_dir", None) or ((store.root / "cache") if store else None)
+    return Client(verbose=not args.quiet, stamp_dir=stamp)
 
 
 def _slug(text: str) -> str:
@@ -341,6 +349,102 @@ def cmd_scan(args):
            f"(numbers refer to this table)", table)
 
 
+QUICK_LENSES = "EPMQTH"                     # entities, pairs, mechanisms, problems, topics, rising: about 25 to 70 searches
+QUICK_FORM_LENSES = {"skill": "S", "mcp": "D", "cli": "N", "library": "N"}   # the lens a question's form adds
+QUICK_ORDER = "SDNHEPMQ"        # a small budget or a time limit ends the scan. The form's registries go first: they are
+                                # other hosts, answer in a second, and a dead one is asked once (20 s). Then the rising
+                                # list (6 to 9 searches, finds what no word matches), then names, pairs, mechanisms and
+                                # problems; the 16 to 24 topic searches (T) and code search (K) last
+
+
+def quick_lenses(forms, lenses: str | None = None) -> str:
+    """The lenses `quick` runs: the given letters, else the base lenses plus one per form. Code search (K) is left out
+    unless asked for: GitHub allows 10 of those a minute."""
+    chosen = lenses or QUICK_LENSES + "".join(QUICK_FORM_LENSES.get(f, "") for f in forms or [])
+    return "".join(dict.fromkeys(chosen))
+
+
+def _scratch_registry() -> Store:
+    """A throwaway registry for commands that record nothing, removed when the process ends."""
+    root = Path(tempfile.mkdtemp(prefix="github-scout-quick-"))
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    return Store.init(root / "r", "scratch")
+
+
+def cmd_quick(args):
+    vocab = {"entities": args.entity or [], "mechanisms": args.mechanism or [], "problems": args.problem or [],
+             "forms": args.form or []}
+    words = " ".join(w for k in ("entities", "mechanisms", "problems") for w in vocab[k])
+    if not words:
+        raise StoreError("quick needs search words: -e (names of things, a|b for synonyms), -m (how a solution works) "
+                         "or -p (a short problem phrase); write each in English and in Chinese")
+    cjk = bool(HAN.search(words))
+    quiet_warnings = args.quiet
+    if not cjk and not quiet_warnings:
+        print("warn  no Chinese words: add -p \"<中文短语>\" or -e \"term|中文\" to also find Chinese-language projects",
+              file=sys.stderr)
+    lenses = quick_lenses(vocab["forms"], args.lenses)
+    args.quiet = not args.verbose                             # each search prints only with --verbose
+    args.stamp_dir = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "github-scout"   # agents running
+    client = make_client(args)                                                                            # at once share one budget
+    if not client.token and "K" in lenses:
+        lenses = lenses.replace("K", "")
+        if not quiet_warnings:
+            print("warn  no GitHub token: SKILL.md code search skipped (GITHUB_TOKEN or `gh auth login`)", file=sys.stderr)
+    keep = Path(args.keep).expanduser() if args.keep else None
+    if keep:
+        store = Store.init(keep, "quick")
+    else:
+        store = _scratch_registry()
+    new_project(store, "quick", "Quick", "one-off lookups")
+    new_question(store, "quick/q", args.question, args.stage, ["en", "zh"] if cjk else ["en"])
+    doc = store.question("quick/q")
+    doc.data.update({k: v for k, v in vocab.items() if v})
+    store.save_question(doc)
+    began = time.monotonic()
+    scan = Scan(store, client, doc.data, progress=False).run(lenses, args.budget, args.per_query, QUICK_ORDER, args.seconds)
+    store.save_scan(scan)
+    table = annotate(store, rescore(scan, doc.data))
+    seconds = time.monotonic() - began
+    rows, rise = visible(table), rising(table)
+    errors = [f"{s['lens']} {s['query'][:50]}: {s['error'][:70]}" for s in table["searches"] if s.get("error")]
+    limit = min_stars()
+    cands = table["candidates"]
+    low = sum(1 for c in cands if is_low(c, limit) and is_open(c) and not is_stale(c) and not excluded(c))
+    stale = sum(1 for c in cands if is_stale(c))
+    bad = sum(1 for c in cands if is_lure(c) or is_farmed(c))
+    if args.json:
+        pick = ("repo", "stars", "pushed", "created", "desc", "score", "fit", "lenses", "topics")
+        print(json.dumps({"question": args.question, "lenses": lenses, "searches": len(table["searches"]),
+                          "github_calls": client.github_calls, "seconds": round(seconds),
+                          "rows": [{k: c.get(k) for k in pick} for c in rows[:args.top]],
+                          "rising": [{k: c.get(k) for k in pick} for c in rise[:args.rising]],
+                          "hidden": {"under_stars": low, "stale": stale, "lures_or_farmed": bad}, "errors": errors},
+                         ensure_ascii=False, indent=1))
+        return
+    out = [f"quick: {args.question}",
+           f"{len(table['searches'])} searches ({lenses}) · {client.github_calls} GitHub calls · {seconds:.0f}s · "
+           f"{len(rows)} repos pass the filters (50+ stars, pushed in the last 6 months, no lures)",
+           "  #  score  stars created   pushed  repo  description  [lenses] fit = question groups in its own words"]
+    out += [row(i, c) for i, c in enumerate(rows[:args.top], 1)]
+    if len(rows) > args.top:
+        out.append(f"... {len(rows) - args.top} more (--top N)")
+    if rise and args.rising:
+        out.append("rising (new, growing fast, no match in their own words; judge each by what it makes):")
+        out += [row(f"h{i}.", c) for i, c in enumerate(rise[:args.rising], 1)]
+    out.append(f"hidden: {low} under {limit} stars, {stale} not pushed in {HIDE_MONTHS} months, {bad} lures or farmed installs")
+    timed = sum(1 for s in table["searches"] if s.get("error") == "skipped: time")
+    if timed:
+        out.append(f"time limit: {timed} searches were not run ({args.seconds:.0f}s; --seconds N raises it, 0 removes it)")
+    if errors:
+        out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]))
+    out.append("next: these are leads from word matches, not a ranking: keep the rows that do the need, add the names "
+               "you know and the ones people recommend on the web, check them with github-scout look <owner/repo> ..., "
+               "then search independent feedback on the 2-3 you name (references/lookup.md)"
+               + (f"   (kept in {keep})" if keep else ""))
+    print("\n".join(out))
+
+
 def cmd_pick(args):
     store = _store(args)
     project, qid = store.split_ref(args.ref)
@@ -420,7 +524,12 @@ def cmd_pick(args):
 
 
 def cmd_look(args):
-    store = _store(args)
+    try:
+        store = _store(args)
+    except StoreError:
+        if args.q:
+            raise
+        store = _scratch_registry()   # no registry and nothing to record: look anyway
     client = make_client(args, store)
     texts, results, entries = [], [], []
     for r in args.repos:
@@ -448,7 +557,7 @@ def cmd_look(args):
             project, qid = store.split_ref(args.q)
             entries.append(_entry(args, p["repo"], project, qid, "peeked", "read" if args.source else "look", None, p))
     store.append_ledger(entries)
-    _out(args, "\n\n".join(texts) + ("\n\nnext: open its verifiable effect, then github-scout note <repo> --q <question> "
+    _out(args, "\n\n".join(texts) + ("\n\nnext: review project claims briefly; search independent feedback before recommending the top 2-3; then github-scout note <repo> --q <question> "
                                      "--take use|adapt|learn|later|skip --results <links> --note \"...\"" if results else ""),
          results)
 
@@ -472,11 +581,8 @@ def pack(path: Path, include: list[str] | None) -> str:
     return f"packed: {out}" + (f" ({total})" if total else "")
 
 
-def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict | None = None) -> str | None:
-    """use, adapt and learn make a repo a reference: it needs a verifiable effect (a mid or strong item) and enough
-    stars, or a written reason for each (owner, 2026-10-18 and 10-19). Enough stars is the threshold, or the relaxed
-    floor of its direction in the question's scans (`row`). Refused before anything is written. Returns the reason
-    the repo counts under the threshold, for the take and the ledger."""
+def _gate(args, slug: str, stars, carded: bool = False, row: dict | None = None) -> str | None:
+    """Keep the star floor for references. Project links and independent feedback are recorded without automatic grading."""
     if args.take not in REFERENCE_TAKES:
         return args.low_stars
     row = row or {}
@@ -493,12 +599,6 @@ def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict
                             + f", under {floor}{' (relaxed for its direction)' if floor < limit else ''}: no reference. Say "
                             "why it is an exception with --low-stars \"<why>\" (an official organisation's new repo, say), "
                             "or note it as later or skip")
-    installs = 0 if is_farmed(row) else int(row.get("installs") or 0)
-    if best_tier(results, slug, installs) == "weak" and not args.no_results:
-        problems.append(f"{slug} shows {'only text in its own repo' if results else 'no verifiable effect on its card'}. "
-                        "Give --results <links to what it does, seen outside its README text: a live site, a package or "
-                        "store page, screenshots, GIFs or videos, posts on X, Bilibili, YouTube, blogs or Xiaohongshu>, "
-                        "or --no-results \"<why it still counts>\"; with only a text description it is later or skip")
     if problems:
         raise StoreError("\n".join(problems))
     return low
@@ -507,7 +607,7 @@ def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict
 def _links(items: list[str] | None) -> list[str]:
     bad = [x for x in items or [] if not URL.match(x)]
     if bad:
-        raise StoreError(f"--results takes links (http or https) to its verifiable effect: {', '.join(bad)}")
+        raise StoreError(f"--results takes links (http or https) to project evidence or feedback: {', '.join(bad)}")
     return list(dict.fromkeys(items or []))
 
 
@@ -525,8 +625,7 @@ def cmd_note(args):
         return use, {k: v for k, v in (("low_stars", low), ("no_results", args.no_results)) if v}
 
     if card:
-        low = _gate(args, card.id, card.data.get("stars"), [*map(str, as_list(card.data.get("results"))), *results], True,
-                    row)
+        low = _gate(args, card.id, card.data.get("stars"), carded=True, row=row)
         use, extra = take(low)
         set_use(store, card.id, use, level)
         if results:
@@ -553,7 +652,7 @@ def cmd_note(args):
         return
     client = make_client(args, store)
     meta = peek(client, slug, 0, effect=False)
-    low = _gate(args, meta["repo"], meta.get("stars"), results, row=row or scan_row(store, project, qid, meta["repo"]))
+    low = _gate(args, meta["repo"], meta.get("stars"), row=row or scan_row(store, project, qid, meta["repo"]))
     use, extra = take(low)
     kind = args.kind or meta["kind"]
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
@@ -565,7 +664,7 @@ def cmd_note(args):
     store.append_ledger([{**_entry(args, meta["repo"], project, qid, "card", level or "read",
                                    f"{args.take}: {args.note or ''}", meta), **extra}])
     print(f"{doc.path}\nkind {kind} ({meta['form']}; {'; '.join(meta['evidence'])})\n"
-          "fill the card (the idea, then its verifiable effect and any trial), list upstream paths we depend on under "
+          "fill the card (the idea, project evidence, independent feedback and any trial), list upstream paths we depend on under "
           "watch:, then write the report in the question file and run github-scout check")
 
 
@@ -790,9 +889,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--top", type=int, default=40)
     p.add_argument("--all", action="store_true", help="also show decided and stale rows; with --expand keep every link")
 
+    p = add("quick", cmd_quick, "the GitHub sweep of a lookup before building, run by a subagent (references/lookup.md): "
+            "searches with the words you give, prints a table of leads, writes no registry", (common, js))
+    p.add_argument("question", help="one sentence: the result you want, not the tool you imagine")
+    p.add_argument("-e", "--entity", action="append", metavar="A|B", help="a name or thing, synonyms after | "
+                   "(repeat; give English and Chinese: \"xiaohongshu|小红书\")")
+    p.add_argument("-m", "--mechanism", action="append", metavar="A|B", help="how a solution works, in README words (repeat)")
+    p.add_argument("-p", "--problem", action="append", metavar="PHRASE", help="a short phrase a user of this would write, "
+                   "one per language (repeat)")
+    p.add_argument("--form", action="append", choices=["skill", "mcp", "cli", "library", "app", "extension"],
+                   help="what you want it to be; skill, mcp, cli and library add that kind of search (repeat)")
+    p.add_argument("--stage", choices=STAGES, default="idea", help="where your own work stands (default idea)")
+    p.add_argument("--lenses", help=f"lens letters from {LENSES} (default {QUICK_LENSES} plus the form's)")
+    p.add_argument("--budget", type=int, default=150, help="max GitHub API calls (default 150); skills.sh, npm and the MCP registry searches do not stop at it")
+    p.add_argument("--seconds", type=float, default=300, help="stop starting searches after this long (default 300, 0 = no limit)")
+    p.add_argument("--per-query", type=int, default=30)
+    p.add_argument("--top", type=int, default=20)
+    p.add_argument("--rising", type=int, default=5, help="rising rows to show (default 5, 0 hides them)")
+    p.add_argument("--keep", metavar="DIR", help="keep the scan in a new registry here (default: thrown away)")
+    p.add_argument("--verbose", action="store_true", help="print every search as it runs")
+
     p = add("pick", cmd_pick, "record verdicts on scan rows: numbers from the table, or owner/repo")
     p.add_argument("ref")
-    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look: a verifiable effect and 50+ stars, or the "
+    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look: relevant and 50+ stars, or the "
                    "relaxed floor of its direction (the scan header names them)")
     p.add_argument("--low-stars", metavar="REASON", help="shortlist items under the star floor anyway, with this "
                    "reason (an official organisation's new repo, say); it goes into the ledger")
@@ -803,7 +922,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rest", metavar="REASON", help="skip every other row shown, with this reason")
     p.add_argument("--top", type=int, default=40, help="rows --rest covers (default 40)")
 
-    p = add("look", cmd_look, "look at repos: facts, activity, kind, verifiable effect (strong, mid or weak), tree, "
+    p = add("look", cmd_look, "look at repos: facts, activity, kind, project evidence, tree, "
             "README start; --source reads the code", (common, js))
     p.add_argument("repos", nargs="+")
     p.add_argument("--q", help="<project>/<question>: record that we looked; its scans give relaxed floors and installs")
@@ -814,14 +933,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--include", nargs="+", metavar="GLOB", help="with --pack: only these paths")
 
     p = add("note", cmd_note, "record what we take from a repo; creates or updates its card. use, adapt and learn need "
-            "a verifiable effect (mid or strong) and 50+ stars (or the relaxed floor of its direction), or a written reason")
+            "50+ stars (or the relaxed floor of its direction), or a written reason")
     p.add_argument("repo")
     p.add_argument("--q", required=True, help="<project>/<question>")
     p.add_argument("--take", required=True, choices=TAKES)
-    p.add_argument("--results", nargs="+", metavar="URL", help="links to its verifiable effect: a live site, a package or "
-                   "store page, screenshots, GIFs or videos, posts on X, Bilibili, YouTube, blogs, Xiaohongshu; added to "
-                   "the card. Text pages in the repo itself are weak and do not count")
-    p.add_argument("--no-results", metavar="REASON", help="why it is a reference without a verifiable effect")
+    p.add_argument("--results", nargs="+", metavar="URL", help="optional project evidence or independent feedback links; "
+                   "added to the card without grading their quality")
+    p.add_argument("--no-results", metavar="REASON", help="optional context about missing evidence (legacy field; no exception is required)")
     p.add_argument("--low-stars", metavar="REASON", help="why it is a reference under the star threshold")
     p.add_argument("--trial", metavar="TEXT", help="what we ran and what came out; written into the card, level trial")
     p.add_argument("--note", help="one line: what we take, or why not")

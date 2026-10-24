@@ -1,25 +1,24 @@
 # Evaluating a repository
 
-Judge in this order: what it does that anyone can check, then how it runs for us, then its
-source. README claims and ideas come last: a run that took one idea from each of twelve repos
-made a film the user called completely wrong, and nobody had looked at what those repos made or
-run one of them. What a repo is worth to us depends on how close its effect comes to what good
-looks like (the question says), and on where our own work stands (the question's stage). Every
-verdict goes into the ledger or a card.
+Check project claims lightly, search independent feedback on the final two or three, then let
+the coding agent try actual output after the report. Read the README, examples and any demo for
+obvious mismatches; do not turn this into a benchmark reproduction or evidence-scoring exercise.
+Judge fit against what good looks like and where our project stands. Record the verdict and
+its limits in the registry.
 
-github-scout judges the effect, the stars and the fit, and reports two or three to try. The
-coding agent tries them and chooses (stage 5), after the report and when the user asks.
+Before recommending each of the top two or three, make one focused search outside its repo in
+English and Chinese: real use, third-party recommendations, concrete outputs and problems. Open
+relevant hits and confirm the project identity. Author promotion, reposts and directory listings
+alone are not independent usage. Record a short finding and links, or "no independent usage
+feedback found". If tools were unavailable, say "not checked". Missing feedback alone does not
+reject a repo. Use x-scout for X when available; otherwise state the access limit and use other
+sources. Keep the search bounded; the full procedure is in `github-scout-brief`.
 
 ## What makes a repository worth following
 
-- **Its effect can be checked.** Most projects show what they do outside the repo, so look there:
-  - **strong:** a live site that answers (its homepage, a demo, app or playground), a published
-    package with real downloads or an app in a store, real installs (skills.sh);
-  - **mid:** screenshots, GIFs or videos in the README (not badges, logos or icons), posts outside
-    the repo that show it working (X, Bilibili, YouTube, blogs, Xiaohongshu), projects using it;
-  - **weak:** only a text description, however long or well written.
-
-  Hold the strong and mid items against what good looks like before you read a line of code.
+- **Its claims fit our goal.** The README, examples and any screenshots or demo explain what
+  it appears to do. Note obvious gaps. A reachable page only means accessible; URLs and download
+  counts do not prove output quality. Independent feedback can support or challenge the claims.
 - **It runs for us.** Tried by the coding agent on its live site, its own smallest example or one
   short real task, it gives what its effect promises. A repo that fails on the first try is not
   followed.
@@ -35,10 +34,6 @@ coding agent tries them and chooses (stage 5), after the report and when the use
 
 ## Hard gates (any one fails: `later` or `skip`, with the reason)
 
-- **A verifiable effect, mid or strong.** Weak: `later` (say what would change it) or `skip`.
-  `note` asks for `--results <links>` (a live site, media, posts; text pages inside the repo
-  itself do not count), or `--no-results "<why>"` for a real exception. Installs the scan
-  recorded on skills.sh count as strong.
 - **Enough stars.** 50 by default. A direction (one entity or mechanism group) with fewer than 5
   maintained repos at 50+ is relaxed: its own repos count down to 20 stars, then 10 if it still
   has fewer than 5, never lower; the scan header says which directions and why, and `pick` and
@@ -60,7 +55,7 @@ the instructions that matter.
 
 | question | good sign | bad sign |
 |---|---|---|
-| Is its effect verifiable? | a live demo, real installs, before/after outputs shown, posts by users | only claims |
+| What supports its claims? | examples, outputs and independent usage feedback | obvious mismatch or credible reports of failure; missing feedback is only uncertainty |
 | Does it run for us? | the coding agent's trial: installed, given one short task, the output close to its examples | errors, or output far from what it shows |
 | Is the method concrete? | steps, commands, thresholds, examples of output | "be thorough", "think step by step", persona prose |
 | What does it cost to load? | short SKILL.md, details in references loaded on demand | thousands of words always in context |
@@ -125,8 +120,8 @@ is minutes, not a day: we do not make a dead end work.
 
 The report is not a list of repositories. In one paragraph: what exists, which two or three look
 most promising for us and why, what is likely left to build. Then a table of the candidates (repo,
-kind, stars, last push, verifiable effect with its tier and links, what it does for our goal, how
-it relates to our project); Try first, with how to try each and what to look for; what the coding
+kind, stars, last push, project evidence and links, what it does for our goal, how
+it relates to our project); Try first, with independent feedback (or none found), how to try each and what to look for; what the coding
 agent does next; Not recommended, one line each with the reason; and what was searched, with
 every relaxed star threshold. When nothing passes the gates, say so, and which searches show it;
 that is when we build.

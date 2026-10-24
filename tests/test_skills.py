@@ -20,6 +20,11 @@ class SkillFormatTests(unittest.TestCase):
             m = re.match(r"---\n(.*?)\n---\n", text, re.S)
             self.assertIsNotNone(m, path)
             fields = dict(re.findall(r"^(\w[\w-]*): (.*)$", m.group(1), re.M))
+            quoted = re.search(r'^description: ".*"$', m.group(1), re.M)
+            if quoted:
+                fields["description"] = fields["description"][1:-1]
+            else:
+                self.assertNotIn(": ", fields.get("description", ""), f"{path}: a colon in an unquoted description is invalid YAML; quote it")
             self.assertEqual(fields.get("name"), path.parent.name, path)
             self.assertTrue(20 <= len(fields.get("description", "")) <= 160, path)   # short: called on purpose
             self.assertEqual(fields.get("license"), "MIT", path)
@@ -51,6 +56,11 @@ class SkillFormatTests(unittest.TestCase):
                  "```", "", "End."]
         self.assertEqual(build.drop_local_only(lines), ["Intro.", "", "| a |", "|---|", "| b |", "", "- keep", "- keep too", "",
                                                         "```", "github-scout adopt x", "```", "", "End."])
+        lines = ["## Keep", "", "Text.", "", "## Lookup (`github-scout quick`)", "", "Brief:", "", "```", "## not a heading",
+                 "```", "", "### Steps", "", "- one", "", "## Next", "", "More.", ""]
+        self.assertEqual(build.drop_local_only(lines), ["## Keep", "", "Text.", "", "## Next", "", "More."])
+        lines = ["# Top", "## Lookup (`github-scout quick`)", "```", "brief", "```", "# Next"]
+        self.assertEqual(build.drop_local_only(lines), ["# Top", "# Next"])   # a heading's section goes, its code block too
 
     def test_evals_name_real_repositories(self):
         import json

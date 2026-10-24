@@ -29,7 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills" / "github-scout" / "scripts"))
 
-from github_scout import discover, registry  # noqa: E402
+from github_scout import cli, discover, registry  # noqa: E402
 from github_scout.github import Client  # noqa: E402
 from github_scout.store import Store, min_stars  # noqa: E402
 
@@ -47,8 +47,8 @@ def load(path: Path | None = None) -> list[dict]:
     return cases
 
 
-def scan_case(case: dict, client: Client, root: Path) -> tuple[dict, discover.Scan, dict]:
-    """A fresh registry with the case as its only question, scanned with the default lenses and budget."""
+def scan_case(case: dict, client: Client, root: Path, lenses: str | None = None, budget: int = 250, seconds: float = 0) -> tuple[dict, discover.Scan, dict]:
+    """A fresh registry with the case as its only question, scanned with the given lenses (default: all) and budget."""
     if root.exists():
         raise SystemExit(f"{root} exists: pass an empty folder to --keep")
     store = Store.init(root, "eval")
@@ -60,7 +60,8 @@ def scan_case(case: dict, client: Client, root: Path) -> tuple[dict, discover.Sc
     store.save_question(doc)
     calls, start = client.calls, time.monotonic()
     sc = discover.Scan(store, client, doc.data)
-    scan = sc.run()
+    chosen = cli.quick_lenses(doc.data.get("forms")) if lenses == "quick" else (lenses or discover.DEFAULT_LENSES)
+    scan = sc.run(chosen, budget, order=cli.QUICK_ORDER if lenses == "quick" else "", seconds=seconds)
     store.save_scan(scan)
     cost = {"calls": client.calls - calls, "seconds": round(time.monotonic() - start), "searches": len(scan["searches"]),
             "repos": len(scan["candidates"]), "errors": [f"{s['lens']} {s['query'][:60]}: {s['error'][:80]}"
@@ -111,6 +112,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", metavar="FILE", help="also write the results here")
     ap.add_argument("--keep", metavar="DIR", help="keep each case's registry here, one folder per case")
     ap.add_argument("--verbose", action="store_true", help="print every search as it runs")
+    ap.add_argument("--lenses", metavar="LETTERS", help="lenses to run: letters, or 'quick' for what `github-scout quick` "
+                    "runs for the case's forms (default: every lens, as a full scan)")
+    ap.add_argument("--budget", type=int, default=250, help="max GitHub API calls per scan (default 250)")
+    ap.add_argument("--seconds", type=float, default=0, help="stop starting searches after this long (default: no limit)")
     args = ap.parse_args(argv)
     cases = load(Path(args.cases) if args.cases else None)
     if args.case:
@@ -129,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             shared = done.get(key)
             if shared is None:
                 print(f"scanning {case['id']} ...", file=sys.stderr, flush=True)
-                done[key] = shared = (case["id"], *scan_case(case, client, base / case["id"]))
+                done[key] = shared = (case["id"], *scan_case(case, client, base / case["id"], args.lenses, args.budget, args.seconds))
             first, scan, sc, cost = shared
             res = {"id": case["id"], "repos": where(scan, sc, case["must_find"]),
                    **({"shared": first} if first != case["id"] else

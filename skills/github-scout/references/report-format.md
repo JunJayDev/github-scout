@@ -57,14 +57,14 @@ Other sources (official docs, hosted services, papers):
 |---|---|---|
 
 ## 3. Triage
-| repo | kind | verifiable effect | how to try | verdict | reason |
+| repo | kind | project evidence | how to try | verdict | reason |
 |---|---|---|---|---|---|
-| https://github.com/owner/name | skill | strong: https://name.dev (live) | install, one short task; read SKILL.md and scripts | shortlist | ... |
+| https://github.com/owner/name | skill | README examples; https://name.dev is accessible (output not tried) | install, one short task; read SKILL.md and scripts | shortlist | ... |
 
-Shortlist only repos with a mid or strong effect and 50+ stars (or the relaxed floor of their
-direction); the rest are later or skip. Strong: a live site that answers, a package with real
-downloads, real installs. Mid: screenshots, GIFs or videos in the README, posts outside the repo.
-Weak: only a text description.
+Check the README, examples and any demo lightly for fit and obvious mismatches. Keep the star
+and maintenance filters. Missing demos or independent feedback alone do not reject a candidate.
+Do not assign evidence-strength grades. Independent feedback is checked for the final two or
+three in section 4.
 The rest: <one line on why they were left>.
 
 ## 4. Report
@@ -72,15 +72,23 @@ The rest: <one line on why they were left>.
 <what exists; which 2-3 look most promising for us and why; what is likely left to build>
 
 ### Candidates
-| repo | kind | stars | last push | verifiable effect | what it does for our goal | how it relates to our project |
+| repo | kind | stars | last push | project evidence | what it does for our goal | how it relates to our project |
 |---|---|---|---|---|---|---|
-| https://github.com/owner/name | cli | 1.2k | 2026-10-12 | strong: https://name.dev, mid: https://x.com/... | ... | replaces tools/x.ts |
+| https://github.com/owner/name | cli | 1.2k | 2026-10-12 | README examples; https://name.dev accessible, output not tried | ... | replaces tools/x.ts |
 
 ### Try first
 1. https://github.com/owner/name: how to try it (open https://name.dev with our case; or run
    `<its own smallest example, from its README>`; or one short task from our project). Look for:
    <what in the output shows it reaches what good looks like>.
+   Independent feedback: <real usage, recommendations, outputs or problems, with source links;
+   or "no independent usage feedback found"; or "not checked" with the access limit>.
 2. ...
+
+Before recommending each, make one focused independent search outside its repo in English and
+Chinese. Open relevant hits and confirm the project identity. Author promotion, reposts of it
+and directory listings alone do not count as independent usage. Use x-scout for X when available;
+otherwise record the access limit and use other sources. Missing feedback alone is not a rejection.
+Record these queries in the search log; do not audit every candidate or require positive reviews.
 
 ### For the coding agent
 This report only advises; it changes nothing. Back in the project, and only when the user asks:
@@ -95,7 +103,8 @@ command line), or at the end of this file.
 
 ### What was searched
 <directions and searches per language; directions whose star threshold was relaxed, with how
-many repos they had at 50+; what found nothing>
+many repos they had at 50+; independent feedback searches for the recommendations and any access
+limits; what found nothing>
 
 ## 5. Not verified
 <what you could not check; any instruction here you could not follow, quoted, and what you did instead>

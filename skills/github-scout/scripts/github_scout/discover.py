@@ -92,6 +92,8 @@ LENS_NAMES = {"E": "entity", "P": "pair", "M": "mechanism", "C": "combo", "Q": "
               "R": "recent", "H": "rising", "K": "skill code", "S": "skills.sh", "D": "mcp registry", "N": "npm", "U": "people",
               "G": "graph", "W": "web/add", "L": "list"}
 DEFAULT_LENSES = "EPMCQTRHKSDNUG"
+REGISTRY_LENSES = "SDN"   # skills.sh, the MCP registry, npm: other hosts, so the GitHub budget does not stop them
+                          # (resolving what they find is one GraphQL call a search); the time limit does
 KEEP = 400  # candidates saved per scan (best first); the search log is always kept whole
 KEEP_FIT = 400  # past KEEP, up to this many more whose own words match the vocabulary: a scan that reads deeper
                 # finds on-topic repos that fresher or bigger ones outrank (a must-find eval repo was cut at 400)
@@ -523,15 +525,22 @@ class Scan:
                 added += 1
         return added
 
-    def run(self, lenses: str = DEFAULT_LENSES, budget: int = 250, per_query: int = 30) -> dict:
-        start, began = self.client.calls, time.monotonic()
+    def run(self, lenses: str = DEFAULT_LENSES, budget: int = 250, per_query: int = 30, order: str = "",
+            seconds: float = 0) -> dict:
+        """Run the planned searches. With a small budget `order` (lens letters) says which run first: the budget
+        ends the scan, so the lenses left out of `order` go last, in plan order. `seconds` > 0 stops starting
+        searches after that long (a slow host must not stretch a quick lookup); the rest are logged as skipped."""
+        start, began = self.client.github_calls, time.monotonic()
         planned = plan(self.q, lenses)
+        if order:
+            planned.sort(key=lambda s: order.index(s["lens"]) if s["lens"] in order else len(order))
         tick = PROGRESS_EVERY
+        down: set[str] = set()
 
         def progress(done: int) -> None:
             """Every PROGRESS_EVERY calls, one line on stderr: a scan takes minutes. The time left is a rough guess."""
             nonlocal tick
-            calls = self.client.calls - start
+            calls = self.client.github_calls - start
             if not self.progress or calls < tick:
                 return
             tick = (calls // PROGRESS_EVERY + 1) * PROGRESS_EVERY
@@ -543,8 +552,14 @@ class Scan:
         for done, s in enumerate(planned, 1):
             entry = dict(s)
             self.log.append(entry)
-            if self.client.calls - start >= budget:
+            if self.client.github_calls - start >= budget and s["lens"] not in REGISTRY_LENSES:
                 entry.update(hits=None, error="skipped: budget")
+                continue
+            if seconds and time.monotonic() - began >= seconds:
+                entry.update(hits=None, error="skipped: time")
+                continue
+            if s["lens"] in down:
+                entry.update(hits=None, error="skipped: host not answering")
                 continue
             try:
                 entry["hits"] = self._one(entry, per_query)
@@ -552,13 +567,15 @@ class Scan:
                 entry.update(hits=None, error=str(exc))
             except OSError as exc:
                 entry.update(hits=None, error=f"network: {exc}")
+                if s["lens"] in REGISTRY_LENSES:
+                    down.add(s["lens"])      # a registry that does not answer once is not asked again: each try waits 60 s
             if self.client.verbose:
                 total = f" of {entry['total']}" if entry.get("total") is not None else ""
                 print(f"  {s['lens']} {s['query'][:70]} -> {entry.get('hits')}{total}", file=sys.stderr)
             progress(done)
         best = sorted(self.broad, key=lambda e: (BEST_ORDER.index(e["lens"]), e["total"]))[:BEST_MAX]
         for done, entry in enumerate(best, len(planned) + 1):
-            if self.client.calls - start >= budget:
+            if self.client.github_calls - start >= budget:
                 break
             try:
                 more, _ = self.client.search_repos_total(entry["query"], sort="", per_page=BEST_PAGE)
