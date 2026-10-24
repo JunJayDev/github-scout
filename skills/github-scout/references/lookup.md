@@ -20,7 +20,7 @@ The main agent does not run the commands or read this file. It hands the need to
 web search (Claude Code's Agent tool, a Codex subagent, or a background session) and keeps only
 the answer. Run it on Sonnet by default (Claude Code: the Agent tool with `model: "sonnet"`): the
 work is many rounds of searching and reading, and Sonnet judges a repo by what it does, not by
-the words it matches. A harness without Claude models uses its mid-size model with web search.
+the words it matches. In Codex, the subagent runs on `gpt-6.1-sol` by default.
 
 While the lookup runs, the main agent goes on with work that does not depend on it, but does not
 build the thing in question: a lookup that comes back after the build is wasted.

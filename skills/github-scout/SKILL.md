@@ -43,10 +43,11 @@ lines what exists today.
 
 Before you build a tool, skill, workflow or component, or pick between tools, hand a lookup to a
 subagent with web search, on Sonnet by default (Claude Code: the Agent tool with
-`model: "sonnet"`). It asks the web and the registries what people use, sweeps GitHub for
-new repos with `github-scout quick`, checks the few that fit and answers with a verdict in about
-fifteen lines. The main agent does not run the commands or read the steps; it sends this brief,
-keeps working on what does not depend on the answer, and builds the thing only after the answer:
+`model: "sonnet"`; Codex: `gpt-6.1-sol`). It asks the web and the registries what people use,
+sweeps GitHub for new repos with `github-scout quick`, checks the few that fit and answers with a
+verdict in about fifteen lines. The main agent does not run the commands or read the steps; it
+sends this brief, keeps working on what does not depend on the answer, and builds the thing only
+after the answer:
 
 ```
 Look for what already exists before we build this. Follow references/lookup.md in the

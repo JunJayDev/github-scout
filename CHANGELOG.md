@@ -10,7 +10,8 @@ Renamed from reuse-first to github-scout, and split by stage.
   awesome lists and the registries (skills.sh, MCP registry, npm, PyPI, Hugging Face) for what people use, runs
   `github-scout quick` as the GitHub sweep for new repos, reads its table as leads by meaning, checks the
   candidates with `look`, searches independent feedback on the two or three it names, and answers use, adapt,
-  borrow an idea, or nothing fits. The subagent runs on Sonnet by default (the trial below ran on it).
+  borrow an idea, or nothing fits. The subagent runs on Sonnet by default (the trial below ran on it), and on
+  `gpt-6.1-sol` in Codex.
   `references/quick.md` is now `references/lookup.md`.
   Why: in about twenty lookups across projects (2026-10-22 to 24) that ran `quick` in the main session, agents
   never adopted a repo they or the user did not already know, and at least six built their own. Keyword rows
