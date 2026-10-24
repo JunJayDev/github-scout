@@ -45,17 +45,17 @@ Open your agent inside your project repository and state the outcome you want:
 2. **Get the report.** Once confirmed, it runs the searches, keeps relevant candidates with enough stars, checks independent feedback on the top two or three, and writes a report: the candidates, the two or three to try first with how to try each, and what was searched. Your project is not changed.
 3. **Try, choose, adopt.** When you are ready, ask your coding agent to act on the report. It tries the two or three (minutes each, outside your project), records each trial, and chooses one to follow. It then commits changes one source repository at a time and runs `github-scout adopt` to record which of your files came from which upstream files and commits. Run `github-scout updates` at any time to check whether upstream changed the files you took.
 
-### Quick lookup (before you build, install or pick something)
+### Lookup before building (in a subagent)
 
-For a small question there is no plan to confirm and no registry. Give the need and a few words in English and Chinese:
+Before your agent builds a tool, skill or component, or picks between tools, it hands a lookup to a subagent and keeps working on what does not depend on the answer. The subagent lists what it already knows, asks the web and the registries (skills.sh, the MCP registry, npm, PyPI, Hugging Face) what people use and recommend, sweeps GitHub for new repos with `github-scout quick`, checks the few that fit, searches independent feedback on them, and answers in about fifteen lines: use X, adapt X, borrow one idea, or nothing fits. It takes five to fifteen minutes and none of it lands in the main session.
 
 ```bash
-github-scout quick "an agent skill that makes a repo quotable by AI search" \
-  -e "geo|generative engine optimization|aeo" -e "seo" \
-  -m "ai search visibility|citability" -p "geo skill for claude code" -p "让项目被 ai 搜索推荐" --form skill
+github-scout quick "split unpunctuated speech transcripts into sentences, offline" \
+  -e "transcript|asr|speech to text|语音转写" -m "sentence segmentation|punctuation restoration|断句|标点恢复" \
+  -p "add punctuation to whisper output" -p "语音识别结果自动加标点" --form library
 ```
 
-It takes one to three minutes, runs the same filters as a scan (lures, farmed installs, dead repos, repos under the star floor), and prints one ranked table. Then `github-scout look <owner/repo>` on the top two or three, followed by a focused independent feedback search before the agent recommends them. A cheap model can run all of it; use the full flow when the answer shapes your project. Recall is lower than a full scan; see [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md).
+Why not GitHub search alone: it matches words, not meaning. In about twenty real lookups that ran only this sweep, agents never adopted a repo they did not already know; the good answers came from what the model knew, the web, and other registries. The brief and the steps: [`skills/github-scout/references/lookup.md`](skills/github-scout/references/lookup.md). Use the full flow when the answer shapes your project.
 
 ### Run without installing (Web chat)
 

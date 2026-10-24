@@ -13,8 +13,8 @@
   does.
 - The command line is Python 3.9+, standard library only. Tests run offline against
   `tests/fake.py`: `python -m unittest discover -s tests`. Lint: `ruff check .`.
-- Descriptions stay short (160 characters, a test holds it). `github-scout` names the quick lookup as the check before
-  building, installing or choosing; the stage skills are called on purpose.
+- Descriptions stay short (160 characters, a test holds it). `github-scout` names the lookup, which a subagent
+  runs, as the check before building or choosing; the stage skills are called on purpose.
 - Ranking or search changes are judged on recall: `evals/evals.json` lists repos a person found
   that a search must not miss, each case with a fixed vocabulary. `python evals/run.py` scans them
   for real (network, by hand); say what a change does to them.

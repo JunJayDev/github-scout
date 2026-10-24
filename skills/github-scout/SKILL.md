@@ -1,6 +1,6 @@
 ---
 name: github-scout
-description: Before you build, install or pick a tool, skill or library, find what GitHub already solved, with a quick lookup or the full flow that ends in a report.
+description: Before you build or pick a tool, skill or library, find what already exists, with a lookup a subagent runs or the full flow that ends in a report.
 license: MIT
 metadata:
   improve-repo: JunJayDev/github-scout
@@ -39,12 +39,26 @@ Run it inside the project's repository when there is one: the agent then reads o
 see what we already have. Without a local project it still runs; the user then says in a few
 lines what exists today.
 
-## Quick lookup (`github-scout quick`)
+## Lookup before building (a subagent runs `github-scout quick`)
 
-For a small question, run `github-scout quick` instead of the stages: before you build something,
-install a tool or skill, or pick a library. It needs no registry, takes one to three minutes and
-prints one ranked table with the scan's filters (lures, farmed installs, dead repos, too few
-stars). A cheap model can run it. Steps and what to hand back: `references/quick.md`. When the
+Before you build a tool, skill, workflow or component, or pick between tools, hand a lookup to a
+subagent with web search. It asks the web and the registries what people use, sweeps GitHub for
+new repos with `github-scout quick`, checks the few that fit and answers with a verdict in about
+fifteen lines. The main agent does not run the commands or read the steps; it sends this brief,
+keeps working on what does not depend on the answer, and builds the thing only after the answer:
+
+```
+Look for what already exists before we build this. Follow references/lookup.md in the
+github-scout skill; do not change the project.
+Need: <one sentence: the result we want, not the tool we imagine>
+Must: <two to four checks a fit passes>
+Project: <path>; it already has <what exists>
+Form: <skill | mcp | cli | library | app | dataset | model>
+Known names: <any the user gave, or none>
+Answer in at most 15 lines. Write your notes to <file>.
+```
+
+The subagent's steps, and why it asks people before GitHub: `references/lookup.md`. When the
 answer shapes the project, run the stages below.
 
 ## Stages
@@ -132,7 +146,7 @@ skills sit next to this folder and use the same command.
 | `find WORDS…` | 1 | has anyone looked at this already? |
 | `ask [P/]Q "goal" --stage S` | 1 | start a question; creates the registry and the project when missing |
 | `scan P/Q --plan` / `scan P/Q` | 1 / 2 | show the searches / run them and print the ranked table, with any relaxed directions |
-| `quick "need" -e … -m … -p … [--form F]` | 1 to 3 | a one-off lookup: no registry, one short table |
+| `quick "need" -e … -m … -p … [--form F]` | lookup | the GitHub sweep a lookup's subagent runs: no registry, a table of leads |
 | `scan P/Q --add FILE\|URL` / `--expand LIST` | 2 | add links found elsewhere / expand an awesome list |
 | `pick P/Q 1 4 h2 --rest "why"` | 3 | verdicts on table rows; under the star floor needs `--low-stars "why"` |
 | `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and project evidence (facts and links) / download one commit and map the code |

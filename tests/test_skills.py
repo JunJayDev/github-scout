@@ -56,6 +56,11 @@ class SkillFormatTests(unittest.TestCase):
                  "```", "", "End."]
         self.assertEqual(build.drop_local_only(lines), ["Intro.", "", "| a |", "|---|", "| b |", "", "- keep", "- keep too", "",
                                                         "```", "github-scout adopt x", "```", "", "End."])
+        lines = ["## Keep", "", "Text.", "", "## Lookup (`github-scout quick`)", "", "Brief:", "", "```", "## not a heading",
+                 "```", "", "### Steps", "", "- one", "", "## Next", "", "More.", ""]
+        self.assertEqual(build.drop_local_only(lines), ["## Keep", "", "Text.", "", "## Next", "", "More."])
+        lines = ["# Top", "## Lookup (`github-scout quick`)", "```", "brief", "```", "# Next"]
+        self.assertEqual(build.drop_local_only(lines), ["# Top", "# Next"])   # a heading's section goes, its code block too
 
     def test_evals_name_real_repositories(self):
         import json

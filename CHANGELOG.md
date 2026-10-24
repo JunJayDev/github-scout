@@ -4,6 +4,31 @@
 
 Renamed from reuse-first to github-scout, and split by stage.
 
+- The lookup before building runs in a subagent and asks people first (owner, 2026-10-25). The main agent
+  sends a short brief (need, Musts, project, form, known names) and keeps only a verdict of about fifteen lines;
+  it never runs the commands or reads the steps. The subagent lists what it already knows, searches the web,
+  awesome lists and the registries (skills.sh, MCP registry, npm, PyPI, Hugging Face) for what people use, runs
+  `github-scout quick` as the GitHub sweep for new repos, reads its table as leads by meaning, checks the
+  candidates with `look`, searches independent feedback on the two or three it names, and answers use, adapt,
+  borrow an idea, or nothing fits. `references/quick.md` is now `references/lookup.md`.
+  Why: in about twenty lookups across projects (2026-10-22 to 24) that ran `quick` in the main session, agents
+  never adopted a repo they or the user did not already know, and at least six built their own. Keyword rows
+  were mostly neighbours (a 76.8k-star job-search agent for "Bilibili covers"), the rising rows were the same
+  five repos whatever the need, nearly every run hit the 150 s limit, and the table, `look` and the doc put
+  13 to 16 KB into the main context. The good answers came from the model's own knowledge (wtpsplit, Konsta
+  UI, missed by the table), web research, Hugging Face datasets and an awesome list read by hand.
+  - Trial (2026-10-25): a subagent given only the brief and `lookup.md`, on a need where the table had missed
+    (split unpunctuated speech transcripts into sentences, Chinese and English, on a Mac), answered in 7.7
+    minutes with three candidates that pass the Musts: SaT (wtpsplit), which the project was already wiring in,
+    from step 1; sherpa-onnx's CT-Transformer punctuation and FireRedPunc from the web, X and Hugging Face. Its
+    two GitHub sweeps gave none of them. Its notes on the doc (a project already using a candidate, a Hugging
+    Face command, an answer shape that fits 15 lines, runtime words in `-m`) are in `lookup.md`.
+  - `quick`: defaults 150 GitHub calls, 300 s and 20 rows (were 80, 150 s, 10): a subagent can wait, and the
+    topic searches that ran last were the ones cut. Lenses and ranking unchanged. Its last line says the rows
+    are leads and points to the lookup.
+  - `tools/build-cloud.py`: a heading that names a local-only command drops its whole section, code blocks
+    included.
+
 - `quick` (owner, 2026-10-22). A one-off lookup for the moment before you build, install or pick something: no
   registry, no plan to confirm, one ranked table in one to three minutes, run by a cheap model if you like. It
   runs the lenses E, P, M, Q, T, H and one per `--form` (skill: skills.sh; mcp: the MCP registry; cli and library: npm),

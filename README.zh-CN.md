@@ -45,17 +45,17 @@ npx skills add JunJayDev/github-scout -g
 2. **生成报告。** 确认后，Agent 执行检索，保留相关且星数达标的仓库，对重点推荐的两三个项目检索独立反馈，再写出报告：候选列表、最值得先试的两三个及各自的试法、检索覆盖范围。你的项目不会被改动。
 3. **试跑、选定与落地。** 准备接入时，让编码 Agent 按报告继续。它在项目外试跑这两三个候选（每个几分钟），记录每次试跑，选定一个整体跟进；然后按每个上游仓库一次提交的方式修改代码，并运行 `github-scout adopt` 记录本地文件对应的上游文件及双端 commit。后续随时运行 `github-scout updates`，即可查看上游是否修改了你所引用的文件。
 
-### 轻量查询（动手做、安装、选型之前）
+### 动手之前先查一下（交给子 Agent）
 
-小问题不用确认计划，也不用登记库。给出需求和几组中英文词：
+Agent 准备自己写一个工具、skill 或组件，或者要在几个工具之间选一个时，把查询交给一个子 Agent，自己继续做不依赖结论的部分。子 Agent 先列出自己已经知道的方案，再到网页和各个登记处（skills.sh、MCP registry、npm、PyPI、Hugging Face）查别人在用、在推荐什么，用 `github-scout quick` 扫一遍 GitHub 上的新仓库，核对少数几个对得上的，查它们的独立反馈，最后用十五行左右给出结论：直接用、改着用、借一个思路，或者没有合适的。整件事五到十五分钟，不占主会话。
 
 ```bash
-github-scout quick "让项目被 AI 搜索引用和推荐的 agent skill" \
-  -e "geo|generative engine optimization|aeo" -e "seo|搜索优化" \
-  -m "ai search visibility|citability" -p "geo skill for claude code" -p "让项目被 ai 搜索推荐" --form skill
+github-scout quick "split unpunctuated speech transcripts into sentences, offline" \
+  -e "transcript|asr|speech to text|语音转写" -m "sentence segmentation|punctuation restoration|断句|标点恢复" \
+  -p "add punctuation to whisper output" -p "语音识别结果自动加标点" --form library
 ```
 
-一到三分钟，过滤规则和完整扫描一样（诱饵、刷量、停更、星数不够的仓库），输出一张排好序的表。再对前两三个跑 `github-scout look <owner/repo>`，由 Agent 补一次独立反馈检索后再推荐。整件事可以交给便宜的模型；答案会影响整个项目时，走完整流程。召回率低于完整扫描，见 [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md)。
+为什么不只搜 GitHub：它按字面匹配，不按意思。在大约二十次只跑这一步的真实查询里，Agent 从没采用过一个它本来不知道的仓库；好答案来自模型自己的知识、网页和其他登记处。交给子 Agent 的说明和步骤见 [`skills/github-scout/references/lookup.md`](skills/github-scout/references/lookup.md)。答案会影响整个项目时，走完整流程。
 
 ### 免安装模式（网页端对话）
 

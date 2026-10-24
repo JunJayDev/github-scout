@@ -438,8 +438,9 @@ def cmd_quick(args):
         out.append(f"time limit: {timed} searches were not run ({args.seconds:.0f}s; --seconds N raises it, 0 removes it)")
     if errors:
         out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]))
-    out.append("next: github-scout look <owner/repo> ... (facts, README, project evidence) for the top 2-3; "
-               "search independent feedback before recommending them; if the choice shapes the project, run the full flow: github-scout ask"
+    out.append("next: these are leads from word matches, not a ranking: keep the rows that do the need, add the names "
+               "you know and the ones people recommend on the web, check them with github-scout look <owner/repo> ..., "
+               "then search independent feedback on the 2-3 you name (references/lookup.md)"
                + (f"   (kept in {keep})" if keep else ""))
     print("\n".join(out))
 
@@ -888,8 +889,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--top", type=int, default=40)
     p.add_argument("--all", action="store_true", help="also show decided and stale rows; with --expand keep every link")
 
-    p = add("quick", cmd_quick, "one-off lookup in about a minute: is there something that already does this? Searches "
-            "with the words you give, prints a short ranked table, writes no registry", (common, js))
+    p = add("quick", cmd_quick, "the GitHub sweep of a lookup before building, run by a subagent (references/lookup.md): "
+            "searches with the words you give, prints a table of leads, writes no registry", (common, js))
     p.add_argument("question", help="one sentence: the result you want, not the tool you imagine")
     p.add_argument("-e", "--entity", action="append", metavar="A|B", help="a name or thing, synonyms after | "
                    "(repeat; give English and Chinese: \"xiaohongshu|小红书\")")
@@ -900,10 +901,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="what you want it to be; skill, mcp, cli and library add that kind of search (repeat)")
     p.add_argument("--stage", choices=STAGES, default="idea", help="where your own work stands (default idea)")
     p.add_argument("--lenses", help=f"lens letters from {LENSES} (default {QUICK_LENSES} plus the form's)")
-    p.add_argument("--budget", type=int, default=80, help="max GitHub API calls (default 80); skills.sh, npm and the MCP registry searches do not stop at it")
-    p.add_argument("--seconds", type=float, default=150, help="stop starting searches after this long (default 150, 0 = no limit)")
+    p.add_argument("--budget", type=int, default=150, help="max GitHub API calls (default 150); skills.sh, npm and the MCP registry searches do not stop at it")
+    p.add_argument("--seconds", type=float, default=300, help="stop starting searches after this long (default 300, 0 = no limit)")
     p.add_argument("--per-query", type=int, default=30)
-    p.add_argument("--top", type=int, default=10)
+    p.add_argument("--top", type=int, default=20)
     p.add_argument("--rising", type=int, default=5, help="rising rows to show (default 5, 0 hides them)")
     p.add_argument("--keep", metavar="DIR", help="keep the scan in a new registry here (default: thrown away)")
     p.add_argument("--verbose", action="store_true", help="print every search as it runs")
