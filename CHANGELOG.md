@@ -25,7 +25,10 @@ Renamed from reuse-first to github-scout, and split by stage.
     Face command, an answer shape that fits 15 lines, runtime words in `-m`) are in `lookup.md`.
   - `quick`: defaults 150 GitHub calls, 300 s and 20 rows (were 80, 150 s, 10): a subagent can wait, and the
     topic searches that ran last were the ones cut. Lenses and ranking unchanged. Its last line says the rows
-    are leads and points to the lookup.
+    are leads and points to the lookup. Recall (`evals/run.py --lenses quick --budget 150 --seconds 300`,
+    2026-10-25): 10 of 10 repos in 5 cases, 4.6 to 6.1 minutes a scan (was 9 of 10 at 80 calls and 150 s;
+    `user-w-ui/search-before-build` now comes back). Kept is not seen: that repo sits at row 254 and
+    `alchaincyf/tramstop-skill` at row 276, past the 20 rows shown, which is why the lookup leans on the web.
   - `tools/build-cloud.py`: a heading that names a local-only command drops its whole section, code blocks
     included.
 
