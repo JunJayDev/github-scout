@@ -1,7 +1,7 @@
 """Looking at a repository as cheaply as possible, and checking it again later.
 
 peek   ~1-1.5k tokens: facts, kind guess with evidence, tree summary, manifests, the start
-       of the README, and the verifiable effect (strong, mid or weak, with the links to open:
+       of the README, and project evidence (facts and links, without a quality verdict:
        a live site checked with one short request, npm downloads, media in the README).
 fetch  download one commit's source into the cache and print a digest that
        says where the code is and how big each part is, so reading can be targeted.
@@ -20,7 +20,7 @@ from pathlib import Path
 
 from .github import Client, GitHubError
 from .discover import DROP, HIDE, SLOW, human, months_since
-from .store import INSTALLS_REAL, SHA, Store, adoptions, as_list, min_stars, repo_ref, today
+from .store import SHA, Store, adoptions, as_list, min_stars, repo_ref, today
 
 MANIFESTS = ["package.json", "pyproject.toml", "setup.py", "Cargo.toml", "go.mod", "Package.swift",
              ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", "manifest.json", "action.yml",
@@ -88,12 +88,8 @@ def guess_kind(paths: list[str], files: dict[str, str], name: str, readme: str, 
     return "library", ["code without a manifest the tool recognises"]
 
 
-# What a repo shows of what it does (owner, 2026-10-19). Most show it outside the repo, so `look` grades it:
-#   strong  a live site that answers (the repo's homepage, a demo or app link in the README), an npm package with
-#           real downloads, real installs recorded by the scan (skills.sh)
-#   mid     screenshots, GIFs or videos in the README (badges, logos and icons left out)
-#   weak    none of these: only a text description
-# Posts outside the repo (X, Bilibili, YouTube, blogs) are mid too; the agent finds them and gives them to `note`.
+# Project-provided evidence leads. Reachability and README links do not establish
+# working output or independent use. The agent searches independent feedback for the top 2-3.
 SITE_WORDS = re.compile(r"demo|playground|\btry\b|\blive\b|online|\bapp\b|website|homepage|gallery|showcase|preview|"
                         r"在线|体验|演示|试用|官网|作品|展示|案例", re.I)
 NOT_EFFECT = re.compile(r"shields\.io|badgen\.net|badge|/actions/workflows/|codecov|star-history|contrib\.rocks|trendshift|"
@@ -113,8 +109,7 @@ POST_ITEM = re.compile(r"/status/\d|/statuses/|weibo\.com/\d+/\w|/explore/\w|/di
                        r"/answer/\d|zhuanlan\.zhihu\.com/p/|/post/\w|mp\.weixin\.qq\.com/s|/comments/\w|item\?id=\d|"
                        r"/posts/\w|/feed/update/|/reel/\w|medium\.com/[^/]+/[^/?#]+|dev\.to/[^/]+/[^/?#]+", re.I)
 # one post that can show it working; a profile or home page (the author's accounts) shows nothing
-SITES_PROBED, MEDIA_SHOWN, NPM_REAL = 3, 4, 100   # live sites checked per repo; media links printed; npm downloads a
-                                                  # month that count as real use
+SITES_PROBED, MEDIA_SHOWN = 3, 4   # sites checked per repo; README links printed
 
 
 def _absolute(url: str, slug: str, branch: str) -> str:
@@ -135,7 +130,7 @@ def _small(url: str, alt: str = "", width: str = "", height: str = "") -> bool:
 
 
 def readme_effect(readme: str, slug: str, branch: str) -> tuple[list[dict], list[str]]:
-    """From a README: media that shows what it does (mid), and links that may be its live site, for `look` to check.
+    """From a README: media links to review, and links that may be its live site, for `look` to check.
     Relative links point into the repo."""
     media: list[dict] = []
     sites: list[str] = []
@@ -149,7 +144,7 @@ def readme_effect(readme: str, slug: str, branch: str) -> tuple[list[dict], list
             media.append({"what": kind, "url": url})
 
     def add_site(text: str, url: str) -> None:
-        if POST.match(url):                                     # social: a post is mid, never a live site
+        if POST.match(url):                                     # social links need independent review
             if POST_ITEM.search(url) and url not in {m["url"] for m in media}:
                 media.append({"what": "post", "url": url})
             return
@@ -184,44 +179,40 @@ def readme_effect(readme: str, slug: str, branch: str) -> tuple[list[dict], list
 
 def effect_of(client: Client, readme: str, slug: str, branch: str, homepage: str = "", package: str = "",
            installs: int = 0) -> dict:
-    """The repo's verifiable effect: its tier, the strong and mid items, and the sites that did not answer.
-    Asks the homepage and up to two README demo links whether they answer (no token, a few seconds each), and npm
-    for a package's downloads."""
+    """Lightweight facts and project-provided links, without grading the repo's effect.
+    Probe up to three sites and query npm downloads. The agent checks independent feedback separately."""
     media, links = readme_effect(readme, slug, branch)
-    strong: list[dict] = []
+    facts: list[dict] = []
     silent: list[str] = []
     home = homepage.strip() if homepage and not GITHUB_HOSTS.match(homepage.strip()) else ""
     sites = list(dict.fromkeys(([home] if home.startswith(("http://", "https://")) else []) + links))[:SITES_PROBED]
     for url in sites:
         if client.reachable(url):
-            strong.append({"what": "live site" + (" (homepage)" if url == home else ""), "url": url})
+            facts.append({"what": "reachable site" + (" (homepage)" if url == home else ""), "url": url})
         else:
             silent.append(url)
     if package:
         n = client.npm_downloads(package)
-        if n is not None and n >= NPM_REAL:
-            strong.append({"what": f"npm {package}: {human(n)} downloads last month",
-                           "url": f"https://www.npmjs.com/package/{package}"})
-    if installs >= INSTALLS_REAL:
-        strong.append({"what": f"skills.sh: {human(installs)} installs", "url": ""})
-    tier = "strong" if strong else "mid" if media else "weak"
-    return {"tier": tier, "strong": strong, "mid": media, "silent": silent}
+        if n is not None:
+            facts.append({"what": f"npm {package}: {human(n)} downloads last month",
+                          "url": f"https://www.npmjs.com/package/{package}"})
+    if installs > 0:
+        facts.append({"what": f"skills.sh: {human(installs)} installs", "url": ""})
+    return {"facts": facts, "media": media, "silent": silent}
 
 
 def render_effect(e: dict) -> list[str]:
-    """`look`'s lines on the verifiable effect: the tier first, then what to open."""
-    if e["tier"] == "weak":
-        return ["verifiable effect: weak, only a text description (no live site, package downloads, installs or media "
-                "found). Look for posts outside the repo (X, Bilibili, YouTube, blogs) before you pick; with none it is "
-                "later or skip"] + ([f"  did not answer: {' '.join(e['silent'])}"] if e["silent"] else [])
-    lines = [f"verifiable effect: {e['tier']}" + "".join(f" · {x['what']}" + (f" {x['url']}" if x["url"] else "")
-                                                         for x in e["strong"])]
-    if e["mid"]:
-        kinds = {k: sum(m["what"] == k for m in e["mid"]) for k in ("post", "image", "video")}
+    """Facts only: reachability is not a quality verdict; README links are not independent feedback."""
+    lines = ["project evidence (not a quality verdict):" + "".join(
+        f" · {x['what']}" + (f" {x['url']}" if x["url"] else "") for x in e["facts"])]
+    if not e["facts"] and not e["media"]:
+        lines.append("  only the project description found; review its claims briefly, then try it later if selected")
+    if e["media"]:
+        kinds = {k: sum(m["what"] == k for m in e["media"]) for k in ("post", "image", "video")}
         what = ", ".join(f"{n} {k}{'s' if n > 1 else ''}" for k, n in kinds.items() if n)
-        shown = sorted(e["mid"], key=lambda m: m["what"] != "post")[:MEDIA_SHOWN]   # posts first: they show it in use
-        lines.append(f"  mid: {what} in the README: " + " ".join(m["url"] for m in shown)
-                     + (f" (+{len(e['mid']) - len(shown)})" if len(e["mid"]) > len(shown) else ""))
+        shown = sorted(e["media"], key=lambda m: m["what"] != "post")[:MEDIA_SHOWN]
+        lines.append(f"  project-provided links: {what} in the README: " + " ".join(m["url"] for m in shown)
+                     + (f" (+{len(e['media']) - len(shown)})" if len(e["media"]) > len(shown) else ""))
     if e["silent"]:
         lines.append(f"  did not answer: {' '.join(e['silent'])}")
     return lines

@@ -10,7 +10,7 @@ GitHub research for coding agents: find proven open-source projects to try befor
 
 When you give your agent a goal, `github-scout` reads your project first to see what you already have and where it falls short. It restates the goal as a concrete outcome, defines what good looks like, sets the project stage, and plans search directions in English and Chinese. Then it pauses for you to confirm the plan.
 
-After you confirm, it searches GitHub and package directories in both languages and keeps repositories with a verifiable effect and 50+ stars. A verifiable effect is something you can check outside the README text: a live site that responds, a package with real downloads, screenshots or videos, or posts about the project. Where a search direction has fewer than five such repositories, its threshold drops to 20 stars, then 10. The run ends with a report for your coding agent: what exists, the two or three candidates to try first and how to try each, what is likely left to build, and what was searched.
+After you confirm, it searches GitHub and package directories in both languages and keeps relevant repositories with 50+ stars. It reviews project descriptions, examples and demos lightly for obvious mismatches. Before recommending the top two or three, it independently searches outside their repositories for real usage, reviews, recommendations, concrete outputs and problems. It records source links or states that no independent usage feedback was found; missing feedback alone does not disqualify a project. Where a search direction has fewer than five such repositories, its threshold drops to 20 stars, then 10. The run ends with a report for your coding agent: what exists, the two or three candidates to try first and how to try each, what is likely left to build, and what was searched.
 
 `github-scout` never runs candidate code and never modifies your repository. When you ask, your coding agent takes the report from there: it tries the two or three in an isolated environment, chooses one to follow as a whole, fills its gaps from other repositories with a stated reason for each, and adopts it under your project's rules. Each adoption records file and commit provenance in a local registry so you can track upstream updates.
 
@@ -42,7 +42,7 @@ Open your agent inside your project repository and state the outcome you want:
 > Use github-scout: make the product videos our agent renders cut and move like an editor's.
 
 1. **Confirm the plan.** The agent inspects your codebase, proposes what good looks like along with English and Chinese search directions, and stops for your confirmation.
-2. **Get the report.** Once confirmed, it runs the searches, keeps candidates with a verifiable effect and enough stars, and writes a report: the candidates, the two or three to try first with how to try each, and what was searched. Your project is not changed.
+2. **Get the report.** Once confirmed, it runs the searches, keeps relevant candidates with enough stars, checks independent feedback on the top two or three, and writes a report: the candidates, the two or three to try first with how to try each, and what was searched. Your project is not changed.
 3. **Try, choose, adopt.** When you are ready, ask your coding agent to act on the report. It tries the two or three (minutes each, outside your project), records each trial, and chooses one to follow. It then commits changes one source repository at a time and runs `github-scout adopt` to record which of your files came from which upstream files and commits. Run `github-scout updates` at any time to check whether upstream changed the files you took.
 
 ### Quick lookup (before you build, install or pick something)
@@ -55,7 +55,7 @@ github-scout quick "an agent skill that makes a repo quotable by AI search" \
   -m "ai search visibility|citability" -p "geo skill for claude code" -p "让项目被 ai 搜索推荐" --form skill
 ```
 
-It takes one to three minutes, runs the same filters as a scan (lures, farmed installs, dead repos, repos under the star floor), and prints one ranked table. Then `github-scout look <owner/repo>` on the top two or three. A cheap model can run all of it; use the full flow when the answer shapes your project. Recall is lower than a full scan; see [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md).
+It takes one to three minutes, runs the same filters as a scan (lures, farmed installs, dead repos, repos under the star floor), and prints one ranked table. Then `github-scout look <owner/repo>` on the top two or three, followed by a focused independent feedback search before the agent recommends them. A cheap model can run all of it; use the full flow when the answer shapes your project. Recall is lower than a full scan; see [`skills/github-scout/references/quick.md`](skills/github-scout/references/quick.md).
 
 ### Run without installing (Web chat)
 
@@ -77,8 +77,8 @@ Each stage is an independent skill that can run on its own. `github-scout` runs 
 |---|---|---|
 | 1. Plan | `github-scout-plan` | Reads your project, restates the goal as a result, defines what good looks like, sets the stage (`idea`, `prototype`, `working`, `polishing`), and writes search directions in English and Chinese. |
 | 2. Search | `github-scout-search` | Searches each direction across names, term pairs, mechanisms, GitHub topics, `SKILL.md` files, skills.sh, the MCP registry, npm, and fast-rising new repos; excludes lures, farmed installs, and repos under 50 stars. |
-| 3. Triage | `github-scout-triage` | Keeps candidates with a verifiable effect (strong or mid) and enough stars, tags their kind (`skill`, `cli`, `mcp`, `library`, `app`, `list`), and notes how each would be tried. |
-| 4. Brief | `github-scout-brief` | Compares the shortlist against your code and writes the report: what exists, a candidate table, the two or three to try first and how, what is not recommended, and what was searched. |
+| 3. Triage | `github-scout-triage` | Checks project claims lightly, keeps relevant candidates with enough stars, tags their kind (`skill`, `cli`, `mcp`, `library`, `app`, `list`), and notes how each would be tried. |
+| 4. Brief | `github-scout-brief` | Checks independent feedback on the top two or three, compares them against your code and writes the report: what exists, a candidate table, the two or three to try first and how, what is not recommended, and what was searched. |
 | 5. Dig | `github-scout-dig` | Run by your coding agent. Tries the two or three in a throwaway directory or container, stops early on dead ends, chooses one to follow as a whole, and names what fills its gaps. |
 | 6. Adopt | `github-scout-adopt` | Run by your coding agent. Brings the chosen repository in as a whole (`depend`, `skill`, `tool`) and fills gaps by your project's rules (`port`, `vendor`, `data`), recording provenance with `github-scout adopt`. |
 
@@ -95,8 +95,8 @@ Usage: `github-scout [--version] [--store DIR] <command> ...`
 
 **Triage, trials, and adoption**
 - `pick` : Record verdicts on scan table rows or `owner/repo` (`--low-stars "<why>"` required under the star floor).
-- `look` : Inspect repository facts, activity, kind, file tree, and the verifiable effect graded strong, mid or weak (`--source` downloads and maps source code).
-- `note` : Record findings on a repo card (`use`, `adapt`, `learn`, `later`, `skip`), including `--results` (links to its verifiable effect), `--trial`, and `--watch` paths.
+- `look` : Inspect repository facts, activity, kind, file tree, and project evidence: site reachability, download counts and README links, without quality grades (`--source` downloads and maps source code).
+- `note` : Record findings on a repo card (`use`, `adapt`, `learn`, `later`, `skip`), including `--results` (optional project evidence or independent feedback links), `--trial`, and `--watch` paths.
 - `brief` : Turn an answered question into the report for the coding agent without changing the project.
 - `adopt` : Record a repository integrated into your project (mode, local paths, upstream paths, and commit hashes).
 
@@ -113,7 +113,7 @@ The minimum star threshold defaults to `50` (override via `GITHUB_SCOUT_MIN_STAR
 
 - **Goal and stage drive the search.** Searching for a generic tool category yields different candidates than stating the target result. Defining what good looks like (two or three finished outputs to match, or runnable checks) and setting your project's stage (`idea`, `prototype`, `working`, `polishing`) determines whether to borrow an entire approach or specific parameters and edge cases.
 - **Bilingual search by entities and mechanisms.** Good projects describe what they touch and how they work rather than broad problem phrases. Every direction is searched in both English and Chinese using each community's native terms; Chinese projects supplied half of the repositories selected in real runs.
-- **Verifiable effect before code.** Most projects show their results outside the repository. A candidate's effect is graded: strong (a live site that responds, a package with real downloads, real installs), mid (screenshots, GIFs or videos in the README, posts on X, Bilibili, YouTube, blogs or Xiaohongshu), or weak (only a text description). Only strong and mid candidates qualify as references, unless you record an explicit reason for an exception.
+- **Lightweight project review; independent feedback before recommending.** Read the README, examples and any demo for fit and obvious mismatches. An accessible page or a download count is a clue, not proof of output quality. For the top two or three only, make one focused independent search per repo in English and Chinese. Open relevant sources and distinguish actual use, recommendations, outputs and problems from author promotion, reposts and directory listings. Record a short finding and links, or "no independent usage feedback found"; if search was unavailable, say "not checked". Neither alone disqualifies a repo. Actual output is tested later by the coding agent.
 - **Stars per direction.** A reference needs 50 stars. Niche directions rarely have five projects that size, so a direction (one group of search terms) with fewer than five is relaxed to 20 stars, then 10, never lower. The scan header and the report say which directions were relaxed and why.
 - **The report stops before trials.** `github-scout` finds, filters and reports; it does not run candidate code or pick a winner. Your coding agent tries the two or three in minutes each, outside your project, and drops a candidate at the first failure.
 - **One main reference, then targeted gaps.** Combining ideas from many unrelated repositories does not add up to a working system. After its trials, the coding agent follows one repository as a whole (with at most one alternate) and takes from other repositories only what fills a named gap, with a reason for each.
@@ -148,7 +148,7 @@ Pre-build search skills such as ECC's `search-first` (the most installed on skil
 
 - reading your local project first to map existing code and gaps;
 - framing the question by project stage and defining verifiable target outputs;
-- enforcing a quality gate: a verifiable effect and 50+ stars (relaxed per thin search direction), with an isolated trial by the coding agent before anyone reads code;
+- keeping the star and maintenance filters, reviewing project claims lightly, and independently checking feedback on the top recommendations before the coding agent tries them;
 - storing every verdict in a persistent registry so repositories are not evaluated twice;
 - writing a codebase-aware report that tells your coding agent what to try first and how;
 - recording file-level and commit-level provenance with `github-scout adopt` and tracking upstream changes via `github-scout updates`.

@@ -50,8 +50,11 @@ skip the commands.
   and offer it for download.
 - List only repositories you have seen (their page, the connector, or a search result naming
   them). Never invent a repository, a star count or a date.
-- **You do not try repos or choose one.** Judge each by its verifiable effect (a live site,
-  package downloads, screenshots, videos, posts outside the repo) and its stars, and write under
+- **You do not try repos or choose one.** Check project claims lightly and keep the star and
+  maintenance filters. Before recommending the top two or three, independently search real use,
+  reviews, recommendations, outputs and problems outside their repos. Distinguish independent
+  sources from author promotion and reposts. Record links or "no independent usage feedback
+  found"; unavailable search is "not checked". Neither alone disqualifies a repo. Write under
   Try first how the coding agent should try each. Back in the project, and only when the user
   asks, that agent tries them, chooses one to follow and brings it in.
 - Without a project, the stage is "idea".

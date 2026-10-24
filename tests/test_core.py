@@ -399,13 +399,13 @@ class FlowTests(Base):
         self.assertEqual(code, 0, out)
         self.assertIn("(software: cli?)", out)
         self.assertIn("maintenance: active · 37 commits in 30 days", out)
-        self.assertIn("verifiable effect: weak, only a text description", out)
+        self.assertIn("only the project description found", out)
         self.assertIn("--results <links>", out)
         self.assertIn("top one 80% of commits", out)
 
         code, _, err = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
                                     "--results", "https://github.com/jackwener/OpenCLI#demo")
-        self.assertIn("jackwener/OpenCLI shows only text in its own repo", err)   # its README is a weak effect
+        self.assertEqual(code, 0, err)  # project links are allowed without an evidence gate
         code, out, _ = self.run_cli("note", "jackwener/OpenCLI", "--q", "ops/browser-ops", "--take", "use",
                                     "--where", "tools/opencli", "--watch", "clis/reddit/**",
                                     "--results", "https://opencli.info/")
@@ -626,7 +626,10 @@ class FlowTests(Base):
         self.assertEqual(code, 0, err)
         for heading, text in (("In one paragraph", "OpenCLI reads all three sites; posting is left to build."),
                               ("Candidates", "| repo | kind | stars |\n|---|---|---|\n| jackwener/OpenCLI | cli | 30k |"),
-                              ("Try first", "1. jackwener/OpenCLI: run `opencli reddit hot`; look for JSON with ids."),
+                              ("Try first", "1. jackwener/OpenCLI: run `opencli reddit hot`; look for JSON with ids.\n"
+                               "Independent feedback: no independent usage feedback found; searched exact project name and usage reviews.\n"
+                               "Author announcement only: https://example.org/announcement; not independent usage.\n"
+                               "X not checked: tool unavailable."),
                               ("Not recommended", "- xpzouying/xiaohongshu-mcp: one site only.")):
             doc.body = re.sub(rf"(\n### {heading}\n)(?:\(.*\)\n|\|.*\|\n\|[-|]+\|\n)?",
                               lambda m, text=text: m.group(1) + text + "\n", doc.body, count=1)
@@ -639,14 +642,16 @@ class FlowTests(Base):
         text = Path(out.splitlines()[0]).read_text(encoding="utf-8")
         order = ["# GitHub scout report: Drive our logged-in sites", "github-scout found the candidates, filtered them",
                  "## Goal and where we stand", "Project code: /src/ops", "## In one paragraph", "OpenCLI reads all three",
-                 "## Candidates", "| jackwener/OpenCLI | cli | 30k |", "## Try first", "run `opencli reddit hot`",
+                 "## Candidates", "| jackwener/OpenCLI | cli | 30k |", "## Try first", "run `opencli reddit hot`", "Independent feedback: no independent usage feedback found",
                  "## Sources", "| [jackwener/OpenCLI](https://github.com/jackwener/OpenCLI) | try first | use | 30000 | "
-                 "mid: [1](https://opencli.info/) |", "## For the coding agent: try, choose, adopt",
+                 "[1](https://opencli.info/) |", "## For the coding agent: try, choose, adopt",
                  "github-scout note jackwener/OpenCLI --q ops/browser-ops --take <use|adapt|learn|later|skip> --trial",
                  "## Adopt and record", "## Not recommended (leave these out)", "- xpzouying/xiaohongshu-mcp: one site",
                  "## What was searched", "repos kept.", "Star threshold 50, relaxed where a direction had under 5"]
         self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
         self.assertNotIn("## Backbone", text)
+        self.assertIn("Author announcement only: https://example.org/announcement; not independent usage.", text)
+        self.assertIn("X not checked: tool unavailable.", text)
 
     def test_resurface_when_a_skipped_repo_grows(self):
         self.seed()
@@ -1022,12 +1027,11 @@ class QualityGateTests(Base):
         code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--note", "x")
         self.assertEqual(code, 1)
         self.assertIn("b/tiny has 12 stars, under 50: no reference. Say why it is an exception with --low-stars", err)
-        self.assertIn("b/tiny shows no verifiable effect on its card. Give --results", err)
         self.assertIsNone(self.store.card("b/tiny"))
         self.assertEqual(self.store.ledger(), [])
         code, _, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn", "--results", "demo.mp4",
                                     "--low-stars", "x")
-        self.assertIn("--results takes links (http or https) to its verifiable effect: demo.mp4", err)
+        self.assertIn("--results takes links (http or https) to project evidence or feedback: demo.mp4", err)
         code, out, err = self.run_cli("note", "b/tiny", "--q", "ops/browser-ops", "--take", "learn",
                                       "--results", "https://example.com/tiny/demo.mp4", "--low-stars", "official org")
         self.assertEqual(code, 0, err)
@@ -1035,17 +1039,15 @@ class QualityGateTests(Base):
         self.assertEqual(card.data["results"], ["https://example.com/tiny/demo.mp4"])
         self.assertEqual(card.data["uses"][0]["low_stars"], "official org")
         self.assertEqual(self.store.ledger()[-1]["low_stars"], "official org")
-        self.assertIn("verifiable effect: mid\n  mid    https://example.com/tiny/demo.mp4", self.run_cli("show", "b/tiny")[1])
+        self.assertIn("evidence links (not automatically verified):\n  https://example.com/tiny/demo.mp4", self.run_cli("show", "b/tiny")[1])
 
         self.api.add(repo("c/plain", 400, "Plain tool", pushed=ago(0.1)))
         code, out, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "later", "--note", "no results yet")
         self.assertEqual(code, 0, err)                                    # later and skip need neither
         self.assertEqual(self.store.card("c/plain").data["results"], [])
-        self.assertIn("verifiable effect: none recorded", self.run_cli("show", "c/plain")[1])
+        self.assertIn("evidence links: none recorded", self.run_cli("show", "c/plain")[1])
         code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt")
-        self.assertEqual(code, 1)
-        self.assertIn("no verifiable effect", err)
-        self.assertNotIn("stars", err)
+        self.assertEqual(code, 0, err)  # missing evidence links do not block recommendations
         code, _, err = self.run_cli("note", "c/plain", "--q", "ops/browser-ops", "--take", "adapt",
                                     "--no-results", "a library: its tests are the result")
         self.assertEqual(code, 0, err)
@@ -1092,8 +1094,6 @@ class QualityGateTests(Base):
         self.assertEqual(errors, [])
         mine = [w.split(": ", 1)[1] for w in warns if "questions/browser-ops.md" in w and "vocabulary" not in w]
         self.assertEqual(mine, ["backbone d/tool was not tried (level read): run its own example, then note --trial",
-                                "backbone d/tool shows no verifiable effect (note --results <a live site, screenshots, "
-                                "videos or posts>)",
                                 "picked e/gap has 12 stars, under 50, and no reason (note --low-stars)"])
         doc = self.store.question("ops/browser-ops")
         doc.data.update(backbone="not a repo", alternate=["a/b"])
@@ -1137,7 +1137,7 @@ class QualityGateTests(Base):
         self.assertEqual([text.index(x) for x in order], sorted(text.index(x) for x in order))
         self.assertNotIn("## Why: the ideas behind it", text)
         self.assertNotIn("## Against what we have", text)                  # left empty: no section
-        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | mid: [1](https://example.com/d/gallery) | "
+        self.assertIn("| [d/tool](https://github.com/d/tool) | backbone | use | 300 | [1](https://example.com/d/gallery) | "
                       "trial | abcdef123456 | n |", text)
         self.assertIn("| [f/alt](https://github.com/f/alt) | alternate | - | - | - | - | - | - |", text)
         self.assertIn("| [e/gap](https://github.com/e/gap) | fills a gap | learn | 12 (official org) |", text)
@@ -1639,8 +1639,7 @@ class ExamineTests(unittest.TestCase):
 
 
 class ReportFirstTests(Base):
-    """Owner, 2026-10-19: stars relaxed per direction when it has few references; results become a verifiable effect
-    in tiers (strong, mid, weak)."""
+    """Star relaxation remains; project evidence is lightweight and ungraded."""
 
     def test_a_direction_with_few_references_shows_its_rows_down_to_20_then_10(self):
         rows = [("a/reddit-cli", 900, "Reddit CLI"), ("b/reddit-mini", 12, "Reddit CLI"), ("c/reddit-mid", 25, "Reddit app")]
@@ -1671,26 +1670,22 @@ class ReportFirstTests(Base):
         self.assertIn("relaxed: reddit", self.store.card("b/reddit-mini").data["uses"][0]["low_stars"])
         self.assertFalse([w for w in self.store.check()[1] if "b/reddit-mini" in w and "stars" in w])
 
-    def test_links_are_graded_and_the_gate_needs_mid_or_strong(self):
-        from github_scout.store import best_tier, link_tier
-        cases = [("https://b.dev/", "mid"), ("https://www.npmjs.com/package/b", "strong"),
-                 ("https://github.com/a/b/blob/main/shot.png", "mid"), ("https://x.com/a/status/1", "mid"),
-                 ("https://www.bilibili.com/video/BV1", "mid"), ("https://github.com/other/user-of-b", "mid"),
-                 ("https://github.com/a/b#demo", "weak"), ("https://github.com/a/b/tree/main/examples", "weak")]
-        self.assertEqual([link_tier(u, "a/b") for u, _ in cases], [t for _, t in cases])
-        self.assertEqual((best_tier([], "a/b"), best_tier([], "a/b", installs=4200)), ("weak", "strong"))
+    def test_optional_links_do_not_grade_or_gate_recommendations(self):
         self.api.add(repo("a/b", 300, "Tool", pushed=ago(0.1)))
+        self.api.paths["repos/a/b/commits/main"] = {"sha": "c" * 40}
         for take in ("use", "adapt", "learn"):
-            code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", take,
-                                        "--results", "https://github.com/a/b#demo")
-            self.assertIn("a/b shows only text in its own repo", err)
-        code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", "later")
-        self.assertEqual(code, 0, err)                                          # weak: later or skip only
-        code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", "learn",
-                                    "--results", "https://www.bilibili.com/video/BV1")
-        self.assertEqual(code, 0, err)
+            code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", take)
+            self.assertEqual(code, 0, err)
+        for url in ("https://github.com/a/b#examples", "https://no-feedback.invalid/review"):
+            code, _, err = self.run_cli("note", "a/b", "--q", "ops/browser-ops", "--take", "use", "--results", url)
+            self.assertEqual(code, 0, err)
+        out = self.run_cli("show", "a/b")[1]
+        self.assertIn("evidence links (not automatically verified)", out)
+        self.assertNotIn("strong", out)
+        self.assertNotIn("mid:", out)
+        self.assertEqual(self.store.check()[0], [])
 
-    def test_look_grades_the_verifiable_effect(self):
+    def test_look_reports_facts_without_grading_effect(self):
         sha = "c" * 40
         self.api.add({**repo("a/b", 300, "Tool", pushed=ago(0.1)), "homepage": "https://b.dev"})
         self.api.paths["repos/a/b/commits/main"] = {"sha": sha}
@@ -1701,16 +1696,24 @@ class ReportFirstTests(Base):
         self.api.downloads["b-cli"] = 5400
         code, out, _ = self.run_cli("look", "a/b")
         self.assertEqual(code, 0, out)
-        self.assertIn("verifiable effect: strong · live site (homepage) https://b.dev · npm b-cli: 5.4k downloads last "
+        self.assertIn("project evidence (not a quality verdict): · reachable site (homepage) https://b.dev · npm b-cli: 5.4k downloads last "
                       "month https://www.npmjs.com/package/b-cli", out)
-        self.assertIn("  mid: 1 image in the README: https://github.com/a/b/blob/main/docs/shot.png", out)
+        self.assertIn("  project-provided links: 1 image in the README: https://github.com/a/b/blob/main/docs/shot.png", out)
         self.assertIn("  did not answer: https://old.b.dev", out)
         self.assertEqual(self.api.token_hosts, {"api.github.com"})            # sites and npm never get the token
         self.api.sites["https://b.dev"] = 404
         self.api.downloads["b-cli"] = 3
-        self.assertIn("verifiable effect: mid", self.run_cli("look", "a/b")[1])
+        self.assertIn("project-provided links: 1 image", self.run_cli("look", "a/b")[1])
         self.api.paths["repos/a/b/readme"] = "# b\nA tool. ![logo](logo.png)\n"
-        self.assertIn("verifiable effect: weak, only a text description", self.run_cli("look", "a/b")[1])
+        del self.api.downloads["b-cli"]
+        self.assertIn("only the project description found", self.run_cli("look", "a/b")[1])
+        self.api.sites["https://b.dev"] = 200
+        code, out, err = self.run_cli("look", "a/b", "--json")
+        self.assertEqual(code, 0, err)
+        evidence = json.loads(out)[0]["effect"]
+        self.assertEqual(evidence["facts"], [{"what": "reachable site (homepage)", "url": "https://b.dev"}])
+        self.assertEqual(evidence["media"], [])
+        self.assertNotIn("tier", evidence)  # an accessible page cannot become a quality grade
 
 
 class QuickTests(Base):

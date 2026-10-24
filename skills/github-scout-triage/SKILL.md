@@ -1,6 +1,6 @@
 ---
 name: github-scout-triage
-description: Keep the repositories a search found that show a verifiable effect and enough stars, tag them, and say how each would be tried.
+description: Check project claims lightly, keep relevant repositories with enough stars, tag them, and say how each would be tried.
 license: MIT
 metadata:
   improve-repo: JunJayDev/github-scout
@@ -9,9 +9,8 @@ metadata:
 
 # GitHub scout: triage
 
-Stage 3 of `github-scout`. Quality first: a repo goes on the shortlist only when anyone can check
-what it does and it has enough stars. Then tag it, because different kinds are tried and read in
-different ways.
+Stage 3 of `github-scout`. Check what the projects claim, cheaply, and shortlist the ones that
+fit the goal. Independent feedback is checked for the final two or three in `github-scout-brief`.
 
 ## Input
 
@@ -19,15 +18,12 @@ The candidates from `github-scout-search`.
 
 ## Check each candidate
 
-- **Verifiable effect.** Most repos show what they do outside the repo, so look there first, and
-  hold what you find against what good looks like in the question:
-  - **strong:** a live site that answers (the repo's homepage, a demo, app or playground link), a
-    published package with real downloads or an app in a store, real installs (skills.sh);
-  - **mid:** screenshots, GIFs or videos in the README (not badges, logos or icons), posts outside
-    the repo that show it working (X, Bilibili, YouTube, blogs, Xiaohongshu), projects that use it;
-  - **weak:** only a text description, however long the README.
-
-  Weak: `later` (say what would change it) or `skip`, never the shortlist.
+- **Project claims, lightly checked.** Read the README and its examples, screenshots or demo to
+  understand what the project does and spot obvious mismatches with our goal. Do not reproduce
+  benchmarks or exhaustively verify each claim. A page answering only means it is accessible;
+  download counts and links are clues, not proof of quality. Missing demos or external feedback
+  are uncertainties to note, not automatic reasons to reject a repo. Actual output is tried by
+  the coding agent after the report.
 - **Stars:** 50, or the relaxed floor of its direction (20, then 10, when the direction has fewer
   than 5 repos at 50+; the scan header names them). Under the floor, no reference: an exception
   needs a written reason, such as an official organisation's repo released this week.
@@ -47,39 +43,36 @@ The candidates from `github-scout-search`.
 | official docs, hosted service | read the pages that answer a direction; note limits, cost and lock-in; list as another source |
 
 Pick 3 to 8 for the shortlist: repos that could carry the whole goal first, then repos that fill
-a piece. Only repos with a mid or strong effect and enough stars go on it. New and fast-growing
-helped find them; it does not pick them: their effect, stars and fit do.
+a piece. Keep the star and maintenance filters. New and fast-growing helped find them; shortlist by
+fit and what the project appears to deliver. There is no evidence-strength score.
 
 ## With the command line
 
 ```bash
-github-scout look --q <q> owner/repo other/repo                      # facts, activity, kind, verifiable effect; ~1.3k tokens each
+github-scout look --q <q> owner/repo other/repo                      # facts, activity, kind, project evidence; ~1.3k tokens each
 github-scout pick <q> 1 4 7 h2 --rest "<why the rest do not help>"   # numbers from the table, h<#> from the rising list
 github-scout pick <q> owner/repo --low-stars "<why it is an exception>"   # a repo under the star floor
 ```
 
-`look` prints the verifiable effect: its tier, then what to open. It checks with one short
-request whether the homepage and the README's demo links answer, asks npm for a package's
-downloads last month, counts the installs the scan recorded (with `--q`), and lists the images,
-GIFs and videos in the README without badges, logos or icons. Open them before you pick. Posts
-outside the repo it cannot find: search for them (`<repo name>` on X, Bilibili, YouTube) when
-the tier is weak.
+`look` prints project evidence without grading it: reachable sites, package download counts and
+README media links. Review the useful items briefly. These are not independent reviews, even
+when the README links outside GitHub; the brief stage searches for those separately.
 
 Every row you were shown and did not pick is recorded as skipped with your reason. Numbers refer
 to the table printed last (`scan --show --all` numbers hidden rows too). `pick` takes a row shown
 by a relaxed direction as is, and records why; a repo under its floor needs `--low-stars`. Use
-`--later` for promising but not now (a weak effect, too few stars), `--list` for lists to expand.
+`--later` for promising but not now (a poor fit today, too few stars), `--list` for lists to expand.
 After picking, run `github-scout scan <q> --lenses UG`: it follows the owners' stars and the links
 in the picked READMEs, which find nothing before you pick.
 
 ## Without the command line (cloud chat)
 
 Write section 3 of the report:
-- a table of the shortlist: repo URL, kind, verifiable effect (tier and a link to it, or "weak"),
+- a table of the shortlist: repo URL, kind, project evidence (a short observation and link, if available),
   how it would be tried, verdict (shortlist, later, skip), reason;
 - one line on why the rest were left.
 
-A weak repo, or one under the star floor, is `later` or `skip`, not `shortlist`.
+Keep the star and maintenance filters. Missing project evidence alone does not force `later` or `skip`.
 
 This is the only table whose verdicts the local import records.
 

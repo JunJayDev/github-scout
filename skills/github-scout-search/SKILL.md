@@ -34,7 +34,7 @@ The directions from `github-scout-plan`. Without directions, run that stage firs
 - **Read the repo's own page** before you list it. Record its stars and last commit as shown there.
 - A repo describes what it makes, not every use people found for it. So also look at what is
   new and growing fast in the form you need, even when no search word matches it. New and
-  fast-growing is how you find; it does not pick. Picking (triage) goes by verifiable effect,
+  fast-growing is how you find; it does not pick. Picking (triage) goes by fit, project evidence,
   stars and fit; the coding agent's trial settles it later.
 
 ## With the command line

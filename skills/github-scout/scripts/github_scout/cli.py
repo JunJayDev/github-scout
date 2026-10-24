@@ -29,7 +29,7 @@ from .registry import (
     render_find, set_adoption, set_use, show_card, show_question, stage_help, write_index,
 )
 from .store import (
-    HAN, KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, best_tier, env,
+    HAN, KINDS, LEVELS, MODES, REFERENCE_TAKES, SHA, STAGES, TAKES, URL, Store, StoreError, as_list, env,
     lang_gaps, locate, min_stars, parse_langs, question_langs, read_config, stars_of, today,
 )
 
@@ -37,8 +37,8 @@ EPILOG = """stages (one skill each; github-scout runs 1 to 4 and ends with a rep
   1 plan    find, ask, scan --plan       the goal, what good looks like, search directions
   2 search  scan, scan --add/--expand     every lens, merged and ranked; lures, farmed installs and repos under 50 stars
                                           left out (a direction with under 5 at 50+ shows its rows down to 20, then 10)
-  3 triage  pick, look, note              keep repos with a verifiable effect (mid or strong) and enough stars
-  4 brief   write the report, brief       what exists, the 2-3 to try first and how
+  3 triage  pick, look, note              check project claims lightly; keep relevant repos with enough stars
+  4 brief   write the report, brief       independent feedback on the top 2-3, what to try and how
 then the project's coding agent, when the user asks:
   5 dig     note --trial, look --source   try the 2-3, choose one to follow as a whole, fill its gaps with reasons
   6 adopt   adopt                         bring it into the project; updates then watches it
@@ -438,8 +438,8 @@ def cmd_quick(args):
         out.append(f"time limit: {timed} searches were not run ({args.seconds:.0f}s; --seconds N raises it, 0 removes it)")
     if errors:
         out.append(f"errors ({len(errors)}): " + "; ".join(errors[:3]))
-    out.append("next: github-scout look <owner/repo> ... (facts, README, verifiable effect) for the top 2-3; "
-               "if the choice shapes the project, run the full flow: github-scout ask"
+    out.append("next: github-scout look <owner/repo> ... (facts, README, project evidence) for the top 2-3; "
+               "search independent feedback before recommending them; if the choice shapes the project, run the full flow: github-scout ask"
                + (f"   (kept in {keep})" if keep else ""))
     print("\n".join(out))
 
@@ -556,7 +556,7 @@ def cmd_look(args):
             project, qid = store.split_ref(args.q)
             entries.append(_entry(args, p["repo"], project, qid, "peeked", "read" if args.source else "look", None, p))
     store.append_ledger(entries)
-    _out(args, "\n\n".join(texts) + ("\n\nnext: open its verifiable effect, then github-scout note <repo> --q <question> "
+    _out(args, "\n\n".join(texts) + ("\n\nnext: review project claims briefly; search independent feedback before recommending the top 2-3; then github-scout note <repo> --q <question> "
                                      "--take use|adapt|learn|later|skip --results <links> --note \"...\"" if results else ""),
          results)
 
@@ -580,11 +580,8 @@ def pack(path: Path, include: list[str] | None) -> str:
     return f"packed: {out}" + (f" ({total})" if total else "")
 
 
-def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict | None = None) -> str | None:
-    """use, adapt and learn make a repo a reference: it needs a verifiable effect (a mid or strong item) and enough
-    stars, or a written reason for each (owner, 2026-10-18 and 10-19). Enough stars is the threshold, or the relaxed
-    floor of its direction in the question's scans (`row`). Refused before anything is written. Returns the reason
-    the repo counts under the threshold, for the take and the ledger."""
+def _gate(args, slug: str, stars, carded: bool = False, row: dict | None = None) -> str | None:
+    """Keep the star floor for references. Project links and independent feedback are recorded without automatic grading."""
     if args.take not in REFERENCE_TAKES:
         return args.low_stars
     row = row or {}
@@ -601,12 +598,6 @@ def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict
                             + f", under {floor}{' (relaxed for its direction)' if floor < limit else ''}: no reference. Say "
                             "why it is an exception with --low-stars \"<why>\" (an official organisation's new repo, say), "
                             "or note it as later or skip")
-    installs = 0 if is_farmed(row) else int(row.get("installs") or 0)
-    if best_tier(results, slug, installs) == "weak" and not args.no_results:
-        problems.append(f"{slug} shows {'only text in its own repo' if results else 'no verifiable effect on its card'}. "
-                        "Give --results <links to what it does, seen outside its README text: a live site, a package or "
-                        "store page, screenshots, GIFs or videos, posts on X, Bilibili, YouTube, blogs or Xiaohongshu>, "
-                        "or --no-results \"<why it still counts>\"; with only a text description it is later or skip")
     if problems:
         raise StoreError("\n".join(problems))
     return low
@@ -615,7 +606,7 @@ def _gate(args, slug: str, stars, results: list, carded: bool = False, row: dict
 def _links(items: list[str] | None) -> list[str]:
     bad = [x for x in items or [] if not URL.match(x)]
     if bad:
-        raise StoreError(f"--results takes links (http or https) to its verifiable effect: {', '.join(bad)}")
+        raise StoreError(f"--results takes links (http or https) to project evidence or feedback: {', '.join(bad)}")
     return list(dict.fromkeys(items or []))
 
 
@@ -633,8 +624,7 @@ def cmd_note(args):
         return use, {k: v for k, v in (("low_stars", low), ("no_results", args.no_results)) if v}
 
     if card:
-        low = _gate(args, card.id, card.data.get("stars"), [*map(str, as_list(card.data.get("results"))), *results], True,
-                    row)
+        low = _gate(args, card.id, card.data.get("stars"), carded=True, row=row)
         use, extra = take(low)
         set_use(store, card.id, use, level)
         if results:
@@ -661,7 +651,7 @@ def cmd_note(args):
         return
     client = make_client(args, store)
     meta = peek(client, slug, 0, effect=False)
-    low = _gate(args, meta["repo"], meta.get("stars"), results, row=row or scan_row(store, project, qid, meta["repo"]))
+    low = _gate(args, meta["repo"], meta.get("stars"), row=row or scan_row(store, project, qid, meta["repo"]))
     use, extra = take(low)
     kind = args.kind or meta["kind"]
     doc = new_card(store, meta, kind, meta["form"], [{k: v for k, v in use.items() if v}], args.watch or [],
@@ -673,7 +663,7 @@ def cmd_note(args):
     store.append_ledger([{**_entry(args, meta["repo"], project, qid, "card", level or "read",
                                    f"{args.take}: {args.note or ''}", meta), **extra}])
     print(f"{doc.path}\nkind {kind} ({meta['form']}; {'; '.join(meta['evidence'])})\n"
-          "fill the card (the idea, then its verifiable effect and any trial), list upstream paths we depend on under "
+          "fill the card (the idea, project evidence, independent feedback and any trial), list upstream paths we depend on under "
           "watch:, then write the report in the question file and run github-scout check")
 
 
@@ -920,7 +910,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("pick", cmd_pick, "record verdicts on scan rows: numbers from the table, or owner/repo")
     p.add_argument("ref")
-    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look: a verifiable effect and 50+ stars, or the "
+    p.add_argument("items", nargs="*", metavar="ITEM", help="worth a look: relevant and 50+ stars, or the "
                    "relaxed floor of its direction (the scan header names them)")
     p.add_argument("--low-stars", metavar="REASON", help="shortlist items under the star floor anyway, with this "
                    "reason (an official organisation's new repo, say); it goes into the ledger")
@@ -931,7 +921,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rest", metavar="REASON", help="skip every other row shown, with this reason")
     p.add_argument("--top", type=int, default=40, help="rows --rest covers (default 40)")
 
-    p = add("look", cmd_look, "look at repos: facts, activity, kind, verifiable effect (strong, mid or weak), tree, "
+    p = add("look", cmd_look, "look at repos: facts, activity, kind, project evidence, tree, "
             "README start; --source reads the code", (common, js))
     p.add_argument("repos", nargs="+")
     p.add_argument("--q", help="<project>/<question>: record that we looked; its scans give relaxed floors and installs")
@@ -942,14 +932,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--include", nargs="+", metavar="GLOB", help="with --pack: only these paths")
 
     p = add("note", cmd_note, "record what we take from a repo; creates or updates its card. use, adapt and learn need "
-            "a verifiable effect (mid or strong) and 50+ stars (or the relaxed floor of its direction), or a written reason")
+            "50+ stars (or the relaxed floor of its direction), or a written reason")
     p.add_argument("repo")
     p.add_argument("--q", required=True, help="<project>/<question>")
     p.add_argument("--take", required=True, choices=TAKES)
-    p.add_argument("--results", nargs="+", metavar="URL", help="links to its verifiable effect: a live site, a package or "
-                   "store page, screenshots, GIFs or videos, posts on X, Bilibili, YouTube, blogs, Xiaohongshu; added to "
-                   "the card. Text pages in the repo itself are weak and do not count")
-    p.add_argument("--no-results", metavar="REASON", help="why it is a reference without a verifiable effect")
+    p.add_argument("--results", nargs="+", metavar="URL", help="optional project evidence or independent feedback links; "
+                   "added to the card without grading their quality")
+    p.add_argument("--no-results", metavar="REASON", help="optional context about missing evidence (legacy field; no exception is required)")
     p.add_argument("--low-stars", metavar="REASON", help="why it is a reference under the star threshold")
     p.add_argument("--trial", metavar="TEXT", help="what we ran and what came out; written into the card, level trial")
     p.add_argument("--note", help="one line: what we take, or why not")

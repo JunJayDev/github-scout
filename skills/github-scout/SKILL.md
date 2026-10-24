@@ -10,8 +10,8 @@ metadata:
 # GitHub scout
 
 Before building something, look at what others have built. This skill takes a goal from the
-user's project, searches GitHub in English and Chinese, keeps the repositories whose effect
-anyone can check, and writes a report for the coding agent: what exists, which two or three look
+user's project, searches GitHub in English and Chinese, checks project claims lightly, independently searches feedback on the top two or three,
+and writes a report for the coding agent: what exists, which two or three look
 most promising for us and how to try each, and what is likely left to build. It never changes
 the project, and it does not try repositories or choose one.
 
@@ -21,9 +21,10 @@ gaps from others with a reason each, then brings it in (stage 6, `github-scout-a
 registry records which repo went where, so `updates` can say when upstream changes the files we
 took.
 
-Effect comes first. A repo is a reference only when it shows what it does in a way anyone can
-check (a live site, a package people download, screenshots, videos, posts outside the repo) and
-has 50 stars or more, or the relaxed floor of its direction. An idea from each of a dozen repos
+Review the README, examples and any demo briefly for obvious mismatches. Before recommending
+the top two or three, search outside the repo for independent use, reviews and outputs; record
+what you found or that no independent feedback was found. Missing feedback is not a rejection.
+A reference needs 50 stars or more, or the relaxed floor of its direction. An idea from each of a dozen repos
 does not add up to a working whole: the coding agent follows one.
 
 ## What the user must give
@@ -55,8 +56,8 @@ report.
 |---|---|---|---|
 | 1 plan | `github-scout-plan` | reads our project, restates the goal, says what good looks like, picks the stage, writes search directions in English and Chinese | the question with its directions |
 | 2 search | `github-scout-search` | searches along every direction; drops lures, farmed installs, dead repos and those with too few stars | ranked candidates |
-| 3 triage | `github-scout-triage` | keeps the candidates with a verifiable effect and enough stars; says how each would be tried | a shortlist |
-| 4 brief | `github-scout-brief` | compares with our project; writes what exists, the two or three to try first and how, what is left to build | the report for the coding agent |
+| 3 triage | `github-scout-triage` | checks project claims lightly and keeps relevant candidates with enough stars; says how each would be tried | a shortlist |
+| 4 brief | `github-scout-brief` | checks independent feedback on the top two or three; compares with our project and writes the report | the report for the coding agent |
 | 5 dig | `github-scout-dig` | the coding agent tries the two or three, stops early on a dead end, chooses one to follow and names what fills its gaps | trials; the choice |
 | 6 adopt | `github-scout-adopt` | the coding agent brings it into our project by its rules, and records it | the change in our project; an `adopted` entry on each card |
 
@@ -84,10 +85,15 @@ report.
   that names them. Never invent names, stars or dates.
 - Search every direction in English and in Chinese, with the words each community uses, and in
   any other language the user's audience needs.
-- Judge the verifiable effect before code. **Strong:** a live site that answers, a package with
-  real downloads, real installs. **Mid:** screenshots, GIFs or videos in the README, posts outside
-  the repo (X, Bilibili, YouTube, blogs, Xiaohongshu). **Weak:** only a text description. A weak
-  repo is `later` or `skip`, however good its idea.
+- Check project claims lightly: read the README, examples, screenshots or demo, and note obvious
+  mismatches. A reachable page only means accessible; links and download counts do not prove
+  quality. Do not grade evidence or reject a repo just for lacking a demo or external feedback.
+- Before recommending the top two or three, make one focused independent search per repo, in
+  English and Chinese. Look for real use, recommendations, concrete outputs and problems. Open
+  relevant sources and distinguish them from author promotion or repeated copies of it. Record
+  a short finding with source links, or "no independent usage feedback found". If search is
+  unavailable, say "not checked". Use x-scout for X when available; otherwise note the X access
+  limit and use other sources. Full steps: `github-scout-brief`.
 - Stars: 50 by default. A direction (one entity or mechanism group) with fewer than 5 such repos
   shows its own repos down to 20 stars, then 10, never lower; the scan header says which
   directions were relaxed. Under the floor a repo is no reference unless you write why (an
@@ -129,8 +135,8 @@ skills sit next to this folder and use the same command.
 | `quick "need" -e … -m … -p … [--form F]` | 1 to 3 | a one-off lookup: no registry, one short table |
 | `scan P/Q --add FILE\|URL` / `--expand LIST` | 2 | add links found elsewhere / expand an awesome list |
 | `pick P/Q 1 4 h2 --rest "why"` | 3 | verdicts on table rows; under the star floor needs `--low-stars "why"` |
-| `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and the verifiable effect (tier and links) / download one commit and map the code |
-| `note a/b --q P/Q --take T --results URL…` | 3, 4 | the repo's card: its verifiable effect, what it would do for us; `--trial "…"` records a trial (5) |
+| `look --q P/Q a/b [--source]` | 3 / 5 | facts, activity, kind and project evidence (facts and links) / download one commit and map the code |
+| `note a/b --q P/Q --take T --results URL…` | 3, 4 | the repo's card: project evidence, independent feedback and what it would do for us; `--trial "…"` records a trial (5) |
 | `brief P/Q` | 4 | write the report for the coding agent |
 | `adopt a/b --q P/Q --mode M --into PATHS` | 6 | record what came into the project from where; `updates` then watches it |
 | `import REPORT --q P/Q` | any | take over a report from a cloud chat; every link is checked |

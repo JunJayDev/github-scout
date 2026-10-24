@@ -28,10 +28,19 @@ Give it to your cheapest capable model and keep only its short answer in your ow
    means a guess.
 4. **Look at the two or three rows that fit the need,** not blindly the first three: skip a word that
    matches in another sense (`geo` is also geography; a README beautifier matches `readme`).
-   `github-scout look <owner/repo> …` gives facts, activity, the verifiable effect and the start of
+   `github-scout look <owner/repo> …` gives facts, activity, project evidence and the start of
    the README. No registry is needed.
-5. **Answer** with those two or three: stars, last push, one line on what each does for the need,
-   and the one risk that matters. Say what the lookup did not cover.
+5. **Before recommending those two or three, search independent feedback.** Make one focused
+   search per repo outside its repository in English and Chinese, using its exact name or
+   `owner/repo` with usage, review, output or problem terms. Open relevant hits and confirm the
+   identity. Look for real use, third-party recommendations, concrete outputs and problems;
+   author promotion, reposts and directory listings alone do not count. Use x-scout for X when
+   available; otherwise state the access limit and use other sources. Say "no independent usage
+   feedback found" when nothing turns up, or "not checked" when tools were unavailable. Neither
+   alone disqualifies a repo. Keep this bounded to the recommendations.
+6. **Answer** with those two or three: stars, last push, one line on what each does for the need,
+   the independent feedback with links (or none found), and the one risk that matters. Say what
+   the lookup did not cover. This check is done by the agent; the CLI table alone does not do it.
 
 ## Reading the table
 

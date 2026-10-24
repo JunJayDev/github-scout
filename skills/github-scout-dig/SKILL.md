@@ -16,7 +16,7 @@ repo that does not run for us is not followed, however good its idea.
 ## Input
 
 The report from `github-scout brief <q>`: what good looks like, the two or three under Try first
-with how to try each and what to look for, and the facts on each (stars, verifiable effect, the
+with how to try each and what to look for, and the facts on each (stars, project evidence, independent feedback, the
 reviewed commit). The project's own AGENTS.md or CLAUDE.md and its conventions win over the
 report.
 
