@@ -1,6 +1,6 @@
 ---
 name: github-scout-brief
-description: Write the report for your coding agent: what exists, the two or three to try first and how, without changing the project.
+description: "Write the report for your coding agent: what exists, the two or three to try first and how, without changing the project."
 license: MIT
 ---
 

@@ -20,6 +20,11 @@ class SkillFormatTests(unittest.TestCase):
             m = re.match(r"---\n(.*?)\n---\n", text, re.S)
             self.assertIsNotNone(m, path)
             fields = dict(re.findall(r"^(\w[\w-]*): (.*)$", m.group(1), re.M))
+            quoted = re.search(r'^description: ".*"$', m.group(1), re.M)
+            if quoted:
+                fields["description"] = fields["description"][1:-1]
+            else:
+                self.assertNotIn(": ", fields.get("description", ""), f"{path}: a colon in an unquoted description is invalid YAML; quote it")
             self.assertEqual(fields.get("name"), path.parent.name, path)
             self.assertTrue(20 <= len(fields.get("description", "")) <= 160, path)   # short: called on purpose
             self.assertEqual(fields.get("license"), "MIT", path)

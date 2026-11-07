@@ -6,6 +6,43 @@
 
 [![CI](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+编码 Agent 常常还没查有没有现成的，就动手自己写。`github-scout` 让它先查：读你的项目，用中英文搜 GitHub，然后交给 Agent 一份简短报告，写明已经有什么、最值得先试的两三个项目，以及每个怎么试。它不会改动你的项目。
+
+适合用 Claude Code、Codex 或其他支持 skill 的 Agent 写代码的人。也可以在命令行里手动运行，或者把一个文件上传到 ChatGPT、Claude 网页版直接用。
+
+## 输出示例
+
+问题取自[完整示例](skills/github-scout/references/workflow.md)：用脚本通过已登录的 Chrome 读写 Reddit、X 和小红书，不让模型去点页面。Agent 搜「social media automation」时，漏掉了正好解决这件事的 3 万星项目。下面这次检索跑于 2026-11-07（141 条检索，约 7 分钟），它排在 Agent 读到的表格第 4 行：
+
+```text
+scan demo/browser-ops 20261107-121044: 141 searches, 1250 repos
+…
+  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics
+  1.  15.0 109.7k  26-02 26-11-06  Panniantong/Agent-Reach  Give your AI agent eyes to see the entire internet. Read & search Twitter, Reddit, YouTube  [EPMTR] fit 5
+  2.  14.8   3.7k  26-03 26-11-06  whiteguo233/OpenBiliClaw  本地私有、开源的自进化跨平台 AI 内容发现 Agent：先理解你，再主动从 B站、小红书、抖音、YouTube、X、知乎、Reddit、微博等平台与开放 Web 寻找内容。（支持  [EPMCTRK] fit 5
+  3.  14.6   4.5k  26-08 26-11-02  ZJU-REAL/Easel  An open-source AI agent for social media — discover trends, create content, publish everyw  [EPR] fit 4
+  4.  14.4  30.9k  26-03 26-11-05  jackwener/OpenCLI  Make Any Website into CLI & Use your logged-in browser by AI agent.   [PMCRS] fit 3 installs 20.5k
+  5.  13.3  18.9k  26-04 26-11-07  browser-use/browser-harness  Let Claude Code, Codex or Cursor use your real Chrome, logged in as you. One prompt to set  [MTRS] fit 3 installs 864
+  6.  13.2    114  26-08 26-08-23  woniu9524/open-web-bridge  Drive your real Chrome from any AI agent — logged-in sessions, real fingerprint, live tabs  [TS] fit 4 installs 9
+…
+```
+
+接着 Agent 用 `look` 细看有希望的几行：
+
+```text
+$ github-scout look jackwener/OpenCLI
+## jackwener/OpenCLI  (software: cli?)  https://github.com/jackwener/OpenCLI
+Make Any Website into CLI & Use your logged-in browser by AI agent.
+stars 30941 · forks 3033 · issues 288 · created 2026-03-14 · pushed 2026-11-05 · JavaScript
+head main@36bbbd7f60bd · release v2.0.2 2026-10-20
+maintenance: active · 94 commits in 30 days · 5 releases in 90 days · 10+ contributors, top one 77% of commits
+…
+verifiable effect: strong · live site (homepage) https://opencli.info/ · npm @jackwener/opencli: 165.2k downloads last month https://www.npmjs.com/package/@jackwener/opencli
+…
+```
+
+最后写出报告：已经有什么、最值得先试的两三个及各自怎么试、大概还要自己写哪些。这个问题的报告样例见[完整示例](skills/github-scout/references/workflow.md)第 5 节。想自己跑出这张表，见[不用 Agent，手动试一次](#不用-agent手动试一次)。
+
 ## 工作方式
 
 收到目标后，`github-scout` 会先读取你的当前项目，了解现有代码和不足之处。随后将目标转化为具体的结果描述，明确达标标准，确定项目所处阶段，并规划中英文检索方向，然后暂停等待你确认。
@@ -15,6 +52,8 @@
 `github-scout` 不运行候选项目的代码，也不修改你的项目。你提出要求后，由编码 Agent 接手报告：在隔离环境中试跑这两三个候选，选定一个整体跟进，其余仓库只用来补它的缺口且每处写明理由，再按项目规范落地。每次落地都会在本地登记库中记录文件与提交来源，方便后续跟踪上游更新。
 
 ## 快速开始
+
+需要 Python 3.9+ 和 GitHub 访问权限：运行一次 `gh auth login`，或者设置 `GITHUB_TOKEN`。
 
 ### 安装
 
@@ -33,13 +72,21 @@ npx skills add JunJayDev/github-scout -g
 /plugin install github-scout@github-scout
 ```
 
-命令行工具需要 Python 3.9+ 以及已登录的 `gh` CLI（或配置 `GITHUB_TOKEN`），无任何第三方 Python 依赖。首次提问时会自动在 `~/.github-scout` 创建本地登记库。
+Skill 自带一份命令行工具（只用 Python 标准库），Agent 不需要另外安装。首次提问时会自动在 `~/.github-scout` 创建本地登记库。
+
+想在终端里自己运行命令（下面的手动试用、`import`、`updates`），再把 `github-scout` 装到 PATH：
+
+```bash
+pipx install git+https://github.com/JunJayDev/github-scout   # 或：uv tool install git+https://github.com/JunJayDev/github-scout
+```
 
 ### 使用
 
 在项目仓库目录下启动 Agent，直接描述你想要的结果：
 
 > 用 github-scout：让我们 agent 渲染的产品宣传片，剪辑和动效像专业剪辑师做的。
+
+一次运行分三段：你确认检索方案，检索 5 到 15 分钟，报告存进 `~/.github-scout/projects/<项目>/briefs/`。
 
 1. **确认方案。** Agent 先读取项目代码，提出达标标准与中英文检索方向，并停下来等你确认。
 2. **生成报告。** 确认后，Agent 执行检索，保留效果可验证且星数达标的仓库，写出报告：候选列表、最值得先试的两三个及各自的试法、检索覆盖范围。你的项目不会被改动。
@@ -56,6 +103,33 @@ github-scout import report.md --q <project>/<question>
 ```
 
 `import` 会通过 GitHub API 核验报告中的每一个链接，并保存候选仓库、笔记与结论。
+
+### 不用 Agent，手动试一次
+
+想看看 Agent 拿到的是什么，可以自己跑一次检索。先把 `github-scout` 装到 PATH（见上面的安装），然后创建一个问题：
+
+```bash
+github-scout ask demo/browser-ops "Read and post on Reddit, X and Xiaohongshu from scripts through my logged-in Chrome, with no model clicking pages" --stage working
+```
+
+`ask` 会打印问题文件的路径。打开它，把开头四个空列表换成检索词（用 skill 时由 Agent 来写）：
+
+```yaml
+entities: ["reddit", "xiaohongshu|小红书|rednote|xhs", "twitter|x.com|推特", "bilibili|B站|哔哩哔哩", "zhihu|知乎"]
+mechanisms: ["logged-in browser|登录态", "chrome extension|浏览器插件|Chrome 插件", "browser cookies", "CDP", "browser automation|浏览器自动化"]
+forms: [cli, mcp, skill]
+problems: ["social media automation", "自媒体 自动化", "website to cli"]
+```
+
+然后运行检索，再细看其中一行：
+
+```bash
+github-scout scan demo/browser-ops --plan   # 列出要跑的检索，不联网
+github-scout scan demo/browser-ops          # 约 7 分钟，输出类似上面的排序表（仓库在变，排名会变）
+github-scout look jackwener/OpenCLI         # 活跃度、类型、可验证效果、README 开头
+```
+
+之后的步骤和 Agent 一样：`pick` 给表里的行记结论，`note` 记下每个仓库对你有什么用，`brief` 写出报告。完整步骤见 [`workflow.md`](skills/github-scout/references/workflow.md)。
 
 ## 六个阶段
 
