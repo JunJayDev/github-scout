@@ -125,7 +125,7 @@ Then run the search and look at a row up close:
 
 ```bash
 github-scout scan demo/browser-ops --plan   # list the searches; no network
-github-scout scan demo/browser-ops          # about 7 minutes; prints a table like the one above (rows shift as repos change)
+github-scout scan demo/browser-ops          # 6 to 9 minutes; prints a table like the one above (rows shift as repos change)
 github-scout look jackwener/OpenCLI         # activity, kind, verifiable effect, README start
 ```
 

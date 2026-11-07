@@ -125,7 +125,7 @@ problems: ["social media automation", "自媒体 自动化", "website to cli"]
 
 ```bash
 github-scout scan demo/browser-ops --plan   # 列出要跑的检索，不联网
-github-scout scan demo/browser-ops          # 约 7 分钟，输出类似上面的排序表（仓库在变，排名会变）
+github-scout scan demo/browser-ops          # 6 到 9 分钟，输出类似上面的排序表（仓库在变，排名会变）
 github-scout look jackwener/OpenCLI         # 活跃度、类型、可验证效果、README 开头
 ```
 
