@@ -366,6 +366,15 @@ class FlowTests(Base):
     def rows(self, out):
         return [ln for ln in out.splitlines() if ln.strip()[:3].strip().rstrip(".").isdigit()]
 
+    def test_scan_without_a_token_says_so_first(self):
+        self.seed()
+        cli.make_client = lambda args, store=None: client(self.api, token="")
+        code, _, err = self.run_cli("scan", "ops/browser-ops", "--quiet")
+        self.assertEqual(code, 0, err)
+        self.assertIn("no GitHub token", err)
+        cli.make_client = lambda args, store=None: client(self.api)
+        self.assertNotIn("no GitHub token", self.run_cli("scan", "ops/browser-ops", "--quiet")[2])   # a token is quiet
+
     def test_full_loop(self):
         self.seed()
         code, out, _ = self.run_cli("scan", "ops/browser-ops", "--quiet")

@@ -1,6 +1,6 @@
 ---
 name: github-scout-adopt
-description: For the coding agent: bring the chosen repo into your project as a whole, and what fills its gaps, by its rules; record where.
+description: "For the coding agent: bring the chosen repo into your project as a whole, and what fills its gaps, by its rules; record where."
 license: MIT
 ---
 

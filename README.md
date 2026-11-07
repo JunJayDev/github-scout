@@ -6,6 +6,43 @@ GitHub research for coding agents: find proven open-source projects to try befor
 
 [![CI](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml/badge.svg)](https://github.com/JunJayDev/github-scout/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+Coding agents start writing before they check whether someone already built the thing. `github-scout` makes yours look first. It reads your project, searches GitHub in English and Chinese, and hands your agent a short report: what already exists, the two or three projects worth trying first, and how to try each. It never changes your project.
+
+It is for people who build with Claude Code, Codex or another agent that runs skills. You can also run it by hand from the command line, or in ChatGPT or Claude on the web with one uploaded file.
+
+## What you get
+
+The question from the [worked example](skills/github-scout/references/workflow.md): read and post on Reddit, X and Xiaohongshu from scripts through a logged-in Chrome, with no model clicking pages. Agents that searched for "social media automation" missed the 30k-star tool that does it. This scan ran on 2026-11-07 (141 searches, about 7 minutes) and puts it on row 4 of the table your agent reads:
+
+```text
+scan demo/browser-ops 20261107-121044: 141 searches, 1250 repos
+…
+  #  score  stars created   pushed  repo  description  [lenses] fit = vocabulary groups in its own name/description/topics
+  1.  15.0 109.7k  26-02 26-11-06  Panniantong/Agent-Reach  Give your AI agent eyes to see the entire internet. Read & search Twitter, Reddit, YouTube  [EPMTR] fit 5
+  2.  14.8   3.7k  26-03 26-11-06  whiteguo233/OpenBiliClaw  本地私有、开源的自进化跨平台 AI 内容发现 Agent：先理解你，再主动从 B站、小红书、抖音、YouTube、X、知乎、Reddit、微博等平台与开放 Web 寻找内容。（支持  [EPMCTRK] fit 5
+  3.  14.6   4.5k  26-08 26-11-02  ZJU-REAL/Easel  An open-source AI agent for social media — discover trends, create content, publish everyw  [EPR] fit 4
+  4.  14.4  30.9k  26-03 26-11-05  jackwener/OpenCLI  Make Any Website into CLI & Use your logged-in browser by AI agent.   [PMCRS] fit 3 installs 20.5k
+  5.  13.3  18.9k  26-04 26-11-07  browser-use/browser-harness  Let Claude Code, Codex or Cursor use your real Chrome, logged in as you. One prompt to set  [MTRS] fit 3 installs 864
+  6.  13.2    114  26-08 26-08-23  woniu9524/open-web-bridge  Drive your real Chrome from any AI agent — logged-in sessions, real fingerprint, live tabs  [TS] fit 4 installs 9
+…
+```
+
+Your agent then opens the promising rows with `look`:
+
+```text
+$ github-scout look jackwener/OpenCLI
+## jackwener/OpenCLI  (software: cli?)  https://github.com/jackwener/OpenCLI
+Make Any Website into CLI & Use your logged-in browser by AI agent.
+stars 30941 · forks 3033 · issues 288 · created 2026-03-14 · pushed 2026-11-05 · JavaScript
+head main@36bbbd7f60bd · release v2.0.2 2026-10-20
+maintenance: active · 94 commits in 30 days · 5 releases in 90 days · 10+ contributors, top one 77% of commits
+…
+verifiable effect: strong · live site (homepage) https://opencli.info/ · npm @jackwener/opencli: 165.2k downloads last month https://www.npmjs.com/package/@jackwener/opencli
+…
+```
+
+and writes the report: what exists, the two or three to try first and how to try each, and what is likely left to build. Section 5 of the [worked example](skills/github-scout/references/workflow.md) shows a report for this question. To get this table yourself, see [Try it by hand](#try-it-by-hand).
+
 ## How it works
 
 When you give your agent a goal, `github-scout` reads your project first to see what you already have and where it falls short. It restates the goal as a concrete outcome, defines what good looks like, sets the project stage, and plans search directions in English and Chinese. Then it pauses for you to confirm the plan.
@@ -15,6 +52,8 @@ After you confirm, it searches GitHub and package directories in both languages 
 `github-scout` never runs candidate code and never modifies your repository. When you ask, your coding agent takes the report from there: it tries the two or three in an isolated environment, chooses one to follow as a whole, fills its gaps from other repositories with a stated reason for each, and adopts it under your project's rules. Each adoption records file and commit provenance in a local registry so you can track upstream updates.
 
 ## Quick start
+
+You need Python 3.9+ and GitHub access: run `gh auth login` once, or set `GITHUB_TOKEN`.
 
 ### Install
 
@@ -33,13 +72,21 @@ In Claude Code, you can also install via the plugin marketplace:
 /plugin install github-scout@github-scout
 ```
 
-The CLI requires Python 3.9+ and a logged-in `gh` CLI (or `GITHUB_TOKEN`). It has no external Python dependencies. Your first question automatically initializes the local registry in `~/.github-scout`.
+The skills bring their own copy of the CLI (standard library only), so your agent needs nothing else. Your first question creates the local registry in `~/.github-scout`.
+
+To run the commands yourself (the walkthrough below, `import`, `updates`), put `github-scout` on your PATH:
+
+```bash
+pipx install git+https://github.com/JunJayDev/github-scout   # or: uv tool install git+https://github.com/JunJayDev/github-scout
+```
 
 ### Use
 
 Open your agent inside your project repository and state the outcome you want:
 
 > Use github-scout: make the product videos our agent renders cut and move like an editor's.
+
+A run has three parts: a plan you confirm, a search of 5 to 15 minutes, and a report saved in `~/.github-scout/projects/<project>/briefs/`.
 
 1. **Confirm the plan.** The agent inspects your codebase, proposes what good looks like along with English and Chinese search directions, and stops for your confirmation.
 2. **Get the report.** Once confirmed, it runs the searches, keeps candidates with a verifiable effect and enough stars, and writes a report: the candidates, the two or three to try first with how to try each, and what was searched. Your project is not changed.
@@ -56,6 +103,33 @@ github-scout import report.md --q <project>/<question>
 ```
 
 `import` checks every GitHub link against the API and saves the candidates, notes, and verdicts.
+
+### Try it by hand
+
+To see what your agent sees, run one search yourself. With `github-scout` on your PATH (see Install), start a question:
+
+```bash
+github-scout ask demo/browser-ops "Read and post on Reddit, X and Xiaohongshu from scripts through my logged-in Chrome, with no model clicking pages" --stage working
+```
+
+`ask` prints the path of a question file. Open it and replace the four empty lists at the top with the search words (your agent writes these when it runs the skill):
+
+```yaml
+entities: ["reddit", "xiaohongshu|小红书|rednote|xhs", "twitter|x.com|推特", "bilibili|B站|哔哩哔哩", "zhihu|知乎"]
+mechanisms: ["logged-in browser|登录态", "chrome extension|浏览器插件|Chrome 插件", "browser cookies", "CDP", "browser automation|浏览器自动化"]
+forms: [cli, mcp, skill]
+problems: ["social media automation", "自媒体 自动化", "website to cli"]
+```
+
+Then run the search and look at a row up close:
+
+```bash
+github-scout scan demo/browser-ops --plan   # list the searches; no network
+github-scout scan demo/browser-ops          # 6 to 9 minutes; prints a table like the one above (rows shift as repos change)
+github-scout look jackwener/OpenCLI         # activity, kind, verifiable effect, README start
+```
+
+From here the skill goes on as your agent would: `pick` records verdicts on rows, `note` keeps what each repo would do for you, and `brief` writes the report. The steps are in [`workflow.md`](skills/github-scout/references/workflow.md).
 
 ## Six stages
 

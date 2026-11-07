@@ -195,6 +195,13 @@ Renamed from reuse-first to github-scout, and split by stage.
 - Only scan files are read from a question's scan folder; other files may sit beside them.
 - Registries, variables and config files from before the rename are still read.
 - `README.zh-CN.md`, `AGENTS.md`, `.codex-plugin/plugin.json`, `evals/evals.json` (recall cases).
+- First run (2026-11-07). `npx skills add JunJayDev/github-scout` installed 4 of the 7 skills: the
+  descriptions of adopt, brief and dig had an unquoted colon, which is invalid YAML, so the
+  installer skipped them. They are quoted now, and a test fails on an unquoted colon. `scan`
+  without a GitHub token says so before it starts (anonymous search is slower and has no code
+  search) instead of only listing 401 errors at the end. Both READMEs open with what the tool is
+  for, a real scan table and `look` output, how to put `github-scout` on PATH, and a by-hand
+  walkthrough that reproduces the table.
 
 ## 0.1.0 (unreleased)
 

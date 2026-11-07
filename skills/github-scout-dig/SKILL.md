@@ -1,6 +1,6 @@
 ---
 name: github-scout-dig
-description: For the coding agent: try the report's two or three repos, stop early on dead ends, choose one to follow, fill gaps with reasons.
+description: "For the coding agent: try the report's two or three repos, stop early on dead ends, choose one to follow, fill gaps with reasons."
 license: MIT
 ---
 

@@ -296,6 +296,9 @@ def cmd_scan(args):
         if gaps and not (args.add or args.expand):
             print("\n".join(gaps), file=sys.stderr)
         client = make_client(args, store)
+        if not client.token:
+            print("warn  no GitHub token: searches run anonymously, slower and without code search "
+                  "(run `gh auth login` or set GITHUB_TOKEN)", file=sys.stderr)
         sc = Scan(store, client, q, progress=not args.quiet)
         if args.add or args.expand:
             if args.add:
